@@ -29,7 +29,9 @@ start_precmd="openchronology_prestart"
 
 openchronology_prestart()
 {
-	install -d -o openchronology -g openchronology -m 0755 /var/run/openchronology
+	# Root's: in a folder of the service's user, it could replace daemon(8)'s pidfile and have
+	# stop signal another process.
+	install -d -o root -g wheel -m 0755 /var/run/openchronology
 }
 
 run_rc_command "$1"

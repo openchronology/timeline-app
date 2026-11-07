@@ -3,7 +3,9 @@
 # Sets up OpenChronology after Homebrew installs it (#116), as the other packages' setup does:
 # the configuration, PostgreSQL @PG_MAJOR@ (started with brew services when it is not running),
 # the database with pgmp, the migration and the openchronology-server service. Homebrew's
-# PostgreSQL runs as you, so the server does too. An installation that has its configuration
+# PostgreSQL runs as you, so the server does too; it connects to the database as the
+# openchronology role, which owns it but is not a superuser as you are there, as the other
+# packages' servers do. An installation that has its configuration
 # and database already (an upgrade) is left alone, with advice. Safe to run again.
 # Usage: openchronology-setup
 set -e
@@ -32,9 +34,8 @@ new_config() {
   mv "$1.new" "$1"
 }
 key=$(od -An -tx1 -N32 /dev/urandom | tr -d ' \n')
-user=$(id -un)
 new_config "$CONFIG" \
-  "s|^AUTH_ENCRYPTION_KEY=\$|AUTH_ENCRYPTION_KEY=$key|; s|^DATABASE_URL=.*|DATABASE_URL=postgresql://$user@/openchronology?host=/tmp|" \
+  "s|^AUTH_ENCRYPTION_KEY=\$|AUTH_ENCRYPTION_KEY=$key|; s|^DATABASE_URL=.*|DATABASE_URL=postgresql://openchronology@/openchronology?host=/tmp|" \
   "$EXAMPLES/openchronology.env.example"
 new_config "$CONFIG_DIR/syslog.env" "" "$EXAMPLES/syslog.env.example"
 
@@ -111,9 +112,14 @@ See $DOCS.
 MSG
   exit 1
 fi
-if [ -z "$(pg postgres "SELECT 1 FROM pg_database WHERE datname='openchronology'")" ]; then
-  "$PG/createdb" -h /tmp openchronology
+# The server's role: it owns the database, and migrates it, without a superuser's rights.
+if [ -z "$(pg postgres "SELECT 1 FROM pg_roles WHERE rolname='openchronology'")" ]; then
+  pg postgres 'CREATE ROLE openchronology LOGIN'
 fi
+if [ -z "$(pg postgres "SELECT 1 FROM pg_database WHERE datname='openchronology'")" ]; then
+  "$PG/createdb" -h /tmp -O openchronology openchronology
+fi
+# pgmp is not a trusted extension: you, the superuser, create it once for the server's role.
 pg openchronology 'CREATE EXTENSION IF NOT EXISTS pgmp'
 "$PREFIX/bin/openchronology-migrate" --no-restart
 "$BREW" services restart openchronology-server >/dev/null

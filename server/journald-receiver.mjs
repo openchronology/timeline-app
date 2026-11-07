@@ -124,8 +124,9 @@ export class JournaldIngest extends MomentIngest {
 /**
  * The journalctl command following the journal from `cursor` (or, on a first run, from
  * `since`): on this machine, or on `host` over SSH (with `sshKey`, and `knownHosts` for the
- * hosts it has seen: a host's key is accepted the first time and checked after). `units`
- * and `matches` narrow it as `journalctl -u` and `FIELD=value` arguments do.
+ * hosts it has seen: a host's key is accepted the first time and checked after; or, with
+ * `strictHostKeys`, the operator's own known hosts, which must list the host's key already).
+ * `units` and `matches` narrow it as `journalctl -u` and `FIELD=value` arguments do.
  * @returns {[string, string[]]} the program and its arguments, for spawn (no local shell)
  */
 export function journalCommand({
@@ -137,6 +138,7 @@ export function journalCommand({
   cursor = null,
   sshKey = null,
   knownHosts = null,
+  strictHostKeys = false,
 }) {
   const args = [
     '--follow',
@@ -158,7 +160,12 @@ export function journalCommand({
       // A service has no home: its key and the hosts it has seen are configured paths.
       ...(sshKey ? ['-i', sshKey] : []),
       ...(knownHosts
-        ? ['-o', 'StrictHostKeyChecking=accept-new', '-o', `UserKnownHostsFile=${knownHosts}`]
+        ? [
+            '-o',
+            `StrictHostKeyChecking=${strictHostKeys ? 'yes' : 'accept-new'}`,
+            '-o',
+            `UserKnownHostsFile=${knownHosts}`,
+          ]
         : []),
       host,
       '--',
@@ -217,7 +224,8 @@ const list = (text) =>
  * Reads the configuration from `env` and follows the journal until stopped (docs/journald.md):
  * routes from JOURNALD_ROUTES_JSON, the file JOURNALD_ROUTES, or one timeline
  * (JOURNALD_TIMELINE); the cursor in JOURNALD_CURSOR_FILE, else in systemd's state directory
- * (STATE_DIRECTORY, its first entry), else ./journald.cursor; the SSH known hosts beside it.
+ * (STATE_DIRECTORY, its first entry), else ./journald.cursor; the SSH known hosts in
+ * JOURNALD_KNOWN_HOSTS (checked strictly), else beside the cursor (the first key accepted).
  * On SIGTERM or SIGINT it stops journalctl, sends what is queued, keeps the cursor and returns.
  * @returns {Promise<number>} the exit code: 0, or 1 when the queues could not be emptied
  */
@@ -246,7 +254,8 @@ export async function main(env = process.env) {
     matches: list(env.JOURNALD_MATCHES),
     since: env.JOURNALD_SINCE || 'now',
     sshKey: env.JOURNALD_SSH_KEY || null,
-    knownHosts: join(dirname(ingest.cursorFile), 'known_hosts'),
+    knownHosts: env.JOURNALD_KNOWN_HOSTS || join(dirname(ingest.cursorFile), 'known_hosts'),
+    strictHostKeys: Boolean(env.JOURNALD_KNOWN_HOSTS),
   };
   console.log(
     `journald: following ${options.host ? options.host + "'s" : 'this machine’s'} journal${

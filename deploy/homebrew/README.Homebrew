@@ -13,8 +13,14 @@ only while building). Homebrew's PostgreSQL and the server run as you. openchron
 
   - starts PostgreSQL 17 with `brew services` if it is not running;
   - writes $(brew --prefix)/etc/openchronology/openchronology.env (readable only by you), with
-    a new AUTH_ENCRYPTION_KEY and the database at postgresql://<you>@/openchronology;
-  - creates the openchronology database, with the bundled pgmp extension;
+    a new AUTH_ENCRYPTION_KEY and the database at postgresql://openchronology@/openchronology;
+  - creates the openchronology role, which owns the database but is not a superuser (as you
+    are in Homebrew's PostgreSQL), and the openchronology database, with the bundled pgmp
+    extension. (Installations set up by earlier versions keep connecting as you, as their
+    configuration says; setup leaves them so.) Homebrew's PostgreSQL lets anyone on this
+    Mac connect as any role (trust authentication); on a shared Mac, set a password for
+    yourself and the role (and the role's in DATABASE_URL), and change "trust" to
+    "scram-sha-256" in its pg_hba.conf;
   - migrates it (openchronology-migrate) and starts the `openchronology-server` service,
     which listens on 127.0.0.1:5173 and starts again when you log in.
 
@@ -37,6 +43,8 @@ Edit $(brew --prefix)/etc/openchronology/openchronology.env, then
   - ADMIN_USERNAME, ADMIN_EMAIL and ADMIN_INITIAL_PASSWORD for the first administrator,
     created by `openchronology-migrate`. The password is used once; to sign in with it again
     (or with a new one written there), run `openchronology-reset-admin-password`.
+    Once you have signed in and changed it, empty ADMIN_INITIAL_PASSWORD again, so the file
+    holds no working password.
   - Sign-in providers, human verification, quotas: see the comments in the file and
     authentication.md, administration.md in this directory.
 
@@ -99,6 +107,7 @@ The configuration (including AUTH_ENCRYPTION_KEY) and the database remain; delet
 
     rm -rf $(brew --prefix)/etc/openchronology $(brew --prefix)/var/openchronology
     $(brew --prefix postgresql@17)/bin/dropdb -h /tmp openchronology
+    $(brew --prefix postgresql@17)/bin/dropuser -h /tmp openchronology
 
 Layout
 ------

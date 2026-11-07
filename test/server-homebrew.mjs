@@ -49,10 +49,12 @@ assert.equal(await psql("SELECT to_regclass('oc_timelines') IS NOT NULL"), 't');
 const config = await sh(`stat -f '%Lp' "${configFile}" && cat "${configFile}"`);
 assert.match(config, /^600$/m);
 assert.match(config, /^AUTH_ENCRYPTION_KEY=[a-f0-9]{64}$/m);
-const user = (await sh('id -un')).trim();
-assert.match(
-  config,
-  new RegExp(`^DATABASE_URL=postgresql://${user}@/openchronology\\?host=/tmp$`, 'm'),
+// The server connects as the database's owner, a role that is not a superuser.
+assert.match(config, /^DATABASE_URL=postgresql:\/\/openchronology@\/openchronology\?host=\/tmp$/m);
+assert.equal(await psql("SELECT rolsuper FROM pg_roles WHERE rolname='openchronology'"), 'f');
+assert.equal(
+  await psql("SELECT pg_get_userbyid(datdba) FROM pg_database WHERE datname='openchronology'"),
+  'openchronology',
 );
 // brew colors its status even when piped; the words are what matter.
 const services = (await sh('brew services list')).replace(/\x1B\[[0-9;]*m/g, '');
