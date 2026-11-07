@@ -7940,20 +7940,29 @@ if (desktop) {
       )
     )
       return;
-    trustedFiles = documentRequest;
+    if (trustedFiles !== documentRequest) {
+      trustedFiles = documentRequest;
+      // Trusted now, its files may get the thumbnails only the system's thumbnailers make:
+      // asked again for those that had none.
+      for (const [url, found] of thumbnails) if (found === null) thumbnails.delete(url);
+      requestRender(false);
+    }
     void window.__TAURI__!.core.invoke('desktop_open_file', { url: link.href }).catch(fail);
   });
   // Thumbnails of photos on this computer (#440), as markers show them: asked of Rust in
   // batches of up to 64 as markers need them, kept here (the latest 2,000, and the photos that
-  // have none), and drawn when they come. They stay in this page: they are never saved.
+  // have none), and drawn when they come. They stay in this page: they are never saved. Rust
+  // runs the system's thumbnailers only on files in folders the user populated from, or on any
+  // the timeline names once the user trusted it by opening one of its files.
   const thumbnails = new Map<string, string | null>(),
     wantedThumbnails = new Set<string>();
   let thumbnailTimer: ReturnType<typeof setTimeout> | undefined;
   const askThumbnails = async () => {
     const urls = [...wantedThumbnails].slice(0, 64);
     for (const url of urls) wantedThumbnails.delete(url);
+    const trusted = trustedFiles === documentRequest;
     const found = await window
-      .__TAURI__!.core.invoke<(string | null)[]>('desktop_thumbnails', { urls })
+      .__TAURI__!.core.invoke<(string | null)[]>('desktop_thumbnails', { urls, trusted })
       .catch(() => [] as (string | null)[]);
     urls.forEach((url, i) => thumbnails.set(url, found[i] ?? null));
     while (thumbnails.size > 2000) thumbnails.delete(thumbnails.keys().next().value!);

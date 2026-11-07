@@ -63,6 +63,33 @@ class ExtensionTests(unittest.TestCase):
             a=Q(rng.randrange(-10**100,10**100),rng.randrange(1,10**60));b=Q(rng.randrange(1,10**90),rng.randrange(1,10**40))
             actual=self.c.execute('SELECT q_add(?,?),q_sub(?,?),q_mul(?,?),q_div(?,?)',(text(a),text(b))*4).fetchone()
             self.assertEqual(actual,tuple(map(text,(a+b,a-b,a*b,a/b))))
+    def test_size_limits_and_schema_use(self):
+        self.assertEqual(self.c.execute("SELECT q_decimal('1e10000'),q_decimal('-1e-10000')").fetchone(),
+                         ('1'+'0'*10000+'/1','-1/1'+'0'*10000))
+        for source in ['1e10001','1e-10001','1e99999999999','0e99999999999','1e'+'9'*40]:
+            with self.assertRaises(sqlite3.DataError): self.c.execute('SELECT q_decimal(?)',(source,)).fetchall()
+        big='1'*1048576
+        self.assertEqual(self.c.execute('SELECT q_cmp(?,?)',(big,big)).fetchone(),(0,))
+        for sql in ['SELECT q(?)','SELECT q_decimal(?)','SELECT q_add(?,?)']:
+            args=(big+'1',)*sql.count('?')
+            with self.assertRaises(sqlite3.DataError): self.c.execute(sql,args).fetchall()
+        self.assertEqual(self.c.execute("SELECT q_is_canonical(?)",(big+'/1',)).fetchone(),(0,))
+        # Only q_is_canonical may run from a schema; the rest are refused in generated columns,
+        # views and defaults, including in a file whose schema was written by hand.
+        self.c.execute('CREATE TABLE ok(time TEXT CHECK(q_is_canonical(time)=1))')
+        self.c.execute("CREATE TABLE d(a TEXT DEFAULT (q('1')))")
+        for statement in ["CREATE TABLE g(a TEXT, b TEXT GENERATED ALWAYS AS (q_decimal('1e5')) VIRTUAL)",
+                          "CREATE INDEX i ON ok(q(time))", "INSERT INTO d DEFAULT VALUES"]:
+            with self.assertRaises(sqlite3.OperationalError): self.c.execute(statement)
+        with tempfile.TemporaryDirectory() as temp:
+            path=os.path.join(temp,'crafted.db');c=sqlite3.connect(path)
+            c.execute("CREATE TABLE g(a TEXT, b TEXT GENERATED ALWAYS AS (upper(a)) VIRTUAL)")
+            c.execute("INSERT INTO g(a) VALUES('x')");c.commit()
+            c.execute('PRAGMA writable_schema=ON')
+            c.execute("UPDATE sqlite_schema SET sql=replace(sql,'upper(a)',\"q_decimal('1e99999999999')\") WHERE name='g'")
+            c.commit();c.close();c=connection(path)
+            with self.assertRaises(sqlite3.DatabaseError): c.execute('SELECT b FROM g').fetchall()
+            c.close()
     def test_native_index_and_collation(self):
         self.c.execute('PRAGMA trusted_schema=OFF')
         self.c.execute('CREATE TABLE events(time TEXT COLLATE RATIONAL_V1 CHECK(q_is_canonical(time)=1)) STRICT')

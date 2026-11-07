@@ -46,8 +46,16 @@ void q_result(sqlite3_context *ctx, const mpq_t value) {
   if (!text) sqlite3_result_error_nomem(ctx);
   else sqlite3_result_text(ctx, text, -1, sqlite3_free);
 }
+/* The longest argument the functions read, and the largest decimal exponent q_decimal takes.
+   Exact values stay far larger than any time needs (the editor takes 20,000 characters and
+   exponents to 10,000), but no single call can ask GMP for a number so large that allocating
+   or computing it exhausts memory or kills the process: 1e99999999999 would. Larger inputs are
+   refused with SQLITE_TOOBIG. */
+#define Q_ARGUMENT_BYTES 1048576
+#define Q_DECIMAL_EXPONENT 10000UL
 static int q_arg(mpq_t out, sqlite3_value *arg) {
   if (sqlite3_value_type(arg) != SQLITE_TEXT) return SQLITE_MISMATCH;
+  if (sqlite3_value_bytes(arg) > Q_ARGUMENT_BYTES) return SQLITE_TOOBIG;
   return q_parse(out, (const char *)sqlite3_value_text(arg), sqlite3_value_bytes(arg));
 }
 static int decimal(mpq_t out, const char *s, int len) {
@@ -72,9 +80,8 @@ static int decimal(mpq_t out, const char *s, int len) {
     if (i < len && (s[i] == '+' || s[i] == '-')) { exp_neg = s[i] == '-'; i++; }
     if (i == len || s[i] < '0' || s[i] > '9') { sqlite3_free(coefficient); return SQLITE_MISMATCH; }
     while (i < len && s[i] >= '0' && s[i] <= '9') {
-      unsigned digit = (unsigned)(s[i++] - '0');
-      if (exponent > (ULONG_MAX - digit) / 10) { sqlite3_free(coefficient); return SQLITE_TOOBIG; }
-      exponent = exponent * 10 + digit;
+      exponent = exponent * 10 + (unsigned)(s[i++] - '0');
+      if (exponent > Q_DECIMAL_EXPONENT) { sqlite3_free(coefficient); return SQLITE_TOOBIG; }
     }
   }
   if (i != len) { sqlite3_free(coefficient); return SQLITE_MISMATCH; }
@@ -82,7 +89,6 @@ static int decimal(mpq_t out, const char *s, int len) {
   sqlite3_free(coefficient); mpz_set_ui(mpq_denref(out), 1);
   if (mpz_sgn(mpq_numref(out)) == 0) return SQLITE_OK;
   if (neg) mpz_neg(mpq_numref(out), mpq_numref(out));
-  if (exp_neg && exponent > ULONG_MAX - (unsigned long)frac) return SQLITE_TOOBIG;
   mpz_init(power);
   if (exp_neg || exponent < (unsigned long)frac) {
     mpz_ui_pow_ui(mpq_denref(out), 10, exp_neg ? exponent + (unsigned long)frac : (unsigned long)frac - exponent);
@@ -103,8 +109,9 @@ static void scalar(sqlite3_context *ctx, int argc, sqlite3_value **argv) {
     goto done;
   }
   if (op == Q_DECIMAL) {
-    rc = sqlite3_value_type(argv[0]) == SQLITE_TEXT
-      ? decimal(a, (const char *)sqlite3_value_text(argv[0]), sqlite3_value_bytes(argv[0])) : SQLITE_MISMATCH;
+    rc = sqlite3_value_type(argv[0]) != SQLITE_TEXT ? SQLITE_MISMATCH
+      : sqlite3_value_bytes(argv[0]) > Q_ARGUMENT_BYTES ? SQLITE_TOOBIG
+      : decimal(a, (const char *)sqlite3_value_text(argv[0]), sqlite3_value_bytes(argv[0]));
   } else rc = q_arg(a, argv[0]);
   if (op == Q_VALID) {
     char *normalized = rc == SQLITE_OK ? q_text(a) : NULL;
@@ -115,7 +122,7 @@ static void scalar(sqlite3_context *ctx, int argc, sqlite3_value **argv) {
   }
   if (rc == SQLITE_OK && argc == 2) rc = q_arg(b, argv[1]);
   if (rc != SQLITE_OK) {
-    sqlite3_result_error(ctx, rc == SQLITE_TOOBIG ? "Decimal exponent too large" : "Expected exact rational TEXT", -1);
+    sqlite3_result_error(ctx, rc == SQLITE_TOOBIG ? "Rational argument or decimal exponent too large" : "Expected exact rational TEXT", -1);
     sqlite3_result_error_code(ctx, rc); goto done;
   }
   switch (op) {
@@ -161,17 +168,26 @@ static int collation(void *unused, int an, const void *ap, int bn, const void *b
   mpq_clears(a, b, NULL); return (result > 0) - (result < 0);
 }
 int sqlite_rational_register(sqlite3 *db) {
-  static const struct { const char *name; int argc; int op; } functions[] = {
-    {"q",1,Q_NORMALIZE},{"q_make",2,Q_MAKE},{"q_decimal",1,Q_DECIMAL},{"q_is_canonical",1,Q_VALID},
-    {"q_cmp",2,Q_CMP},{"q_add",2,Q_ADD},{"q_sub",2,Q_SUB},{"q_mul",2,Q_MUL},{"q_div",2,Q_DIV},
-    {"q_neg",1,Q_NEG},{"q_abs",1,Q_ABS},{"q_floor",1,Q_FLOOR},{"q_ceil",1,Q_CEIL},
-    {"q_num",1,Q_NUM},{"q_den",1,Q_DEN},{"q_min",2,Q_MIN},{"q_max",2,Q_MAX}
+  /* Only q_is_canonical may appear in a database's schema (its CHECK constraints), so only it
+     is innocuous. The rest are direct-only: a file's views, triggers, defaults, indexes and
+     generated columns cannot call them, so opening a crafted file never runs arithmetic its
+     author chose. */
+  static const struct { const char *name; int argc; int op; int flags; } functions[] = {
+    {"q",1,Q_NORMALIZE,SQLITE_DIRECTONLY},{"q_make",2,Q_MAKE,SQLITE_DIRECTONLY},
+    {"q_decimal",1,Q_DECIMAL,SQLITE_DIRECTONLY},{"q_is_canonical",1,Q_VALID,SQLITE_INNOCUOUS},
+    {"q_cmp",2,Q_CMP,SQLITE_DIRECTONLY},{"q_add",2,Q_ADD,SQLITE_DIRECTONLY},
+    {"q_sub",2,Q_SUB,SQLITE_DIRECTONLY},{"q_mul",2,Q_MUL,SQLITE_DIRECTONLY},
+    {"q_div",2,Q_DIV,SQLITE_DIRECTONLY},{"q_neg",1,Q_NEG,SQLITE_DIRECTONLY},
+    {"q_abs",1,Q_ABS,SQLITE_DIRECTONLY},{"q_floor",1,Q_FLOOR,SQLITE_DIRECTONLY},
+    {"q_ceil",1,Q_CEIL,SQLITE_DIRECTONLY},{"q_num",1,Q_NUM,SQLITE_DIRECTONLY},
+    {"q_den",1,Q_DEN,SQLITE_DIRECTONLY},{"q_min",2,Q_MIN,SQLITE_DIRECTONLY},
+    {"q_max",2,Q_MAX,SQLITE_DIRECTONLY}
   };
   unsigned i;
   int rc = sqlite3_create_collation_v2(db, "RATIONAL_V1", SQLITE_UTF8, NULL, collation, NULL);
   for (i = 0; rc == SQLITE_OK && i < sizeof(functions)/sizeof(functions[0]); i++)
     rc = sqlite3_create_function_v2(db, functions[i].name, functions[i].argc,
-      SQLITE_UTF8 | SQLITE_DETERMINISTIC | SQLITE_INNOCUOUS,
+      SQLITE_UTF8 | SQLITE_DETERMINISTIC | functions[i].flags,
       (void *)(intptr_t)functions[i].op, scalar, NULL, NULL, NULL);
   if (rc == SQLITE_OK) rc = q_index_register(db);
   return rc;

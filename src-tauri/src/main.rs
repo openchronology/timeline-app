@@ -15,7 +15,8 @@
 //!   last saw, and commands refuse to act on a baseline it has not seen.
 //! - `server::Server`: the connected servers and their sign-ins (server.rs).
 //! - `Population`: the folders and files picked for the file populator (populate.rs), the only
-//!   paths it scans, and whether the one running was cancelled.
+//!   paths it scans, whether the one running was cancelled, and the folders timelines were
+//!   populated from (whose files the system's thumbnailers may read; thumbnails.rs).
 //!
 //! File work runs on Tauri's blocking thread pool (`spawn_blocking`), so long reads and saves
 //! never stall the async runtime that serves IPC.
@@ -382,11 +383,38 @@ async fn desktop_import(app: tauri::AppHandle) -> Result<Option<Opened>, String>
     .map_err(|e| e.to_string())?
 }
 /// The file populator's picked folders and files (#433): the only paths it scans, chosen in the
-/// native dialog so the page never names one; and whether the population running was cancelled.
+/// native dialog so the page never names one; whether the population running was cancelled;
+/// and the folders and files timelines were populated from (canonical, the latest
+/// MOST_POPULATED), remembered across starts in `populated.json` in the app's config folder.
 #[derive(Default)]
 struct Population {
     roots: Mutex<Vec<PathBuf>>,
     cancel: AtomicBool,
+    populated: Mutex<Vec<PathBuf>>,
+}
+/// The most folders remembered as populated from.
+const MOST_POPULATED: usize = 64;
+/// Remembers that timelines were populated from `roots`, here and in `populated.json`, the
+/// latest first, so the system's thumbnailers may read their files (thumbnails.rs) this time
+/// and next. The file is the user's alone (0600 on Unix): it names the user's folders.
+fn remember_populated(app: &tauri::AppHandle, roots: &[PathBuf]) -> Result<(), String> {
+    let state = app.state::<Population>();
+    let mut populated = state.populated.lock().map_err(|e| e.to_string())?;
+    for root in roots
+        .iter()
+        .filter_map(|root| std::fs::canonicalize(root).ok())
+    {
+        populated.retain(|known| *known != root);
+        populated.insert(0, root);
+    }
+    populated.truncate(MOST_POPULATED);
+    let directory = app.path().app_config_dir().map_err(|e| e.to_string())?;
+    std::fs::create_dir_all(&directory).map_err(|e| e.to_string())?;
+    thumbnails::write_private(
+        &directory.join("populated.json"),
+        &serde_json::to_vec(&*populated).map_err(|e| e.to_string())?,
+    )
+    .map_err(|e| e.to_string())
 }
 /// Adds folders (or, with `folders` false, files) picked in the native dialog to the file
 /// populator's list, and resolves to the whole list. A cancelled dialog leaves it as it was.
@@ -460,6 +488,9 @@ async fn desktop_populate(
         if events.is_empty() {
             return Err("No files there matched. Check the folders and the kind of file.".into());
         }
+        // Thumbnails of these files without it would lack videos and HEIC photos; failing to
+        // remember them for next time is no reason to lose the timeline.
+        let _ = remember_populated(&app, &roots);
         let baseline = Arc::new(Snapshot::from_document(&populate::document(
             template, events,
         ))?);
@@ -481,19 +512,24 @@ async fn desktop_populate(
     .await
     .map_err(|e| e.to_string())?
 }
-/// Opens a moment's `file:///` source in the system's app for that file (#433). Refuses
-/// programs, scripts and anything that isn't a file on this computer (populate::local_file).
+/// Opens a moment's `file:///` source in the system's app for that file (#433) when it is a
+/// photo, video, sound or document, or else shows it in its folder; errors when it isn't a file
+/// on this computer (populate::local_file).
 #[tauri::command]
 fn desktop_open_file(url: String) -> Result<(), String> {
     populate::open_file(&url)
 }
 /// Thumbnails of the photos `urls` (`file:///` links) name (#440), in order, each a `data:` URL
 /// or null when it isn't a photo on this computer or can't be read; made in parallel, and kept
-/// in the app's cache folder (thumbnails.rs). At most 64 at once.
+/// in the app's cache folder (thumbnails.rs). At most 64 at once. The system's thumbnailers are
+/// run only on files in folders timelines were populated from, or, with `trusted`, on any the
+/// links name: the editor says so once the user has trusted the timeline by opening one of its
+/// files.
 #[tauri::command]
 async fn desktop_thumbnails(
     app: tauri::AppHandle,
     urls: Vec<String>,
+    trusted: Option<bool>,
 ) -> Result<Vec<Option<String>>, String> {
     if urls.len() > thumbnails::MOST_AT_ONCE {
         return Err("Ask for at most 64 thumbnails at once.".into());
@@ -503,14 +539,22 @@ async fn desktop_thumbnails(
         .app_cache_dir()
         .map_err(|e| e.to_string())?
         .join("thumbnails");
+    let populated = app
+        .state::<Population>()
+        .populated
+        .lock()
+        .map_err(|e| e.to_string())?
+        .clone();
+    let trusted = trusted == Some(true);
     tauri::async_runtime::spawn_blocking(move || {
+        let system = |path: &std::path::Path| trusted || thumbnails::chosen(path, &populated);
         let mut found = vec![None; urls.len()];
         std::thread::scope(|scope| {
             for (chunk, found) in urls.chunks(16).zip(found.chunks_mut(16)) {
-                let cache = &cache;
+                let (cache, system) = (&cache, &system);
                 scope.spawn(move || {
                     for (url, slot) in chunk.iter().zip(found) {
-                        *slot = thumbnails::thumbnail(cache, url);
+                        *slot = thumbnails::thumbnail(cache, url, system);
                     }
                 });
             }
@@ -727,6 +771,16 @@ fn main() {
                     None => vec![server::Server::default_origin().to_owned()],
                 },
             };
+            // The folders timelines were populated from, whose files the system's
+            // thumbnailers may read.
+            if let Some(bytes) = read("populated.json") {
+                let mut folders =
+                    serde_json::from_slice::<Vec<PathBuf>>(&bytes).unwrap_or_default();
+                folders.truncate(MOST_POPULATED);
+                if let Ok(mut populated) = app.state::<Population>().populated.lock() {
+                    *populated = folders;
+                }
+            }
             let state = app.state::<server::Server>();
             // Connecting puts a server first, so the one in use is connected last.
             for origin in servers.iter().take(server::SERVERS).rev() {

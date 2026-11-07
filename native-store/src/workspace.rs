@@ -28,6 +28,20 @@ use std::{
 };
 /// Makes temporary directory and file names unique within this process.
 static NEXT: AtomicU64 = AtomicU64::new(0);
+/// Creates a new, empty file at `path`, failing if anything is there already, readable and
+/// writable only by the user from the moment it exists (0600 on Unix). Created with the usual
+/// mode and narrowed after, it would be readable to others in between, and another user who
+/// opened it then could go on reading everything later written to it.
+fn create_private(path: &Path) -> std::io::Result<std::fs::File> {
+    let mut options = std::fs::OpenOptions::new();
+    options.write(true).create_new(true);
+    #[cfg(unix)]
+    {
+        use std::os::unix::fs::OpenOptionsExt;
+        options.mode(0o600);
+    }
+    options.open(path)
+}
 /// The byte budget for one query's SQLite results, and for its JSON reply (counted as UTF-16
 /// in the webview, so twice its UTF-8 length; see `Snapshot::query`).
 const BUDGET: usize = 8 * 1024 * 1024;
@@ -261,18 +275,7 @@ impl Snapshot {
                 .as_nanos(),
             NEXT.fetch_add(1, Ordering::Relaxed)
         ));
-        let created = std::fs::OpenOptions::new()
-            .write(true)
-            .create_new(true)
-            .open(&source)
-            .map_err(|e| e.to_string())?;
-        #[cfg(unix)]
-        {
-            use std::os::unix::fs::PermissionsExt;
-            created
-                .set_permissions(std::fs::Permissions::from_mode(0o600))
-                .map_err(|e| e.to_string())?;
-        }
+        create_private(&source).map_err(|e| e.to_string())?;
         let result = (|| {
             super::save(&source, document)?;
             Self::open(&source)
@@ -1503,6 +1506,86 @@ mod safety_tests {
         db.execute("CREATE VIEW points_nodes AS SELECT * FROM real_nodes", &[])
             .unwrap();
         assert!(Snapshot::open(path).is_err());
+    }
+    /// A copy of a one-moment timeline whose `timeline_meta.description` is a generated column
+    /// computing `expression`, written into the schema by hand as an attacker would.
+    fn crafted(baseline: &Snapshot, name: &str, expression: &str) -> std::path::PathBuf {
+        let path = baseline.directory().join(name);
+        std::fs::copy(baseline.path(), &path).unwrap();
+        let db = Connection::open(&path, true).unwrap();
+        db.execute("PRAGMA writable_schema=ON", &[]).unwrap();
+        db.execute("UPDATE sqlite_schema SET sql=replace(sql,'description TEXT NOT NULL','description TEXT GENERATED ALWAYS AS ('||?1||') VIRTUAL') WHERE name='timeline_meta'", &[expression]).unwrap();
+        path
+    }
+    /// A generated column calling `q_decimal` with an exponent too large for GMP (which used to
+    /// kill the process) is refused with an error by every reader: the function may not appear
+    /// in a schema at all. A generated column of any other expression is refused by the check
+    /// of the file's tables before anything reads it.
+    #[test]
+    fn generated_columns_are_refused_without_crashing() {
+        let document:Document=serde_json::from_value(json!({"format":"openchronology","version":1,"title":"Crafted","description":"","events":[{"id":"a","time":"1/1","metadata":{"title":"A"}}]})).unwrap();
+        let baseline = Snapshot::from_document(&document).unwrap();
+        let path = crafted(&baseline, "decimal.och", "q_decimal('1e99999999999')");
+        for error in [Snapshot::open(&path).err(), crate::open(&path).err()] {
+            assert!(error.unwrap().contains("unsafe use of q_decimal()"));
+        }
+        // Even a reader that skips the checks gets an error: SQLite refuses the schema.
+        assert!(Connection::open(&path, false)
+            .and_then(|db| db.query("SELECT description FROM timeline_meta", &[]))
+            .unwrap_err()
+            .contains("unsafe use of q_decimal()"));
+        let refused = "Timeline tables must not have generated or hidden columns";
+        let path = crafted(&baseline, "innocuous.och", "upper(title)");
+        assert_eq!(Snapshot::open(&path).err().as_deref(), Some(refused));
+        assert_eq!(crate::open(&path).err().as_deref(), Some(refused));
+    }
+    /// Staged documents are created readable only by the user, whatever the umask, and
+    /// snapshots live in a folder only the user can enter.
+    #[cfg(unix)]
+    #[test]
+    fn staged_files_and_snapshots_are_private() {
+        use std::os::unix::fs::PermissionsExt;
+        let mode = |path: &Path| std::fs::metadata(path).unwrap().permissions().mode() & 0o777;
+        let path = std::env::temp_dir().join(format!(
+            "och-private-{}-{}.och",
+            std::process::id(),
+            NEXT.fetch_add(1, Ordering::Relaxed)
+        ));
+        create_private(&path).unwrap();
+        assert_eq!(mode(&path), 0o600);
+        assert!(create_private(&path).is_err(), "never an existing file");
+        std::fs::remove_file(&path).unwrap();
+        let document:Document=serde_json::from_value(json!({"format":"openchronology","version":1,"title":"Private","description":"","events":[]})).unwrap();
+        let snapshot = Snapshot::from_document(&document).unwrap();
+        assert_eq!(mode(snapshot.directory()), 0o700);
+    }
+    /// q_decimal takes exponents up to 10,000 either way, as the editor's parser does, and
+    /// refuses larger ones (and arguments over 1 MiB) with an error.
+    #[test]
+    fn rational_functions_bound_exponents_and_argument_sizes() {
+        let path = std::env::temp_dir().join(format!("och-bounds-{}.och", std::process::id()));
+        let db = Connection::open(&path, true).unwrap();
+        let big = db.scalar("SELECT q_decimal('1e10000')", &[]).unwrap();
+        assert_eq!(big.len(), 10003);
+        let small = db.scalar("SELECT q_decimal('-25e-10000')", &[]).unwrap();
+        assert_eq!(small, format!("-1/4{}", "0".repeat(9998)));
+        for source in ["1e10001", "1e-10001", "1e99999999999", "1e-99999999999"] {
+            assert!(db
+                .scalar("SELECT q_decimal(?1)", &[source])
+                .unwrap_err()
+                .contains("too large"));
+        }
+        let long = "1".repeat(1048577);
+        assert!(db
+            .scalar("SELECT q_add(?1,'1')", &[&long])
+            .unwrap_err()
+            .contains("too large"));
+        assert_eq!(
+            db.scalar("SELECT q_cmp(?1,?1)", &[&long[1..]]).unwrap(),
+            "0"
+        );
+        drop(db);
+        let _ = std::fs::remove_file(&path);
     }
 }
 
