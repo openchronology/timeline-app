@@ -6,6 +6,7 @@ import { NextResponse } from 'next/server';
 import { analyticsPolicy } from '../server/site.mjs';
 import { landingFramePolicy } from '../server/landing.mjs';
 import { platformServices } from '../server/platform.mjs';
+import { SHARED_CACHE_CONTROL, sharedPage } from '../server/shared-cache.mjs';
 import { indexNowKeyFile } from '../server/indexnow.mjs';
 import { RESERVED_NAMES, USERNAME, timelineAddress } from '../src/addresses.ts';
 /**
@@ -131,6 +132,11 @@ export async function proxy(request) {
   // leak through links; and, when the site is served over https, HSTS for a year.
   response.headers.set('Content-Security-Policy', policy);
   response.headers.set('X-Content-Type-Options', 'nosniff');
+  // A public page every signed-out visitor sees alike (#473) may be kept for a minute by a shared
+  // cache in front of the server (server/shared-cache.mjs; server/shared-response.cjs then adds
+  // `Vary: Cookie`); every other page keeps Next.js's `private, no-cache, no-store`.
+  if (sharedPage({ method: request.method, pathname, headers: request.headers }))
+    response.headers.set('Cache-Control', SHARED_CACHE_CONTROL);
   response.headers.set('Referrer-Policy', 'no-referrer');
   if (process.env.APP_ORIGIN?.startsWith('https:'))
     response.headers.set('Strict-Transport-Security', 'max-age=31536000');

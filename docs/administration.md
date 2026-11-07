@@ -1,6 +1,6 @@
 # Administration, storage limits and automation
 
-<!-- description: Run an OpenChronology server: the first administrator, storage quotas, the landing page, IndexNow, terms, API keys and other operator settings. -->
+<!-- description: Run an OpenChronology server: the first administrator, storage quotas, the landing page, IndexNow, page caching, terms, API keys and other operator settings. -->
 
 Copyright (c) 2026 Athan Clark. SPDX-License-Identifier: GPL-3.0-only
 
@@ -408,6 +408,85 @@ The key is 8 to 128 letters, digits and dashes; anything else stops the server s
 - Nothing is sent while `APP_ORIGIN` is `localhost` or a loopback address, which the engines could not reach.
 
 Check it works by opening `https://<your site>/<key>.txt`, then watch the log for `IndexNow: submitted …` after you save a public timeline. Bing Webmaster Tools lists what it received under **IndexNow**.
+
+## Reverse proxy, page caching and page speed
+
+The server renders each page as it is asked for. A reverse proxy in front of it, such as nginx, can keep a copy of the public pages that signed-out visitors and search engines read, and answer from it for a minute, so a busy timeline is rendered once a minute rather than for every reader ([#473](https://github.com/openchronology/timeline-app/issues/473)).
+
+**What the server allows a shared cache to keep.** These pages, asked for with `GET` or `HEAD` and without a session cookie (`oc_session`, or `__Host-oc_session` over HTTPS) or an `Authorization` header, are sent with `Cache-Control: public, s-maxage=60, stale-while-revalidate=300` and `Vary: Cookie`:
+
+- the home page, `/explore`, `/for` and each audience's page, and the help (`/help`, `/help/<page>`);
+- profiles (`/<username>`, `/users/<username>`);
+- a timeline's page, and its moments' and durations' pages, at either of its addresses (`/<owner>/<slug>/…` or `/timelines/<id>/…`).
+
+Signed out, a private timeline's pages are not found, the same for everyone, so that 404 may be kept too. Everything else is sent with `private, no-cache, no-store`: every page seen with a session, the sign-in, account, administration, editor, download and plugin pages, a timeline's history, settings and pull requests, the router's payload that the site's own links fetch, server errors, and the API. Little changes for a site without a cache: `s-maxage` gives browsers no lifetime, and `Vary: Cookie` keeps a copy from before signing in from being shown after.
+
+A page carries a fresh nonce for its content security policy, written into its scripts and its `Content-Security-Policy` header alike, and a kept copy keeps both, so it runs as it did. Everyone who reads that copy gets the same nonce. That doesn't weaken the policy: script injected into a page would have had to carry the nonce before the render that chose it, and the next render, a minute later, chooses another.
+
+**What it means for changes.** A change to a public page, a timeline made private, or content taken down by moderation reaches signed-out readers within a minute, and one reader more may get the old copy while the cache fetches the new one. To remove something at once, empty the cache (below). Do the same after upgrading, since pages kept from before name script files the new version no longer has.
+
+**A cache in nginx.** In the `http` block (for example a file in `/etc/nginx/conf.d/`):
+
+```nginx
+# Leave nginx's version out of its Server header and error pages.
+server_tokens off;
+# Where kept pages go: 10 MB of keys, at most 1 GB, dropped when unread for 10 minutes.
+proxy_cache_path /var/cache/nginx/openchronology levels=1:2 keys_zone=openchronology:10m
+                 max_size=1g inactive=10m use_temp_path=off;
+# A request with a session cookie, in either form, is a signed-in visitor's.
+map $http_cookie $openchronology_session {
+    default 0;
+    "~(^|;)\s*(__Host-)?oc_session=" 1;
+}
+```
+
+And the site:
+
+```nginx
+server {
+    # With nginx before 1.25.1, `listen 443 ssl http2;` instead of `http2 on;`.
+    listen 443 ssl;
+    http2 on;
+    server_name timelines.example.org;
+    ssl_certificate /etc/letsencrypt/live/timelines.example.org/fullchain.pem;
+    ssl_certificate_key /etc/letsencrypt/live/timelines.example.org/privkey.pem;
+    server_tokens off;
+
+    location / {
+        proxy_pass http://127.0.0.1:5173;
+        proxy_http_version 1.1;
+        proxy_set_header Host $host;
+        # One address, the client's, so the server may set TRUST_PROXY=1.
+        proxy_set_header X-Forwarded-For $remote_addr;
+        proxy_set_header X-Forwarded-Proto $scheme;
+        client_max_body_size 256m;
+        proxy_read_timeout 1h;
+
+        # Keep what the server marks public for as long as it says, never a session's, a
+        # token's or the router's payload, and refresh a stale page in the background.
+        proxy_cache openchronology;
+        proxy_cache_key $scheme$host$request_uri;
+        proxy_cache_bypass $openchronology_session $http_authorization $http_rsc;
+        proxy_no_cache $openchronology_session $http_authorization $http_rsc;
+        proxy_cache_use_stale updating error timeout http_502 http_503 http_504;
+        proxy_cache_background_update on;
+        proxy_cache_lock on;
+        add_header X-Cache-Status $upstream_cache_status always;
+    }
+}
+```
+
+nginx follows each response's `Cache-Control`, so it keeps only the pages above, for a minute; with no `proxy_cache_valid`, it keeps nothing the server didn't mark. It also follows `Vary`: a visitor who carries other cookies, such as Google Analytics' after allowing it, gets a copy of their own. The session cookie bypasses the cache outright, so a signed-in visitor never gets a signed-out copy. Live updates (`/api/live`) send `X-Accel-Buffering: no`, so they stream with buffering on, which a cache needs. `X-Cache-Status` shows `MISS`, `HIT`, `STALE`, `UPDATING` or `BYPASS`: `curl -sI https://timelines.example.org/help | grep -i -e cache-control -e x-cache-status` twice should show a `MISS`, then a `HIT`. To empty the cache, delete what is in its folder, `/var/cache/nginx/openchronology/`; nginx carries on without a reload.
+
+The NixOS module's virtual host (`services.openchronology.nginx.enable`) sets `server_tokens off` but keeps no cache, and turns `proxy_buffering` off, which a cache can't work with. To cache there, leave `nginx.enable` off and write the virtual host from the sample above, putting the `http` block's lines in `services.nginx.appendHttpConfig`. Caddy, which the packages' READMEs show, has no cache of its own and doesn't announce its version.
+
+**Measuring page speed.** Google ranks pages partly by their [Core Web Vitals](https://web.dev/articles/vitals): how soon the largest thing on the page shows (LCP, good under 2.5 s), how soon it responds to a click or key (INP, good under 200 ms) and how much it shifts as it loads (CLS, good under 0.1). They need a site on the public internet and a browser, so CI doesn't measure them; measure your own site:
+
+- **[PageSpeed Insights](https://pagespeed.web.dev/)**: enter an address. It shows what real Chrome users measured over the last 28 days, once the site has enough of them (INP is only measured there), and a Lighthouse run from Google's servers, for phones and computers.
+- **Lighthouse**, in Chrome's developer tools (**Lighthouse**, then **Analyze page load**, in a guest window so you are signed out), or from the command line: `npx lighthouse https://timelines.example.org/ --only-categories=performance --view`. Its lab run reports LCP and CLS, with Total Blocking Time standing in for INP.
+- **Google Search Console**'s **Core Web Vitals** report groups the site's pages by how they fare, from the same real-user data.
+
+Measure the home page, `/explore`, a timeline's page and a moment's page, signed out, each twice in a row: with a cache, the second is served from it, which shows in its time to first byte. Write the results down with the date and version, to compare after upgrades.
 
 ## Terms and privacy policy
 

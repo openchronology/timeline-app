@@ -26,10 +26,15 @@ await cp('platform/.next/static', 'platform/.next/standalone/platform/.next/stat
 });
 
 // The application root is ESM; Next generates a CommonJS standalone launcher. It starts with
-// server/peer-address.cjs, which tells route handlers each request's address.
+// server/peer-address.cjs, which tells route handlers each request's address, and
+// server/shared-response.cjs, which finishes the headers of pages a shared cache may keep (#473).
 const launcher = 'platform/.next/standalone/platform/server.cjs';
 await rename('platform/.next/standalone/platform/server.js', launcher);
 await writeFile(
   launcher,
-  (await readFile('server/peer-address.cjs', 'utf8')) + '\n' + (await readFile(launcher, 'utf8')),
+  (await readFile('server/peer-address.cjs', 'utf8')) +
+    '\n' +
+    (await readFile('server/shared-response.cjs', 'utf8')) +
+    '\n' +
+    (await readFile(launcher, 'utf8')),
 );
