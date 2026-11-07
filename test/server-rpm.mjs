@@ -159,7 +159,7 @@ try {
 
   // Removing it keeps the configuration and the database, and says how to delete them.
   const remove = await sh('rpm -e openchronology-server 2>&1');
-  assert.match(remove, /the PostgreSQL database and the openchronology system user remain/i);
+  assert.match(remove, /the PostgreSQL database and the openchronology and openchronology-logs\s+system users remain/i);
   assert.match(await sh('test -e /etc/openchronology && echo present || echo gone'), /present/);
   assert.equal(await psql("SELECT count(*) FROM oc_users WHERE username='kept'"), '1');
   console.log(

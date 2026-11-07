@@ -14,4 +14,4 @@ The Nix derivations and NixOS module that [`flake.nix`](../flake.nix) puts toget
 | [`pgmp.nix`](pgmp.nix)               | The pgmp PostgreSQL extension, at the commit the Dockerfiles pin, for any PostgreSQL's package set.            |
 | [`server.nix`](server.nix)           | The server and website, built from source and laid out as the Debian package installs them, with its commands. |
 | [`test-client.mjs`](test-client.mjs) | The NixOS test's client: signs in, saves, searches and downloads a timeline as `.och`.                         |
-| [`test.nix`](test.nix)               | The NixOS test of the module, which boots a machine with it and nginx.                                         |
+| [`test.nix`](test.nix)               | The NixOS test of the module, which boots a machine with it, nginx and the syslog receiver on its own user.    |
