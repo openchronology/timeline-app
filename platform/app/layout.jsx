@@ -153,7 +153,7 @@ export default async function RootLayout({ children }) {
             </>
           ) : null}
         </footer>
-        {analytics ? <Analytics id={analytics} nonce={nonce} /> : null}
+        {analytics ? <Analytics id={analytics} nonce={nonce} site={siteName()} /> : null}
       </body>
     </html>
   );

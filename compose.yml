@@ -7,20 +7,23 @@ x-app-build: &app-build
     OCH_BUILD_COMMIT: ${OCH_BUILD_COMMIT:-}
     OCH_BUILD_VERSION: ${OCH_BUILD_VERSION:-}
 
+# The application's database role: not a superuser, owner of the database (database-setup).
 x-database-environment: &database-environment
   PGHOST: database
   PGPORT: 5432
-  PGUSER: openchronology
+  PGUSER: openchronology_app
   PGDATABASE: openchronology
-  PGPASSWORD: ${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD in .env}
+  PGPASSWORD: ${APP_DATABASE_PASSWORD:?Set APP_DATABASE_PASSWORD in .env}
 
 services:
   database:
     restart: unless-stopped
+    image: openchronology-postgres:local
     build:
       context: .
       dockerfile: deploy/Dockerfile.postgres
     environment:
+      # The bootstrap superuser, used only by database-setup.
       POSTGRES_USER: openchronology
       POSTGRES_DB: openchronology
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD in .env}
@@ -31,6 +34,24 @@ services:
       interval: 5s
       timeout: 5s
       retries: 20
+  # As the superuser, before each migration: pgmp, and the application's role
+  # (deploy/database-setup.sh).
+  database-setup:
+    image: openchronology-postgres:local
+    build:
+      context: .
+      dockerfile: deploy/Dockerfile.postgres
+    environment:
+      PGHOST: database
+      PGPORT: 5432
+      PGUSER: openchronology
+      PGDATABASE: openchronology
+      PGPASSWORD: ${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD in .env}
+      APP_DATABASE_PASSWORD: ${APP_DATABASE_PASSWORD:?Set APP_DATABASE_PASSWORD in .env}
+    command: ['openchronology-database-setup']
+    depends_on:
+      database:
+        condition: service_healthy
   migrate:
     image: openchronology-app:local
     build: *app-build
@@ -42,8 +63,8 @@ services:
       DEFAULT_USER_STORAGE_BYTES: ${DEFAULT_USER_STORAGE_BYTES:-}
     command: ['node', 'server/migrate.mjs']
     depends_on:
-      database:
-        condition: service_healthy
+      database-setup:
+        condition: service_completed_successfully
   seed:
     profiles: ['seed']
     image: openchronology-app:local

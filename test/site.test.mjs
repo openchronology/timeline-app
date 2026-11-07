@@ -1,5 +1,6 @@
 // Copyright (c) 2026 Athan Clark. SPDX-License-Identifier: GPL-3.0-only
-// The platform’s name, Support link and Google Analytics (server/site.mjs), off unless configured.
+// The platform’s name, Support link and Google Analytics (server/site.mjs), off unless configured;
+// HSTS over https.
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {
@@ -8,6 +9,7 @@ import {
   platformName,
   siteName,
   supportUrl,
+  transportSecurity,
 } from '../server/site.mjs';
 
 test('a platform names itself, or shows OpenChronology', () => {
@@ -52,4 +54,10 @@ test('Google Analytics is off unless a measurement ID is set', () => {
     script: '',
     connect: '',
   });
+});
+
+test('pages ask browsers to keep to https only when the site is served over it', () => {
+  assert.equal(transportSecurity({ APP_ORIGIN: 'https://timescale.info' }), 'max-age=31536000');
+  assert.equal(transportSecurity({ APP_ORIGIN: 'http://127.0.0.1:5173' }), null);
+  assert.equal(transportSecurity({}), null);
 });

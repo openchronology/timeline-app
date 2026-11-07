@@ -14,6 +14,10 @@ OpenChronology is a free, open-source timeline editor for exact dates at any sca
 
 The software is free software under the GNU GPL version 3: you may use it, study it, share it and change it ([licensing](licensing.md)). The app has no payments or paid features. On a server, each account has a storage limit, set by the site's operator and shown on the **Account** page.
 
+## How does OpenChronology compare with other timeline tools?
+
+It is free and open source, stores times exactly from deep time to fractions of a second, keeps sources on every event, and runs offline or on your own server. Other tools are better for some work, such as TimelineJS for a quick story timeline from a spreadsheet, or Aeon Timeline for planning a novel. See the [comparison of timeline tools](comparison-of-timeline-tools.md).
+
 ## Do I need an account?
 
 No. Anyone can read public timelines, and anyone can start a timeline in the browser and export it as a file. An account lets you save timelines to the server, keep them private or share them, star timelines, and work with others. Accounts are for people 13 and older.

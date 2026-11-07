@@ -12,6 +12,10 @@
 //!
 //! None when the system has none for the file. The pictures go no further than thumbnails.rs,
 //! which shrinks them and keeps them in the app's cache.
+//!
+//! The thumbnailers parse the file with the system's decoders, outside any sandbox, so they are
+//! run only when thumbnails.rs says the user chose the file (`run`). Otherwise only a thumbnail
+//! the file manager already keeps is used (Linux), read by this app.
 use image::DynamicImage;
 use std::path::Path;
 
@@ -22,9 +26,10 @@ const ASKED: u32 = 256;
 #[allow(dead_code)]
 const MOST_SECONDS: u64 = 15;
 
-/// The system's thumbnail of `path`, upright as the system shows it.
-pub fn thumbnail(path: &Path) -> Option<DynamicImage> {
-    platform::thumbnail(path)
+/// The system's thumbnail of `path`, upright as the system shows it; made by its thumbnailers
+/// only when `allowed`.
+pub fn thumbnail(path: &Path, allowed: bool) -> Option<DynamicImage> {
+    platform::thumbnail(path, allowed)
 }
 
 /// Runs `command` to its end, or kills it after MOST_SECONDS: whether it succeeded.
@@ -53,21 +58,44 @@ fn run(command: &mut std::process::Command) -> bool {
         }
     }
 }
-/// A new, empty folder for one thumbnailer's output, removed when dropped.
+/// A new, empty folder for one thumbnailer's output, removed when dropped: readable only by the
+/// user (0700 on Unix), since the thumbnail shows one of the user's pictures, and named
+/// unpredictably, so another user can't take the name first and make thumbnails fail.
 #[allow(dead_code)]
 struct Scratch(std::path::PathBuf);
 #[allow(dead_code)]
 impl Scratch {
     fn new() -> Option<Self> {
+        use std::hash::{BuildHasher, Hasher};
         use std::sync::atomic::{AtomicU64, Ordering};
         static NEXT: AtomicU64 = AtomicU64::new(0);
-        let dir = std::env::temp_dir().join(format!(
-            "oc-thumbnail-{}-{}",
-            std::process::id(),
-            NEXT.fetch_add(1, Ordering::Relaxed)
-        ));
-        std::fs::create_dir(&dir).ok()?;
-        Some(Self(dir))
+        // A few tries, should a name somehow be taken.
+        for _ in 0..4 {
+            // RandomState's keys are random for each process, and hashing the counter and the
+            // time with them gives a name no one else can guess.
+            let mut hasher = std::collections::hash_map::RandomState::new().build_hasher();
+            hasher.write_u64(NEXT.fetch_add(1, Ordering::Relaxed));
+            hasher.write_u128(
+                std::time::SystemTime::now()
+                    .duration_since(std::time::UNIX_EPOCH)
+                    .map_or(0, |d| d.as_nanos()),
+            );
+            let dir = std::env::temp_dir().join(format!(
+                "oc-thumbnail-{}-{:016x}",
+                std::process::id(),
+                hasher.finish()
+            ));
+            let mut builder = std::fs::DirBuilder::new();
+            #[cfg(unix)]
+            {
+                use std::os::unix::fs::DirBuilderExt;
+                builder.mode(0o700);
+            }
+            if builder.create(&dir).is_ok() {
+                return Some(Self(dir));
+            }
+        }
+        None
     }
 }
 impl Drop for Scratch {
@@ -89,12 +117,27 @@ mod platform {
         time::UNIX_EPOCH,
     };
 
-    pub fn thumbnail(path: &Path) -> Option<DynamicImage> {
-        let uri = Url::from_file_path(path).ok()?.to_string();
+    pub fn thumbnail(path: &Path, run: bool) -> Option<DynamicImage> {
         let home = env::var_os("HOME").map(PathBuf::from);
         let cache = env::var_os("XDG_CACHE_HOME")
             .map(PathBuf::from)
             .or_else(|| home.as_ref().map(|h| h.join(".cache")))?;
+        found(
+            &cache.join("thumbnails"),
+            &thumbnailer_dirs(home.as_deref()),
+            path,
+            run,
+        )
+    }
+    /// The thumbnail a file manager kept under `root`, or else, when `run`, one made by a
+    /// thumbnailer described in `dirs`.
+    pub(super) fn found(
+        root: &Path,
+        dirs: &[PathBuf],
+        path: &Path,
+        run: bool,
+    ) -> Option<DynamicImage> {
+        let uri = Url::from_file_path(path).ok()?.to_string();
         let modified = fs::metadata(path)
             .ok()?
             .modified()
@@ -102,8 +145,7 @@ mod platform {
             .duration_since(UNIX_EPOCH)
             .ok()?
             .as_secs();
-        cached(&cache.join("thumbnails"), &uri, modified)
-            .or_else(|| made(&thumbnailer_dirs(home.as_deref()), path, &uri))
+        cached(root, &uri, modified).or_else(|| run.then(|| made(dirs, path, &uri)).flatten())
     }
 
     /// Where thumbnailers are described: `thumbnailers` in XDG_DATA_HOME, then in each of
@@ -342,8 +384,12 @@ mod platform {
     use image::DynamicImage;
     use std::{path::Path, process::Command};
 
-    /// Quick Look's thumbnail, which qlmanage writes as `<file name>.png` in the folder given.
-    pub fn thumbnail(path: &Path) -> Option<DynamicImage> {
+    /// Quick Look's thumbnail, which qlmanage writes as `<file name>.png` in the folder given;
+    /// None unless `allowed`.
+    pub fn thumbnail(path: &Path, allowed: bool) -> Option<DynamicImage> {
+        if !allowed {
+            return None;
+        }
         let scratch = Scratch::new()?;
         let made = run(Command::new("/usr/bin/qlmanage")
             .arg("-t")
@@ -382,8 +428,12 @@ mod platform {
         },
     };
 
-    /// The Shell's thumbnail, as Explorer shows it; never the file type's icon.
-    pub fn thumbnail(path: &Path) -> Option<DynamicImage> {
+    /// The Shell's thumbnail, as Explorer shows it; never the file type's icon. None unless
+    /// `allowed`: the Shell's thumbnail handlers decode the file in this process.
+    pub fn thumbnail(path: &Path, allowed: bool) -> Option<DynamicImage> {
+        if !allowed {
+            return None;
+        }
         unsafe {
             // Each thread that asks joins the multithreaded apartment; joining again is harmless.
             let _ = CoInitializeEx(None, COINIT_MULTITHREADED);
@@ -463,7 +513,7 @@ mod tests {
     #[cfg(all(unix, not(target_os = "macos")))]
     #[test]
     fn freedesktop_thumbnails_kept_and_made() {
-        use super::platform::{cached, command_line, made, mime_types, parse_entry};
+        use super::platform::{cached, command_line, found, made, mime_types, parse_entry};
         use image::{codecs::png::PngEncoder, ImageEncoder, Rgb, RgbImage};
         use md5::{Digest, Md5};
         use std::{fs, os::unix::fs::PermissionsExt, path::Path};
@@ -569,11 +619,32 @@ mod tests {
         fs::write(&clip, b"not really a video").unwrap();
         let picture = made(std::slice::from_ref(&thumbnailers), &clip, uri).unwrap();
         assert_eq!(picture.to_rgb8().get_pixel(10, 10).0, [200, 30, 30]);
+        // Run only for a file the user chose; otherwise only a kept thumbnail is used.
+        let dirs = std::slice::from_ref(&thumbnailers);
+        assert!(found(&root, dirs, &clip, false).is_none());
+        assert!(found(&root, dirs, &clip, true).is_some());
         // Not for a kind it doesn't take.
         let film = dir.join("film.mkv");
         fs::write(&film, b"not really a video").unwrap();
         assert!(made(&[thumbnailers], &film, uri).is_none());
         fs::remove_dir_all(dir).unwrap();
+    }
+
+    /// Scratch folders are the user's alone, and each has its own name.
+    #[cfg(unix)]
+    #[test]
+    fn scratch_folders_are_private() {
+        use std::os::unix::fs::PermissionsExt;
+        let (a, b) = (
+            super::Scratch::new().unwrap(),
+            super::Scratch::new().unwrap(),
+        );
+        assert_ne!(a.0, b.0);
+        let mode = std::fs::metadata(&a.0).unwrap().permissions().mode() & 0o777;
+        assert_eq!(mode, 0o700);
+        let path = a.0.clone();
+        drop(a);
+        assert!(!path.exists());
     }
 
     #[cfg(any(target_os = "macos", windows))]
@@ -588,7 +659,11 @@ mod tests {
         DynamicImage::ImageRgb8(RgbImage::from_pixel(600, 300, Rgb([30, 160, 30])))
             .save(&file)
             .unwrap();
-        let picture = super::thumbnail(&file).expect("the system's thumbnail");
+        assert!(
+            super::thumbnail(&file, false).is_none(),
+            "only for files the user chose"
+        );
+        let picture = super::thumbnail(&file, true).expect("the system's thumbnail");
         let (width, height) = picture.dimensions();
         assert!(width > height, "{width}×{height}");
         let Rgb([r, g, b]) = *picture.to_rgb8().get_pixel(width / 2, height / 2);

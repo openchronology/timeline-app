@@ -8,6 +8,7 @@ import EntitySummary from '../../../../../components/entity-summary.jsx';
 import TimelineSummary from '../../../../../components/timeline-summary.jsx';
 import { accessibleTimeline, versionInfo } from '../../../../../lib/timeline.js';
 import { timelinePath } from '../../../../../../src/addresses.ts';
+import { publicPage } from '../../../../../lib/analytics.js';
 import {
   entityFacts,
   entityMetadata,
@@ -17,11 +18,14 @@ import {
   entityStructuredData,
   jsonLd,
   linksOf,
+  pageTitle,
   momentOf,
   momentTitle,
   presentTime,
   relatedOf,
+  sharedPath,
   siteName,
+  timelineTitle,
 } from '../../../../../lib/sharing.js';
 export const dynamic = 'force-dynamic';
 async function load(params) {
@@ -65,7 +69,14 @@ export default async function MomentPage({ params }) {
   });
   const trail = entityBreadcrumbs(timeline, entity, momentTitle(event));
   return (
-    <main className="editor-page">
+    <main
+      className="editor-page"
+      {...publicPage(
+        timeline,
+        sharedPath(timeline, entity),
+        pageTitle(momentTitle(event), timelineTitle(timeline)),
+      )}
+    >
       {data && (
         <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: jsonLd(data) }} />
       )}

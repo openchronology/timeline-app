@@ -4,7 +4,8 @@
 //! desktop opens in the file's own app); and opening such a link, or showing it in its folder.
 //!
 //! The editor never names a path: it scans only the folders and files picked in the native
-//! dialog (`Roots`), and opens only `file:` links, never anything the checks in `local_file`
+//! dialog (`Roots`), and opens only `file:` links: in their own app only photos, videos, sounds
+//! and documents (`local_file`), anything else in its folder.
 //! refuse. Media dates come from the files' own metadata with nom-exif (EXIF for photos, the
 //! track's creation date for video and audio), read without running anything.
 use nom_exif::{ExifTag, MediaKind, MediaParser, MediaSource, TrackInfoTag};
@@ -382,93 +383,22 @@ pub fn document(mut template: Document, events: Vec<Event>) -> Document {
     template
 }
 
-/// Extensions never handed to the system to open, on any platform: programs, scripts,
-/// installers, launchers and shortcuts, which opening would run.
-const UNSAFE: &[&str] = &[
-    "exe",
-    "com",
-    "bat",
-    "cmd",
-    "ps1",
-    "psm1",
-    "vbs",
-    "vbe",
-    "js",
-    "jse",
-    "wsf",
-    "wsh",
-    "msi",
-    "msp",
-    "mst",
-    "scr",
-    "pif",
-    "cpl",
-    "hta",
-    "lnk",
-    "reg",
-    "jar",
-    "app",
-    "command",
-    "tool",
-    "workflow",
-    "action",
-    "desktop",
-    "sh",
-    "bash",
-    "zsh",
-    "csh",
-    "ksh",
-    "fish",
-    "run",
-    "bin",
-    "appimage",
-    "deb",
-    "rpm",
-    "pkg",
-    "mpkg",
-    "dmg",
-    "apk",
-    "py",
-    "pyw",
-    "pl",
-    "rb",
-    "php",
-    "msc",
-    "url",
-    "inf",
-    "scf",
-    "gadget",
-    "application",
-    "xbap",
-    "settingcontent-ms",
-    "library-ms",
-    "appref-ms",
-    "ws",
-    "diagcab",
-    "elf",
-    "out",
-    "so",
-    "dll",
-    "dylib",
-    "kext",
-    "service",
-    "terminal",
-    "scpt",
-    "applescript",
-    "osascript",
-    "webloc",
-    "inetloc",
-    "fileloc",
-    "iso",
-    "img",
-    "vhd",
-    "vhdx",
+/// Documents opened in their own app, besides photos, videos and sounds: types whose apps show
+/// them rather than run them, with no macros (Office's macro-enabled types, .docm and the like,
+/// are left out). Anything else a timeline links to, whatever it is, is shown in its folder
+/// instead: no list of dangerous types can be complete (help files, installers, themes,
+/// remote-desktop and web-query files all run or reach out when opened), so the safe ones are
+/// listed and the rest left to the user to open from the file manager.
+const DOCUMENTS: &[&str] = &[
+    "pdf", "txt", "md", "csv", "rtf", "epub", "odt", "ods", "odp", "odg", "docx", "xlsx", "pptx",
+    "gif", "bmp",
 ];
-/// The file a `file:` link names, when it may be opened in its own app: a regular file that
-/// exists, isn't a program or script (by its name or its target's, see UNSAFE), and, on Linux and
-/// macOS, isn't executable unless it is a photo, video or sound (as files on a memory card often
-/// are). Errors say why not.
-pub fn local_file(link: &str) -> Result<PathBuf, String> {
+/// The file a `file:` link names, and whether it opens in its own app (true) or is shown in its
+/// folder (false). It opens in its app only when its name and its target's (a link named like a
+/// photo may point at a script) are a photo's, video's, sound's or one of DOCUMENTS; and, on Linux
+/// and macOS, when it isn't executable, unless it is a photo, video or sound (as files on a memory
+/// card often are). Errors when the link isn't to a regular file on this computer.
+pub fn local_file(link: &str) -> Result<(PathBuf, bool), String> {
     let path = local_path(link)?;
     let target = std::fs::canonicalize(&path)
         .map_err(|_| "That file isn't on this computer, or can't be read.".to_string())?;
@@ -476,29 +406,24 @@ pub fn local_file(link: &str) -> Result<PathBuf, String> {
     if !metadata.is_file() {
         return Err("Only files can be opened. Use Show in folder for a folder.".into());
     }
-    for name in [&path, &target] {
+    let openable = |name: &Path| {
         let extension = name
             .extension()
             .and_then(|e| e.to_str())
             .map(str::to_ascii_lowercase)
             .unwrap_or_default();
-        if UNSAFE.contains(&extension.as_str()) {
-            return Err(format!(
-                "Programs and scripts (.{extension}) aren't opened from a timeline. Use Show in folder instead."
-            ));
-        }
-    }
+        kind(name) != "other" || DOCUMENTS.contains(&extension.as_str())
+    };
+    #[allow(unused_mut)]
+    let mut in_app = openable(&path) && openable(&target);
     #[cfg(unix)]
     {
         use std::os::unix::fs::PermissionsExt;
         if metadata.permissions().mode() & 0o111 != 0 && kind(&target) == "other" {
-            return Err(
-                "This file can run as a program, so it isn't opened from a timeline. Use Show in folder instead."
-                    .into(),
-            );
+            in_app = false;
         }
     }
-    Ok(target)
+    Ok((target, in_app))
 }
 /// The path a `file:` link names: `file:///…` (or `file://localhost/…`), absolute.
 pub fn local_path(link: &str) -> Result<PathBuf, String> {
@@ -513,10 +438,11 @@ pub fn local_path(link: &str) -> Result<PathBuf, String> {
     url.to_file_path()
         .map_err(|_| "That isn't a file link.".to_string())
 }
-/// Opens the file a `file:` link names in the system's app for it, if local_file allows it.
+/// Opens the file a `file:` link names in the system's app for it, if local_file allows it, or
+/// else shows it in its folder.
 pub fn open_file(link: &str) -> Result<(), String> {
-    let path = local_file(link)?;
-    launch(&path, false)
+    let (path, in_app) = local_file(link)?;
+    launch(&path, !in_app)
 }
 /// Shows the file a `file:` link names in its folder (the file manager, with it selected where
 /// the platform can), or the folder itself when the link names one.
@@ -835,7 +761,7 @@ mod tests {
     }
 
     #[test]
-    fn only_safe_local_files_open() {
+    fn only_media_and_documents_open_in_their_app() {
         let dir = folder("open");
         let photo = dir.join("photo one.jpg");
         fs::write(&photo, b"x").unwrap();
@@ -843,7 +769,7 @@ mod tests {
         assert!(link.contains("photo%20one.jpg"));
         assert_eq!(
             local_file(&link).unwrap(),
-            fs::canonicalize(&photo).unwrap()
+            (fs::canonicalize(&photo).unwrap(), true)
         );
         assert!(local_file(&link.replace("file:///", "file://localhost/")).is_ok());
         for refused in [
@@ -854,14 +780,44 @@ mod tests {
         ] {
             assert!(local_file(refused).is_err(), "{refused}");
         }
-        for name in ["run.sh", "setup.EXE", "launch.desktop", "Thing.app"] {
+        for name in [
+            "notes.PDF",
+            "list.txt",
+            "Report.docx",
+            "song.flac",
+            "clip.mkv",
+        ] {
             let path = dir.join(name);
             fs::write(&path, b"x").unwrap();
             let link = Url::from_file_path(&path).unwrap().to_string();
-            assert!(local_file(&link).is_err(), "{name}");
+            assert!(local_file(&link).unwrap().1, "{name} opens in its app");
+        }
+        // Programs, scripts, installers and everything not known to be a document: shown in
+        // their folder, including types a list of dangerous ones might miss.
+        for name in [
+            "run.sh",
+            "setup.EXE",
+            "launch.desktop",
+            "Thing.app",
+            "help.chm",
+            "store.msix",
+            "dark.theme",
+            "start.jnlp",
+            "office.rdp",
+            "query.iqy",
+            "Budget.xlsm",
+            "Letter.docm",
+            "profile.mobileconfig",
+            "page.html",
+            "drawing.svg",
+            "no-extension",
+        ] {
+            let path = dir.join(name);
+            fs::write(&path, b"x").unwrap();
+            let link = Url::from_file_path(&path).unwrap().to_string();
             assert!(
-                local_path(&link).is_ok(),
-                "{name} can still be shown in its folder"
+                !local_file(&link).unwrap().1,
+                "{name} is shown in its folder"
             );
         }
         let folder_link = Url::from_file_path(&dir).unwrap().to_string();
@@ -869,14 +825,18 @@ mod tests {
         #[cfg(unix)]
         {
             use std::os::unix::fs::PermissionsExt;
-            let program = dir.join("program");
+            let program = dir.join("program.txt");
             fs::write(&program, b"x").unwrap();
             fs::set_permissions(&program, fs::Permissions::from_mode(0o755)).unwrap();
             let link = Url::from_file_path(&program).unwrap().to_string();
-            assert!(local_file(&link).is_err(), "executable");
+            assert!(!local_file(&link).unwrap().1, "executable");
             // A photo from a memory card, executable as such files often are, still opens.
             fs::set_permissions(&photo, fs::Permissions::from_mode(0o777)).unwrap();
-            assert!(local_file(Url::from_file_path(&photo).unwrap().as_ref()).is_ok());
+            assert!(
+                local_file(Url::from_file_path(&photo).unwrap().as_ref())
+                    .unwrap()
+                    .1
+            );
             // A link named like a photo, pointing at a script, is judged by its target too.
             let script = dir.join("real.sh");
             fs::write(&script, b"x").unwrap();
@@ -884,7 +844,7 @@ mod tests {
             let link = Url::from_file_path(dir.join("innocent.jpg"))
                 .unwrap()
                 .to_string();
-            assert!(local_file(&link).is_err(), "a link to a script");
+            assert!(!local_file(&link).unwrap().1, "a link to a script");
         }
         fs::remove_dir_all(dir).unwrap();
     }

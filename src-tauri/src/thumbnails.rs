@@ -10,6 +10,15 @@
 //! can't decode), the system makes one (system_thumbnails.rs). They are kept in the app's cache
 //! folder, named by a hash of the file's path, size and modification time, so a changed file
 //! gets a new one. They are never sent anywhere: the page holds them only to draw them.
+//!
+//! Timelines come from anyone, and name whatever files they like, so the system's thumbnailers
+//! (separate programs with decoders for every format, run with the user's rights) are used only
+//! for files the user chose: in folders the user populated a timeline from, or in a timeline the
+//! user trusted by opening one of its files. Other files get only what this app reads itself, in
+//! Rust, and thumbnails a file manager already keeps.
+//!
+//! The cache folder is the user's alone (0700 on Unix) and so are its thumbnails (0600), as the
+//! freedesktop thumbnail specification asks, since they show the user's private pictures.
 use base64::Engine;
 use image::{codecs::jpeg::JpegEncoder, DynamicImage, ImageFormat, ImageReader, Limits};
 use std::{
@@ -55,20 +64,29 @@ fn cache_name(path: &Path, metadata: &fs::Metadata) -> String {
     }
     format!("{hash:016x}.jpg")
 }
+/// Whether `path` (canonical) is in one of `folders` (canonical), or is one: the folders and
+/// files the user populated timelines from, whose files the system's thumbnailers may read.
+pub fn chosen(path: &Path, folders: &[PathBuf]) -> bool {
+    folders.iter().any(|folder| path.starts_with(folder))
+}
 /// The thumbnail of the photo or video `link` names, as a `data:image/jpeg;base64,…` URL, from
 /// `cache` or made and kept there; None when it isn't one on this computer or none can be made.
-pub fn thumbnail(cache: &Path, link: &str) -> Option<String> {
+/// `system` says whether the system's thumbnailers may be run on the file (its canonical path):
+/// only for files the user chose. A thumbnail not made for want of them isn't remembered, so it
+/// is made once they may be run.
+pub fn thumbnail(cache: &Path, link: &str, system: &dyn Fn(&Path) -> bool) -> Option<String> {
     let (path, metadata, kind) = picturable(link)?;
     let kept = cache.join(cache_name(&path, &metadata));
     let jpeg = match fs::read(&kept) {
         Ok(jpeg) => jpeg,
         Err(_) => {
-            let jpeg = make(&path, metadata.len(), kind)?;
+            let jpeg = make(&path, metadata.len(), kind, system(&path))?;
             // Written whole, then renamed, so a half-written file is never read back.
-            let _ = fs::create_dir_all(cache);
-            let partial = kept.with_extension(format!("{}.part", std::process::id()));
-            if fs::write(&partial, &jpeg).is_ok() && fs::rename(&partial, &kept).is_err() {
-                let _ = fs::remove_file(&partial);
+            if private_folder(cache).is_ok() {
+                let partial = kept.with_extension(format!("{}.part", std::process::id()));
+                if write_private(&partial, &jpeg).is_err() || fs::rename(&partial, &kept).is_err() {
+                    let _ = fs::remove_file(&partial);
+                }
             }
             jpeg
         }
@@ -79,9 +97,9 @@ pub fn thumbnail(cache: &Path, link: &str) -> Option<String> {
     ))
 }
 /// Makes a thumbnail: a photo's own EXIF thumbnail or the photo scaled down, turned upright; a
-/// video's cover picture; or else the system's (already upright); at most SIDE pixels a side; as
-/// a JPEG.
-fn make(path: &Path, size: u64, kind: &str) -> Option<Vec<u8>> {
+/// video's cover picture; or else the system's (already upright; made by its thumbnailers only
+/// when `system`); at most SIDE pixels a side; as a JPEG.
+fn make(path: &Path, size: u64, kind: &str, system: bool) -> Option<Vec<u8>> {
     let own = if kind == "video" {
         cover(path)
     } else {
@@ -99,7 +117,7 @@ fn make(path: &Path, size: u64, kind: &str) -> Option<Vec<u8>> {
                 picture
             })
     };
-    let mut picture = own.or_else(|| crate::system_thumbnails::thumbnail(path))?;
+    let mut picture = own.or_else(|| crate::system_thumbnails::thumbnail(path, system))?;
     // Shrunk, never enlarged: a small embedded thumbnail stays as it is.
     if picture.width() > SIDE || picture.height() > SIDE {
         picture = picture.thumbnail(SIDE, SIDE);
@@ -110,6 +128,35 @@ fn make(path: &Path, size: u64, kind: &str) -> Option<Vec<u8>> {
         .write_with_encoder(JpegEncoder::new_with_quality(&mut jpeg, 80))
         .ok()?;
     Some(jpeg)
+}
+
+/// Makes `folder` and any folders above it that are missing, readable only by the user (0700
+/// on Unix), and makes it so if it already was there (older versions made it 0755).
+pub fn private_folder(folder: &Path) -> std::io::Result<()> {
+    let mut builder = fs::DirBuilder::new();
+    builder.recursive(true);
+    #[cfg(unix)]
+    {
+        use std::os::unix::fs::{DirBuilderExt, PermissionsExt};
+        builder.mode(0o700);
+        builder.create(folder)?;
+        fs::set_permissions(folder, fs::Permissions::from_mode(0o700))
+    }
+    #[cfg(not(unix))]
+    builder.create(folder)
+}
+/// Writes `bytes` to a new file at `path`, readable only by the user from the start (0600 on
+/// Unix): never created readable to others and narrowed after, when another user could open it.
+pub fn write_private(path: &Path, bytes: &[u8]) -> std::io::Result<()> {
+    use std::io::Write;
+    let mut options = fs::OpenOptions::new();
+    options.write(true).create(true).truncate(true);
+    #[cfg(unix)]
+    {
+        use std::os::unix::fs::OpenOptionsExt;
+        options.mode(0o600);
+    }
+    options.open(path)?.write_all(bytes)
 }
 
 /// A photo decoded by the image crate, within limits on its size and memory.
@@ -363,7 +410,7 @@ mod tests {
         DynamicImage::ImageRgb8(RgbImage::from_pixel(800, 400, Rgb([200, 30, 30])))
             .save(&wide)
             .unwrap();
-        let small = picture(&thumbnail(&cache, &link(&wide)).unwrap());
+        let small = picture(&thumbnail(&cache, &link(&wide), &|_| true).unwrap());
         assert_eq!(small.dimensions(), (160, 80));
         // Its own: the blue EXIF thumbnail, not the red photo, turned upright (orientation 6
         // is a quarter turn clockwise), so the wide thumbnail stands tall.
@@ -377,16 +424,16 @@ mod tests {
             ),
         )
         .unwrap();
-        let own = picture(&thumbnail(&cache, &link(&camera)).unwrap());
+        let own = picture(&thumbnail(&cache, &link(&camera), &|_| true).unwrap());
         assert_eq!(own.dimensions(), (60, 80));
         let Rgb([r, _, b]) = own.to_rgb8().get_pixel(30, 40).to_owned();
         assert!(b > 150 && r < 100, "the embedded thumbnail");
         // Kept: a second asking reads the cache; a changed photo gets a new one.
         assert_eq!(fs::read_dir(&cache).unwrap().count(), 2);
-        assert!(thumbnail(&cache, &link(&camera)).is_some());
+        assert!(thumbnail(&cache, &link(&camera), &|_| true).is_some());
         assert_eq!(fs::read_dir(&cache).unwrap().count(), 2);
         fs::write(&camera, jpeg_of(300, 300, [30, 200, 30])).unwrap();
-        let changed = picture(&thumbnail(&cache, &link(&camera)).unwrap());
+        let changed = picture(&thumbnail(&cache, &link(&camera), &|_| true).unwrap());
         assert_eq!(changed.dimensions(), (160, 160));
         assert_eq!(fs::read_dir(&cache).unwrap().count(), 3);
         fs::remove_dir_all(dir).unwrap();
@@ -438,7 +485,7 @@ mod tests {
                 video_with_cover(&jpeg_of(320, 180, [30, 30, 200]), quicktime),
             )
             .unwrap();
-            let cover = picture(&thumbnail(&cache, &link(&video)).unwrap());
+            let cover = picture(&thumbnail(&cache, &link(&video), &|_| true).unwrap());
             assert_eq!(cover.dimensions(), (160, 90), "{name}");
             let Rgb([r, _, b]) = cover.to_rgb8().get_pixel(80, 45).to_owned();
             assert!(b > 150 && r < 100, "{name}: the cover");
@@ -481,9 +528,62 @@ mod tests {
             "https://example.org/a.jpg".to_string(),
             "file://server/share/a.jpg".to_string(),
         ] {
-            assert!(thumbnail(&cache, &refused).is_none(), "{refused}");
+            assert!(
+                thumbnail(&cache, &refused, &|_| true).is_none(),
+                "{refused}"
+            );
         }
         assert!(!cache.exists() || fs::read_dir(&cache).unwrap().count() == 0);
+        fs::remove_dir_all(dir).unwrap();
+    }
+
+    /// The system's thumbnailers are asked only about files the user chose, and the cache keeps
+    /// thumbnails where only the user can read them.
+    #[test]
+    fn chosen_files_and_private_cache() {
+        let dir = folder("chosen");
+        let photos = fs::canonicalize(&dir).unwrap().join("photos");
+        fs::create_dir_all(photos.join("trip")).unwrap();
+        let folders = [photos.clone()];
+        assert!(chosen(&photos.join("trip/clip.mkv"), &folders));
+        assert!(chosen(&photos, &folders));
+        assert!(!chosen(&dir.join("photos-elsewhere/clip.mkv"), &folders));
+        assert!(!chosen(
+            Path::new("/home/someone/Downloads/clip.mkv"),
+            &folders
+        ));
+        assert!(!chosen(&photos.join("clip.mkv"), &[]));
+        // Whether the system may be asked is decided by the file's real path.
+        let clip = photos.join("trip/clip.mkv");
+        fs::write(&clip, b"not really a video").unwrap();
+        let asked = std::cell::RefCell::new(Vec::new());
+        let ask = |path: &Path| {
+            asked.borrow_mut().push(path.to_path_buf());
+            false
+        };
+        assert!(thumbnail(&dir.join("cache"), &link(&clip), &ask).is_none());
+        assert_eq!(*asked.borrow(), [clip.clone()]);
+        // Made private, and narrowed when an older version made it open to others.
+        #[cfg(unix)]
+        {
+            use std::os::unix::fs::PermissionsExt;
+            let cache = dir.join("cache/thumbnails");
+            fs::create_dir_all(&cache).unwrap();
+            fs::set_permissions(&cache, fs::Permissions::from_mode(0o755)).unwrap();
+            let wide = dir.join("wide.png");
+            DynamicImage::ImageRgb8(RgbImage::from_pixel(320, 200, Rgb([200, 30, 30])))
+                .save(&wide)
+                .unwrap();
+            assert!(thumbnail(&cache, &link(&wide), &|_| false).is_some());
+            let mode = |path: &Path| fs::metadata(path).unwrap().permissions().mode() & 0o777;
+            assert_eq!(mode(&cache), 0o700);
+            let kept: Vec<_> = fs::read_dir(&cache)
+                .unwrap()
+                .map(|e| e.unwrap().path())
+                .collect();
+            assert_eq!(kept.len(), 1);
+            assert_eq!(mode(&kept[0]), 0o600);
+        }
         fs::remove_dir_all(dir).unwrap();
     }
 }

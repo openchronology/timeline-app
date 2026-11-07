@@ -83,6 +83,44 @@ assert.equal(bytes.subarray(0, 16).toString(), 'SQLite format 3\0');
 assert.deepEqual(await converter.convert('read', bytes), document);
 for (const input of [Buffer.from('not sqlite'), Buffer.from('SQLite format 3\0garbage')])
   await assert.rejects(converter.convert('read', input), (error) => error.status === 400);
+// A crafted file whose description is a generated column calling q_decimal with an exponent
+// too large for GMP used to kill the converter with SIGFPE. It is now refused with an error:
+// the converter exits normally, with no signal. node:sqlite edits the schema by hand, as an
+// attacker would; Node versions without its `defensive` option skip this.
+{
+  const { DatabaseSync } = await import('node:sqlite').catch(() => ({}));
+  const { mkdtemp, writeFile, readFile, rm } = await import('node:fs/promises');
+  const { tmpdir } = await import('node:os');
+  const { join } = await import('node:path');
+  const directory = await mkdtemp(join(tmpdir(), 'och-crafted-'));
+  const path = join(directory, 'crafted.och');
+  await writeFile(path, bytes);
+  let crafted = null;
+  try {
+    const db = new DatabaseSync(path, { defensive: false });
+    db.exec('PRAGMA writable_schema=ON');
+    db.exec(
+      "UPDATE sqlite_schema SET sql=replace(sql,'description TEXT NOT NULL','description TEXT GENERATED ALWAYS AS (q_decimal(''1e99999999999'')) VIRTUAL') WHERE name='timeline_meta'",
+    );
+    db.close();
+    crafted = await readFile(path);
+  } catch {}
+  await rm(directory, { recursive: true, force: true });
+  if (crafted) {
+    const probe = new TimelineFiles();
+    const exits = [];
+    const failure = probe.failure.bind(probe);
+    probe.failure = (operation, error, stderr) => {
+      exits.push({ code: error.code, signal: error.signal, stderr });
+      return failure(operation, error, stderr);
+    };
+    await assert.rejects(probe.convert('read', crafted), (error) => error.status === 400);
+    assert.equal(exits.length, 1);
+    assert.equal(exits[0].signal, null);
+    assert.equal(exits[0].code, 1);
+    assert.match(exits[0].stderr, /unsafe use of q_decimal/);
+  } else console.log('SKIP crafted generated column: node:sqlite cannot edit a schema here.');
+}
 // Files are limited to TIMELINE_FILE_BYTES (64 MiB by default), and a conversion stopped by a
 // limit says which (#202).
 assert.equal(converter.limit, 64 * 1024 * 1024);

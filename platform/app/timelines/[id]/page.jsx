@@ -10,11 +10,13 @@ import PreparingCopy from '../../../components/preparing-copy.jsx';
 import { accessibleTimeline, versionInfo } from '../../../lib/timeline.js';
 import { timelinePath } from '../../../../src/addresses.ts';
 import { relatedTimelines } from '../../../../server/collaboration.mjs';
+import { publicPage } from '../../../lib/analytics.js';
 import {
   firstMoments,
   jsonLd,
   linksOf,
   pageMetadata,
+  pageTitle,
   previewOf,
   timelineDescription,
   timelineStructuredData,
@@ -62,7 +64,10 @@ export default async function TimelinePage({ params }) {
   ]);
   const data = timelineStructuredData(timeline);
   return (
-    <main className="editor-page">
+    <main
+      className="editor-page"
+      {...publicPage(timeline, timelinePath(timeline), pageTitle(timelineTitle(timeline)))}
+    >
       {data && (
         <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: jsonLd(data) }} />
       )}

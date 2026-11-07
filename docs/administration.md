@@ -369,6 +369,14 @@ for it and is then sent from the cache.
 - The choice is kept in the visitor's browser. **Analytics settings** in the footer asks again; declining after accepting stops analytics from that page on.
 - Analytics run with Google signals and ad personalization turned off.
 - Embedded timelines (`/embed/…`) and the editor's frame never load analytics.
+- The site sends each page view itself, with Google's automatic page view turned off, so Google gets only an address and title the site chose:
+  - A public timeline's page, and its moments' and durations' pages, are sent at their address and with their title.
+  - Every other page of a timeline (a private or unlisted one, its settings and history, a page that doesn't exist) is sent as `/timelines`, titled "Timeline": not its owner, address or title.
+  - `/compare` is sent without the timelines it compares, `/editor` without what it opens, and desktop sign-in as `/connect`, without its code.
+  - No address keeps its query (searches, which can name private timelines, and where to return after signing in), and any other ID in a path is sent as `(id)`.
+  - Titles are the site's own names for its pages ("Help · timescale.info"), never the browser's title, which on the editor's pages follows the open timeline.
+
+  In the Google Analytics data stream's **Enhanced measurement**, turn off **Page changes based on browser history events**, which would count pages twice and may send their real addresses, and **Outbound clicks** and **File downloads**, which report the addresses of links a visitor follows, such as a private timeline's sources.
 
 An ID that is not a measurement ID is refused at startup. Mention analytics in your privacy notice; `legal/PRIVACY.md` describes the default.
 
