@@ -2,18 +2,18 @@
 
 <!-- description: Run your own OpenChronology server with Docker Compose: public hosting, upgrades and backups, and email for account security. -->
 
-Run commands from `timeline-app` (or the root of its GitHub repository). Install Docker Engine with the Compose plugin. The suite builds PostgreSQL 16 with native GMP-backed pgmp, a Next.js App Router server on Node 24, and the native SQLite `.och` converter. Rust and Node build tools remain in separate build stages; the web container runs as the unprivileged `node` user.
+Run commands from `timeline-app` (or the root of its GitHub repository). Install Docker Engine with the Compose plugin. The suite builds PostgreSQL 16 with native GMP-backed pgmp, a Next.js App Router server on Node 24, and the native SQLite `.och` converter. Rust and Node build tools remain in separate build stages; the web container runs as the unprivileged `node` user, which cannot change the application's files (they belong to root; only Next.js's cache folder is writable).
 
 ```sh
 cp .env.example .env
-# Edit .env: choose a strong POSTGRES_PASSWORD.
+# Edit .env: choose strong, different POSTGRES_PASSWORD and APP_DATABASE_PASSWORD.
 docker compose up --build --wait
 docker compose ps
 ```
 
-Open <http://localhost:5173>. The first build downloads base images and locked dependencies and compiles both extensions. PostgreSQL becomes healthy first, the one-shot `migrate` service installs pgmp and the schema, and then the web server starts. `/healthz` checks database connectivity and the timeline schema. The migration container exiting successfully is expected. The web and database services restart automatically; Compose must complete migrations before starting a new web container.
+Open <http://localhost:5173>. The first build downloads base images and locked dependencies and compiles both extensions. PostgreSQL becomes healthy first, the one-shot `database-setup` service creates pgmp and the application's database role, the one-shot `migrate` service installs the schema, and then the web server starts. `/healthz` checks database connectivity and the timeline schema. The setup and migration containers exiting successfully is expected. The web and database services restart automatically; Compose must complete migrations before starting a new web container.
 
-There is one database password setting. Compose passes it using `PGPASSWORD`, so punctuation does not require URI encoding. Quote values containing `#` or `$` appropriately in `.env` (single quotes prevent interpolation). Keep `.env` private; it is excluded from the Docker build context. Changing this value after initialization does not change the password of an existing PostgreSQL account: rotate the database password and configuration together.
+There are two database passwords. `POSTGRES_PASSWORD` is the superuser's, which PostgreSQL's image creates; only `database-setup` uses it, to create pgmp (which needs a superuser) and the `openchronology_app` role. `APP_DATABASE_PASSWORD` is that role's: it is not a superuser and owns the database and everything in it, and the migrations, the app and the mail worker connect as it, as every other package's server does. A bug in the app that reached the database could then not run programs or read files on the database's machine, as a superuser can. Choose two different passwords. Compose passes them using `PGPASSWORD`, so punctuation does not require URI encoding. Quote values containing `#` or `$` appropriately in `.env` (single quotes prevent interpolation). Keep `.env` private; it is excluded from the Docker build context. `database-setup` sets the role's password from `APP_DATABASE_PASSWORD` each time it runs; changing `POSTGRES_PASSWORD` after initialization does not change the superuser's password: rotate it in PostgreSQL and the configuration together.
 
 The database has no host port. The web port binds only to host loopback. PostgreSQL data lives in the named `timelines` volume, independent of container rebuilds.
 
@@ -63,7 +63,7 @@ docker compose up --wait --force-recreate app
 
 With the mail worker (`--profile mail`), recreate it as well, so that it runs the new image: `docker compose --profile mail up --wait --force-recreate mail-worker`.
 
-If migration fails, leave the web server stopped and inspect its output before continuing. PostgreSQL major upgrades require a separate data migration; do not simply change the image major version against an existing volume. This setup uses one database account for both migrations and runtime; deployments needing separate database privileges can supply their own service configuration.
+If migration fails, leave the web server stopped and inspect its output before continuing. PostgreSQL major upgrades require a separate data migration; do not simply change the image major version against an existing volume. Installations from before `APP_DATABASE_PASSWORD` existed must add it to `.env`; Compose refuses to start until they do. `docker compose run --rm migrate` runs `database-setup` first, which creates the role and hands it the tables, functions and types the app made while it connected as the superuser.
 
 GitHub CI builds the images, boots an isolated stack, verifies exact pgmp arithmetic and bound queries, checks the HTTP session and static frontend, and round-trips SQLite files using the converter inside the actual web image.
 

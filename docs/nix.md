@@ -87,7 +87,7 @@ What the module sets up:
 - **PostgreSQL**, with `pgmp`, and the `openchronology` database and role. The server reaches it over the Unix socket, by peer authentication.
 - **An encryption key**, `AUTH_ENCRYPTION_KEY`, generated on first start in `/var/lib/openchronology/generated.env`. It encrypts authenticator secrets: back it up apart from the database. To give your own, put it in the environment file instead.
 - **`openchronology.service`**, which migrates the database each time it starts, then runs the server, with the Debian unit's hardening. Upgrading the flake input and switching migrates and restarts it.
-- **With `nginx.enable`, a virtual host** for the origin's host. It sets `TRUST_PROXY`, since nginx replaces `X-Forwarded-For` with the client's address. Add `enableACME` and `forceSSL` for HTTPS, as above.
+- **With `nginx.enable`, a virtual host** for the origin's host. It sets `TRUST_PROXY`, since nginx replaces `X-Forwarded-For` with the client's address. Its location sets its own proxy headers and turns off `services.nginx.recommendedProxySettings` there, which would send `X-Forwarded-For` a second time and make every client look like nginx. Add `enableACME` and `forceSSL` for HTTPS, as above.
 
 ### Options
 
@@ -109,7 +109,7 @@ What the module sets up:
 
 ### The first administrator
 
-As with the other packages, set `ADMIN_USERNAME`, `ADMIN_EMAIL` and `ADMIN_INITIAL_PASSWORD` (at least 15 characters) in the environment file before the first start. The server creates that account once. See [administration](administration.md). `openchronology-reset-admin-password` resets its password; run it as the `openchronology` user, with the same environment.
+As with the other packages, set `ADMIN_USERNAME`, `ADMIN_EMAIL` and `ADMIN_INITIAL_PASSWORD` (at least 15 characters) in the environment file before the first start. The server creates that account once. See [administration](administration.md). Once you have signed in and changed the password, remove `ADMIN_INITIAL_PASSWORD` from the environment file, so it no longer holds a working password. `openchronology-reset-admin-password` resets its password to one written there again; run it as the `openchronology` user, with the same environment.
 
 ### Log importers
 
@@ -124,6 +124,8 @@ services.openchronology.syslog = {
   };
 };
 ```
+
+`SYSLOG_HOST = "0.0.0.0"` receives from other machines. The receiver has no TLS or sender authentication, so anyone who can reach its port can add messages to the routed timelines: open the port (5514, UDP and TCP, by default) only to the machines that send, for example on their interface with `networking.firewall.interfaces.<name>.allowedUDPPorts` and `.allowedTCPPorts`, not in `networking.firewall.allowedUDPPorts` for every network. NixOS's firewall blocks it until you open it.
 
 The journald follower runs in the `systemd-journal` group, so it can read the journal.
 

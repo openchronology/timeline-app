@@ -100,6 +100,20 @@ test('journalctl follows from the cursor, or from a time, here or over SSH', () 
     '-o',
     'UserKnownHostsFile=/var/lib/x/known_hosts',
   ]);
+  // The operator's own known hosts: a host not listed there is refused, never accepted.
+  const [, strict] = journalCommand({
+    host: 'forge',
+    knownHosts: '/etc/openchronology/journald_known_hosts',
+    strictHostKeys: true,
+  });
+  assert.deepEqual(strict.slice(0, 6), [
+    '-o',
+    'BatchMode=yes',
+    '-o',
+    'StrictHostKeyChecking=yes',
+    '-o',
+    'UserKnownHostsFile=/etc/openchronology/journald_known_hosts',
+  ]);
 });
 
 test('entries become the importer’s moments, routed by unit, with IDs from their cursors', async () => {

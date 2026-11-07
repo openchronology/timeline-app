@@ -170,15 +170,22 @@ occurs.
 
 Rational arguments must be TEXT; bind strings or use q_decimal. NULL propagates
 through arithmetic; q_is_canonical(NULL) returns 0. Invalid arithmetic raises an
-SQL error. Functions are deterministic and innocuous, supporting checks with
-trusted_schema=OFF.
+SQL error. Functions are deterministic. q_is_canonical is innocuous, supporting
+checks with trusted_schema=OFF; the others are direct-only, so a database's own
+views, triggers, defaults, indexes and generated columns cannot call them, and
+opening an untrusted file never runs arithmetic its author chose.
+
+Each argument may be up to 1 MiB of text, and q_decimal's exponent up to 10,000
+either way (1e10000 is already a 10,001-digit number). Larger inputs raise an
+SQLITE_TOOBIG error rather than ask GMP for a number that would exhaust memory or
+abort the process; q_is_canonical returns 0 for them.
 
 RATIONAL_V1 orders valid rationals numerically, then malformed strings in a
 separate class ordered by bytes. Equivalent valid strings compare equal. This
 remains transitive for unchecked columns. SQLite collation callbacks cannot signal
 allocation failure: that failure terminates the process, consistent with GMP's
-default allocator. Time precision has no fixed numeric ceiling; SQLite value-size,
-memory, and GMP allocation limits still apply. Virtual-table weights, counts,
+default allocator. Time precision has no fixed numeric ceiling beyond the argument
+size above; SQLite value-size, memory, and GMP allocation limits still apply. Virtual-table weights, counts,
 distinct counts, and rowids are signed 64-bit; overflow raises an error.
 
 ## Costs and release scope

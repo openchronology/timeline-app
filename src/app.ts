@@ -2380,12 +2380,30 @@ function capacityPlatform(): Platform | null {
 function capacityTimeline() {
   return remote ? 'remote:' + remote.id : local ? 'local:' + local.path : 'memory:' + model?.title;
 }
+/**
+ * The capacity notices dismissed in this browser, by the hash of their timeline and advice
+ * (dismissalHash). Other pages of the same origin (every file:// page, in some browsers) can
+ * write this storage, so only a list of strings is trusted; anything else counts as none.
+ */
 function capacityDismissed(): string[] {
   try {
-    return JSON.parse(localStorage.getItem('och-capacity-dismissed') ?? '[]');
+    const value: unknown = JSON.parse(localStorage.getItem('och-capacity-dismissed') ?? '[]');
+    return Array.isArray(value)
+      ? value.filter((v): v is string => typeof v === 'string').slice(-50)
+      : [];
   } catch {
     return [];
   }
+}
+/**
+ * A dismissal as it is stored: a short hash of the timeline and its advice, not its title or
+ * file path, which other pages sharing the storage could otherwise read (FNV-1a, 32 bits:
+ * a rare collision only hides a notice).
+ */
+function dismissalHash(id: string): string {
+  let hash = 0x811c9dc5;
+  for (let i = 0; i < id.length; i++) hash = Math.imul(hash ^ id.charCodeAt(i), 0x01000193);
+  return 'h' + (hash >>> 0).toString(16);
 }
 /** A server's entry limit from its session: Infinity for none, the default if unsaid. */
 function sessionEntryLimit(s: Session): number {
@@ -2418,7 +2436,7 @@ function updateCapacity() {
       })
     : [];
   const id = key + '|' + advice.map((a) => a.kind).join(',');
-  const dismissed = capacityDismissed().includes(id);
+  const dismissed = capacityDismissed().includes(dismissalHash(id));
   notice.hidden = !advice.length || dismissed;
   if (notice.hidden || notice.dataset.advice === JSON.stringify(advice)) return;
   notice.dataset.advice = JSON.stringify(advice);
@@ -2481,7 +2499,7 @@ el('capacity-dismiss').onclick = () => {
   try {
     localStorage.setItem(
       'och-capacity-dismissed',
-      JSON.stringify([...capacityDismissed(), id].slice(-50)),
+      JSON.stringify([...capacityDismissed(), dismissalHash(id)].slice(-50)),
     );
   } catch {
     // Without storage the notice stays dismissed until the next change.
@@ -7922,20 +7940,29 @@ if (desktop) {
       )
     )
       return;
-    trustedFiles = documentRequest;
+    if (trustedFiles !== documentRequest) {
+      trustedFiles = documentRequest;
+      // Trusted now, its files may get the thumbnails only the system's thumbnailers make:
+      // asked again for those that had none.
+      for (const [url, found] of thumbnails) if (found === null) thumbnails.delete(url);
+      requestRender(false);
+    }
     void window.__TAURI__!.core.invoke('desktop_open_file', { url: link.href }).catch(fail);
   });
   // Thumbnails of photos on this computer (#440), as markers show them: asked of Rust in
   // batches of up to 64 as markers need them, kept here (the latest 2,000, and the photos that
-  // have none), and drawn when they come. They stay in this page: they are never saved.
+  // have none), and drawn when they come. They stay in this page: they are never saved. Rust
+  // runs the system's thumbnailers only on files in folders the user populated from, or on any
+  // the timeline names once the user trusted it by opening one of its files.
   const thumbnails = new Map<string, string | null>(),
     wantedThumbnails = new Set<string>();
   let thumbnailTimer: ReturnType<typeof setTimeout> | undefined;
   const askThumbnails = async () => {
     const urls = [...wantedThumbnails].slice(0, 64);
     for (const url of urls) wantedThumbnails.delete(url);
+    const trusted = trustedFiles === documentRequest;
     const found = await window
-      .__TAURI__!.core.invoke<(string | null)[]>('desktop_thumbnails', { urls })
+      .__TAURI__!.core.invoke<(string | null)[]>('desktop_thumbnails', { urls, trusted })
       .catch(() => [] as (string | null)[]);
     urls.forEach((url, i) => thumbnails.set(url, found[i] ?? null));
     while (thumbnails.size > 2000) thumbnails.delete(thumbnails.keys().next().value!);

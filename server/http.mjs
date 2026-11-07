@@ -41,7 +41,7 @@ import { createServer } from 'node:http';
 import { readFile } from 'node:fs/promises';
 import { resolve, join } from 'node:path';
 import { isIP } from 'node:net';
-import { minor, Auth } from './auth.mjs';
+import { minor, Auth, limitAddress } from './auth.mjs';
 import { Challenges } from './challenge.mjs';
 import { OAuth, providersFromEnv } from './oauth.mjs';
 import { Directory, directoryFromEnv } from './ldap.mjs';
@@ -73,14 +73,60 @@ import {
 } from '../dist/core.mjs';
 const uuid = /^[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}$/i;
 /**
- * The request's JSON body, read up to `maximum` bytes (16 MiB by default; routes pass less).
- * 415 unless sent as application/json, 413 past the limit (stopping as soon as it is passed),
- * 400 for invalid JSON, and 400 for one holding a link to a file on someone's computer
- * (`file://`, #433): local paths name a person and their folders, and are never stored here.
+ * How deeply a request's JSON may nest. Parsing deeply nested JSON is slow (seconds for a
+ * large body of nested brackets), and no request needs more than a few levels.
+ */
+const JSON_DEPTH = 128;
+/**
+ * Whether the JSON text in `bytes` nests arrays and objects more than `limit` deep, read
+ * without parsing it (brackets inside strings do not count).
+ */
+export function nestedTooDeeply(bytes, limit = JSON_DEPTH) {
+  let depth = 0,
+    string = false;
+  for (let i = 0; i < bytes.length; i++) {
+    const c = bytes[i];
+    if (string) {
+      if (c === 0x5c) i++;
+      else if (c === 0x22) string = false;
+    } else if (c === 0x22) string = true;
+    else if (c === 0x5b || c === 0x7b) {
+      if (++depth > limit) return true;
+    } else if (c === 0x5d || c === 0x7d) depth--;
+  }
+  return false;
+}
+/**
+ * The most a query of a timeline may send: the plugins an overview may carry for a
+ * comparison's projection (queryPlugins allows 1 MiB of them) and the rest of the query.
+ */
+const QUERY_BYTES = 1024 * 1024 + 64 * 1024;
+/**
+ * Queries one address may make a minute without signing in, in this process. Moving about a
+ * timeline makes several a second at most; the limit stops one client from keeping the server
+ * busy reading and parsing queries.
+ */
+const GUEST_QUERIES = 600;
+/**
+ * Separation views (store.view) one account, or one address without an account, may have
+ * built a minute. Each tag separation shows two (the tags' side and the rest), and those
+ * built already are free.
+ */
+const ACCOUNT_VIEW_BUILDS = 60,
+  GUEST_VIEW_BUILDS = 20;
+/**
+ * The request's JSON body, read up to `maximum` bytes (16 MiB by default, for saves and
+ * imports by those signed in; every other route passes what it needs). 415 unless sent as
+ * application/json, 413 past the limit (before reading when Content-Length says so, else as
+ * soon as it is passed), 400 for invalid JSON or JSON nested more than JSON_DEPTH deep, and
+ * 400 for one holding a link to a file on someone's computer (`file://`, #433): local paths
+ * name a person and their folders, and are never stored here.
  */
 async function body(req, maximum = 16 * 1024 * 1024) {
   if (!req.headers['content-type']?.startsWith('application/json'))
     throw new HttpError(415, 'Send JSON.');
+  if (Number(req.headers['content-length']) > maximum)
+    throw new HttpError(413, `Request exceeds the ${maximum}-byte limit.`);
   let size = 0,
     parts = [];
   for await (const part of req) {
@@ -88,9 +134,11 @@ async function body(req, maximum = 16 * 1024 * 1024) {
     if (size > maximum) throw new HttpError(413, `Request exceeds the ${maximum}-byte limit.`);
     parts.push(part);
   }
+  const bytes = Buffer.concat(parts);
+  if (nestedTooDeeply(bytes)) throw new HttpError(400, 'Invalid JSON: nested too deeply.');
   let value;
   try {
-    value = JSON.parse(Buffer.concat(parts).toString());
+    value = JSON.parse(bytes.toString());
   } catch {
     throw new HttpError(400, 'Invalid JSON.');
   }
@@ -412,7 +460,7 @@ export function createRequestHandler({
     let read;
     return {
       chunks: (async function* () {
-        await auth.rateLimit('file-download:' + req.clientAddress);
+        await auth.rateLimit('file-download:' + limitAddress(req));
         const snapshot = await store.snapshot(id, userId);
         read = snapshot.timeline.revision;
         yield await converter.convert('write', snapshot.document);
@@ -647,10 +695,10 @@ export function createRequestHandler({
           try {
             result = ldap
               ? await directory.signIn(req, input, kind)
-              : await auth.signIn(input, register, req.clientAddress, kind, req);
+              : await auth.signIn(input, register, limitAddress(req), kind, req);
           } catch (error) {
             if (!register && error.status === 401)
-              await challenges.signInFailed(req.clientAddress, username);
+              await challenges.signInFailed(limitAddress(req), username);
             throw error;
           }
           if (previous && result.user)
@@ -703,7 +751,7 @@ export function createRequestHandler({
         if (pathname === '/api/reports' && method === 'POST') {
           if (session) auth.require(session, req);
           else auth.requireLogin(req);
-          await auth.rateLimit('report:' + (userId ?? req.clientAddress));
+          await auth.rateLimit('report:' + (userId ?? limitAddress(req)));
           if (!session) await challenges.require(req, 'report', null);
           return response(res, 201, await moderation.report(userId, await body(req, 8192)));
         }
@@ -906,7 +954,7 @@ export function createRequestHandler({
         if (securityRoutes.has(securityAction) && method === 'POST') {
           if (session) auth.require(session, req);
           else auth.requireLogin(req);
-          await auth.rateLimit('security:' + req.clientAddress);
+          await auth.rateLimit('security:' + limitAddress(req));
           const input = await body(req, 8192),
             security = auth.security;
           // These send email to an address the requester types.
@@ -914,13 +962,13 @@ export function createRequestHandler({
             await challenges.require(req, 'email', session);
           let result;
           if (securityAction === 'mfa/complete')
-            result = await security.complete(req, input.code, req.clientAddress, input.passkey);
+            result = await security.complete(req, input.code, limitAddress(req), input.passkey);
           else if (securityAction === 'email/enroll')
             result = await security.enrollEmail(req, input, session);
           else if (securityAction === 'email/verify')
             result = await security.verify(req, input.token);
           else if (securityAction === 'password/forgot')
-            result = await security.forgot(input.email, req.clientAddress);
+            result = await security.forgot(input.email, limitAddress(req));
           else if (securityAction === 'password/reset') result = await security.reset(input);
           else {
             auth.require(session, req);
@@ -976,7 +1024,7 @@ export function createRequestHandler({
         const providerRoute =
           /^\/api\/auth\/(google|github|facebook|microsoft)\/(start|callback)$/.exec(pathname);
         if (providerRoute?.[2] === 'start' && method === 'POST') {
-          const started = await oauth.start(req, providerRoute[1], await body(req), session);
+          const started = await oauth.start(req, providerRoute[1], await body(req, 1024), session);
           return response(res, 200, { url: started.url }, { 'Set-Cookie': started.cookie });
         }
         if (providerRoute?.[2] === 'callback' && method === 'GET') {
@@ -1003,7 +1051,7 @@ export function createRequestHandler({
         // (device/request), and a browser session signed in within five minutes approves the
         // code (CSRF token and rate limit checked in DeviceAuth.approve).
         if (pathname === '/api/auth/device/start' && method === 'POST') {
-          await body(req);
+          await body(req, 1024);
           return response(
             res,
             200,
@@ -1021,12 +1069,12 @@ export function createRequestHandler({
             ),
           );
         if (pathname === '/api/auth/device/poll' && method === 'POST')
-          return response(res, 200, await devices.poll((await body(req)).deviceCode));
+          return response(res, 200, await devices.poll((await body(req, 1024)).deviceCode));
         if (pathname === '/api/auth/device/approve' && method === 'POST')
           return response(
             res,
             200,
-            await devices.approve(session, req, (await body(req)).userCode),
+            await devices.approve(session, req, (await body(req, 1024)).userCode),
           );
         // Agreeing to the terms and privacy policy in force (#277): a signed-in browser or desktop
         // session, with the CSRF token; `acceptTerms` is the version agreed to.
@@ -1385,7 +1433,7 @@ export function createRequestHandler({
           return response(
             res,
             200,
-            await browserForks.copy(browserFork[1], input.revision, req.clientAddress),
+            await browserForks.copy(browserFork[1], input.revision, limitAddress(req)),
           );
         }
         // Forking, duplicating, and syncing a fork with its upstream (versioning.mjs): signed
@@ -1489,7 +1537,7 @@ export function createRequestHandler({
           // A guest's copy goes through BrowserForks, with its rate limit and concurrency cap,
           // rather than the streamed snapshot.
           if (!userId) {
-            const copy = await browserForks.copy(id, undefined, req.clientAddress);
+            const copy = await browserForks.copy(id, undefined, limitAddress(req));
             return response(res, 200, {
               document: copy.document,
               timeline: await store.metadata(id, null),
@@ -1534,7 +1582,7 @@ export function createRequestHandler({
               produce: () => sqliteFile(req, id, userId, t.revision),
               stream: streamResponse,
             });
-          await auth.rateLimit('file-download:' + req.clientAddress);
+          await auth.rateLimit('file-download:' + limitAddress(req));
           const snapshot = await store.snapshot(id, userId);
           return fileResponse(res, await converter.convert('write', snapshot.document));
         }
@@ -1695,13 +1743,30 @@ export function createRequestHandler({
         // an overview of a range, text search, duration and moment pages, single lookups.
         // Each kind's input is checked here; `revision` reads an earlier saved state.
         if (action === 'query' && method === 'POST') {
-          const input = await body(req);
+          // Without an account, counted per address before the body is read: anyone may ask.
+          if (!session)
+            auth.throttle(
+              'query:' + limitAddress(req),
+              GUEST_QUERIES,
+              'Too many requests. Please wait a minute.',
+            );
+          const input = await body(req, QUERY_BYTES);
           if (
             input.revision !== undefined &&
             (typeof input.revision !== 'string' || !/^\d+$/.test(input.revision))
           )
             throw new HttpError(400, 'Expected a revision string.');
           const filter = viewFilter(input.filter);
+          // A separation not built yet costs a read of the whole timeline and a write of its
+          // index: limited per account, or per address without one.
+          const building = {
+            beforeBuild: () =>
+              auth.rateLimit(
+                'view-build:' + (userId ?? limitAddress(req)),
+                userId ? ACCOUNT_VIEW_BUILDS : GUEST_VIEW_BUILDS,
+                'Too many separations. Please wait a minute.',
+              ),
+          };
           if (input.kind === 'tags')
             return response(res, 200, await store.query(id, userId, { kind: 'tags' }));
           if (input.kind === 'related') {
@@ -1756,20 +1821,25 @@ export function createRequestHandler({
             return response(
               res,
               200,
-              await store.query(id, userId, {
-                kind: 'overview',
-                lower,
-                upper,
-                threshold,
-                ...(filter ? { filter } : {}),
-                ...(input.arcs === false ? { arcs: false } : {}),
-                ...(input.revision ? { revision: input.revision } : {}),
-                ...(input.plugins !== undefined
-                  ? {
-                      plugins: queryPlugins(input.plugins),
-                    }
-                  : {}),
-              }),
+              await store.query(
+                id,
+                userId,
+                {
+                  kind: 'overview',
+                  lower,
+                  upper,
+                  threshold,
+                  ...(filter ? { filter } : {}),
+                  ...(input.arcs === false ? { arcs: false } : {}),
+                  ...(input.revision ? { revision: input.revision } : {}),
+                  ...(input.plugins !== undefined
+                    ? {
+                        plugins: queryPlugins(input.plugins),
+                      }
+                    : {}),
+                },
+                building,
+              ),
             );
           }
           if (input.kind === 'search') {
@@ -1826,19 +1896,24 @@ export function createRequestHandler({
             return response(
               res,
               200,
-              await store.query(id, userId, {
-                kind: 'durations',
-                overlapping: true,
-                lower,
-                upper,
-                threshold,
-                limit,
-                offset,
-                sort,
-                text: text.trim(),
-                ...(filter ? { filter } : {}),
-                ...(input.revision ? { revision: input.revision } : {}),
-              }),
+              await store.query(
+                id,
+                userId,
+                {
+                  kind: 'durations',
+                  overlapping: true,
+                  lower,
+                  upper,
+                  threshold,
+                  limit,
+                  offset,
+                  sort,
+                  text: text.trim(),
+                  ...(filter ? { filter } : {}),
+                  ...(input.revision ? { revision: input.revision } : {}),
+                },
+                building,
+              ),
             );
           }
           if (input.kind === 'durations') {
@@ -1860,15 +1935,22 @@ export function createRequestHandler({
             return response(
               res,
               200,
-              await store.query(id, userId, {
-                kind: 'durations',
-                lower,
-                upper,
-                limit,
-                ...(filter ? { filter } : {}),
-                after: input.after ? { first: bound(input.after.first), id: input.after.id } : null,
-                ...(input.revision ? { revision: input.revision } : {}),
-              }),
+              await store.query(
+                id,
+                userId,
+                {
+                  kind: 'durations',
+                  lower,
+                  upper,
+                  limit,
+                  ...(filter ? { filter } : {}),
+                  after: input.after
+                    ? { first: bound(input.after.first), id: input.after.id }
+                    : null,
+                  ...(input.revision ? { revision: input.revision } : {}),
+                },
+                building,
+              ),
             );
           }
           if (input.kind === 'duration' || input.kind === 'moment') {
@@ -1904,16 +1986,21 @@ export function createRequestHandler({
           return response(
             res,
             200,
-            await store.query(id, userId, {
-              kind: 'events',
-              ...(filter ? { filter } : {}),
-              ...(input.id !== undefined ? { id: input.id } : {}),
-              ...(input.revision ? { revision: input.revision } : {}),
-              lower: bound(input.lower),
-              upper: bound(input.upper),
-              limit,
-              after: input.after ? { time: bound(input.after.time), id: input.after.id } : null,
-            }),
+            await store.query(
+              id,
+              userId,
+              {
+                kind: 'events',
+                ...(filter ? { filter } : {}),
+                ...(input.id !== undefined ? { id: input.id } : {}),
+                ...(input.revision ? { revision: input.revision } : {}),
+                lower: bound(input.lower),
+                upper: bound(input.upper),
+                limit,
+                after: input.after ? { time: bound(input.after.time), id: input.after.id } : null,
+              },
+              building,
+            ),
           );
         }
         // Sharing, settings and deletion stay available while a copy is being prepared.

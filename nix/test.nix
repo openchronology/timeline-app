@@ -15,6 +15,8 @@ pkgs.testers.runNixOSTest {
     # the first migration then outlast systemd's usual 90 seconds.
     systemd.services.postgresql.serviceConfig.TimeoutStartSec = "20min";
     systemd.services.openchronology.serviceConfig.TimeoutStartSec = "20min";
+    # As many servers set it: the module's virtual host keeps its own proxy headers regardless.
+    services.nginx.recommendedProxySettings = true;
     services.openchronology = {
       enable = true;
       origin = "http://localhost";

@@ -50,7 +50,7 @@ Releases attach every package, and every push to `main` builds them as artifacts
 
 ```sh
 cp .env.example .env
-# Set a strong POSTGRES_PASSWORD in .env.
+# Set strong, different POSTGRES_PASSWORD and APP_DATABASE_PASSWORD in .env.
 docker compose up --build --wait
 docker compose logs -f app
 ```

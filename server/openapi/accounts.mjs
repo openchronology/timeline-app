@@ -413,7 +413,7 @@ export const paths = {
       tags: ['Sign-in'],
       summary: 'Start signing in with a provider',
       description: [
-        'Begins signing in with Google, GitHub, Facebook or Microsoft (a work, school or personal Microsoft account, as the server’s tenant setting allows), or with `link: true`, linking one to the signed-in account (which needs a sign-in within the last five minutes, and is refused with 403 for an account that signs in only through its directory, `directory_only` in `GET /api/auth/account`). Send the browser to the `url` returned; the provider returns it to `GET /api/auth/{provider}/callback` within ten minutes.',
+        'Begins signing in with Google, GitHub, Facebook or Microsoft (a work, school or personal Microsoft account, as the server’s tenant setting allows), or with `link: true`, linking one to the signed-in account (which needs a sign-in within the last five minutes, and is refused with 403 for an account that signs in only through its directory, `directory_only` in `GET /api/auth/account`). Send the browser to the `url` returned; the provider returns it to `GET /api/auth/{provider}/callback` within ten minutes. The body is at most 1 KiB (413 beyond).',
         SIGN_IN_TOKEN,
       ].join('\n\n'),
       security: SIGN_IN,
@@ -495,7 +495,7 @@ export const paths = {
       tags: ['Sign-in'],
       summary: 'Start signing in the desktop app through a browser',
       description:
-        'The desktop app’s **Sign in using your browser**: it shows `userCode` and opens `verificationUri`, where a signed-in browser approves it (`POST /api/auth/device/approve`), then polls `POST /api/auth/device/poll` with `deviceCode`, which it keeps to itself. The request expires in ten minutes. The caller’s address and `User-Agent` header are recorded with it, for the approval page to show (`GET /api/auth/device/request`). Send an empty JSON object.',
+        'The desktop app’s **Sign in using your browser**: it shows `userCode` and opens `verificationUri`, where a signed-in browser approves it (`POST /api/auth/device/approve`), then polls `POST /api/auth/device/poll` with `deviceCode`, which it keeps to itself. The request expires in ten minutes. The caller’s address and `User-Agent` header are recorded with it, for the approval page to show (`GET /api/auth/device/request`). Send an empty JSON object (at most 1 KiB; 413 beyond).',
       security: ANYONE,
       requestBody: body({ type: 'object' }),
       responses: {
@@ -510,7 +510,7 @@ export const paths = {
       tags: ['Sign-in'],
       summary: 'Check on a desktop sign-in',
       description:
-        'Answers `{pending: true}` until a browser approves, then a desktop session `token`, once. Poll at most every three seconds: a faster poll, an expired request or a used one is refused (400).',
+        'Answers `{pending: true}` until a browser approves, then a desktop session `token`, once. Poll at most every three seconds: a faster poll, an expired request or a used one is refused (400). The body is at most 1 KiB (413 beyond).',
       security: ANYONE,
       requestBody: body({
         type: 'object',

@@ -45,12 +45,15 @@ RUN apt-get update && apt-get install -y --no-install-recommends libsqlite3-0 li
 ENV NODE_ENV=production HOSTNAME=0.0.0.0 PORT=5173 OCH_APP_ROOT=/app NEXT_TELEMETRY_DISABLED=1 OCH_CONVERTER=/usr/local/bin/och-convert
 WORKDIR /app
 COPY --from=converter /app/native-store/target/release/och-convert /usr/local/bin/och-convert
-COPY --from=build --chown=node:node /app/platform/.next/standalone ./
-COPY --from=build --chown=node:node /app/platform/.next/static platform/.next/static
-COPY --from=build --chown=node:node /app/platform/public platform/public
-COPY --from=build --chown=node:node /app/dist dist
-COPY --chown=node:node package.json ./
-COPY --chown=node:node server server
+# The application belongs to root, so the node user it runs as cannot change it; only Next.js's
+# cache folder is node's.
+COPY --from=build /app/platform/.next/standalone ./
+COPY --from=build /app/platform/.next/static platform/.next/static
+COPY --from=build /app/platform/public platform/public
+COPY --from=build /app/dist dist
+COPY package.json ./
+COPY server server
+RUN install -d -o node -g node -m 0755 platform/.next/cache
 # The log importer (docs/log-import.md) as a command, e.g. beside the Compose syslog service.
 RUN ln -s /app/server/import-logs.mjs /usr/local/bin/och-import-logs
 COPY LICENSE NOTICE THIRD_PARTY.md ./

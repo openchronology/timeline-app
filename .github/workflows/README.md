@@ -6,12 +6,12 @@ The GitHub Actions workflows: continuous integration, releases, benchmarks and t
 
 ## Contents
 
-| File                                         | What it is for                                                                                                                              |
-| -------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------- |
-| [`bench.yml`](bench.yml)                     | Runs the benchmark suite on demand and uploads its report ([benchmarks](../../docs/benchmarks.md)).                                         |
-| [`ci.yml`](ci.yml)                           | Every push and pull request: the Compose stack, the tests with each package manager, browsers, PostgreSQL, UI budgets, and the packages.    |
-| [`desktop.yml`](desktop.yml)                 | Builds, tests and uploads the desktop app for Linux, Rocky Linux, macOS and Windows.                                                        |
-| [`nix.yml`](nix.yml)                         | Builds the Nix flake's packages on x86_64 and aarch64 Linux and runs the NixOS test of its module; releases push to Cachix when configured. |
-| [`pages.yml`](pages.yml)                     | Publishes the offline editor to openchronology.github.io on each push to main, after checking it works without a network.                   |
-| [`release.yml`](release.yml)                 | On a version tag or release: builds every asset, checks them, attaches them to the release and publishes the Homebrew formula.              |
-| [`server-packages.yml`](server-packages.yml) | Builds and tests the server packages: .deb, .rpm, the platform archive, FreeBSD, Homebrew and Windows.                                      |
+| File                                         | What it is for                                                                                                                                                                  |
+| -------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| [`bench.yml`](bench.yml)                     | Runs the benchmark suite on demand and uploads its report ([benchmarks](../../docs/benchmarks.md)).                                                                             |
+| [`ci.yml`](ci.yml)                           | Every push and pull request: the Compose stack, the tests with each package manager, browsers, PostgreSQL, UI budgets, and the packages.                                        |
+| [`desktop.yml`](desktop.yml)                 | Builds, tests and uploads the desktop app for Linux, Rocky Linux, macOS and Windows.                                                                                            |
+| [`nix.yml`](nix.yml)                         | Builds the Nix flake's packages on x86_64 and aarch64 Linux and runs the NixOS test of its module; releases push to Cachix when configured.                                     |
+| [`pages.yml`](pages.yml)                     | Publishes the offline editor to openchronology.github.io on each push to main, after checking it works without a network.                                                       |
+| [`release.yml`](release.yml)                 | On a version tag or release: builds every asset, checks them, attests their build provenance, attaches them to the release and publishes the Homebrew formula and AUR packages. |
+| [`server-packages.yml`](server-packages.yml) | Builds and tests the server packages: .deb, .rpm, the platform archive, FreeBSD, Homebrew and Windows.                                                                          |

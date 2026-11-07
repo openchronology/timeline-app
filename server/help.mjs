@@ -253,7 +253,7 @@ export function renderMarkdown(source, { link = (href) => href, anchor = anchors
 
 /** The pages of the help area, in its sections; any doc not listed here joins "More". */
 export const HELP_SECTIONS = [
-  { title: 'Start here', pages: ['guide', 'faq', 'readme'] },
+  { title: 'Start here', pages: ['guide', 'faq', 'comparison-of-timeline-tools', 'readme'] },
   {
     title: 'Making timelines',
     pages: [

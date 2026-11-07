@@ -202,6 +202,8 @@ export async function checkPopulate(browser) {
       [photo, video].sort(),
       'the photo and the video are asked for',
     );
+    // Not trusted yet: Rust may not run the system's thumbnailers on files it didn't see chosen.
+    assert(asks.every(([, args]) => args.trusted === false));
     assert.equal(await page.locator('.event-marker.icon').count(), 1);
 
     // A moment's file: its name as a link, opened in its app once the timeline is trusted.
@@ -222,6 +224,14 @@ export async function checkPopulate(browser) {
     );
     assert.equal(confirms.length, 1, 'asked once for this timeline');
     assert.match(confirms[0], /Open .*IMG_0042\.JPG in its app\?/);
+    // Trusted now: the video, which had no thumbnail, is asked for again, trusted.
+    const trustedAsk = () =>
+      calls.some(
+        ([command, args]) =>
+          command === 'desktop_thumbnails' && args.trusted === true && args.urls.includes(video),
+      );
+    for (let i = 0; i < 50 && !trustedAsk(); i++) await page.waitForTimeout(50);
+    assert(trustedAsk(), 'asked again once trusted');
     await page.locator('#inspector .local-file-reveal').first().click();
     for (let i = 0; i < 50 && !calls.some(([c]) => c === 'desktop_reveal_file'); i++)
       await page.waitForTimeout(50);

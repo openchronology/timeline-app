@@ -24,6 +24,15 @@ finish). Setup writes C:\ProgramData\OpenChronology\setup.log; it is safe to run
 administrator: powershell -ExecutionPolicy Bypass -File "C:\Program Files\OpenChronology
 Server\setup.ps1".
 
+Setup makes C:\ProgramData\OpenChronology the administrators' and replaces its access list
+each time. Any user may create a folder in ProgramData, so if one exists before the first
+install holding files that no administrator (nor the system) owns, setup stops rather than use
+a configuration, password or database another account may have planted: delete the folder or
+move it aside, then install again. If they are an earlier installation's files and you have
+checked them, run setup.ps1 as above with -TrustExistingData. Installed somewhere other than
+Program Files, the program's folder gets Program Files' access: users and the services read
+and run it, and only administrators and the system change it.
+
 Configure
 ---------
 
@@ -38,7 +47,9 @@ OpenChronology service (Services, or Restart-Service OpenChronology):
     reason is there.
   - ADMIN_USERNAME, ADMIN_EMAIL and ADMIN_INITIAL_PASSWORD for the first administrator,
     created by openchronology-migrate. The password is used once; to sign in with it again
-    (or with a new one written there), run openchronology-reset-admin-password.
+    (or with a new one written there), run openchronology-reset-admin-password. Once you
+    have signed in and changed it, blank ADMIN_INITIAL_PASSWORD, so the file no longer holds
+    it; write one there again only to reset.
   - Sign-in providers, human verification, quotas: see the comments in the file and
     authentication.md, administration.md in the doc folder.
 
@@ -57,8 +68,8 @@ API key from Account > API keys) in C:\ProgramData\OpenChronology\syslog.env, th
 Both run as Local Service and log to C:\ProgramData\OpenChronology\logs; restart a service
 after editing its configuration (Restart-Service OpenChronologySyslog). Setup makes syslog.env
 and syslog-routes.json readable by Local Service. Edit them in place (Notepad does); a file
-replaced or written anew there is readable by administrators only, until you grant it again:
-icacls <file> /grant "*S-1-5-19:R". To receive from other machines, set SYSLOG_HOST=0.0.0.0
+replaced or written anew there is readable by administrators only, until you grant it again
+(icacls <file> /grant "*S-1-5-19:R") or run setup again, which sets each file's access. To receive from other machines, set SYSLOG_HOST=0.0.0.0
 and allow the port in Windows Defender Firewall, on a trusted network only: the receiver has
 no TLS or sender authentication.
 

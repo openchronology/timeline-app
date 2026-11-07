@@ -123,15 +123,25 @@ fn resource_limits() -> Result<(), String> {
     }
     unsafe extern "C" {
         fn setrlimit(resource: c_int, limit: *const Limit) -> c_int;
+        fn prctl(option: c_int, ...) -> c_int;
     }
     // Linux resource numbers: 0 RLIMIT_CPU (20 seconds of CPU time), 1 RLIMIT_FSIZE (files
-    // written up to file_bytes(), as the server's limit) and 9 RLIMIT_AS (address space: 512
-    // MiB, or eight times file_bytes() when that is more, since reading a file back as JSON
-    // takes about 4.5 times its size). Soft and hard limits are equal, so the process cannot
-    // raise them again. A limit reached stops the process with a signal (SIGXCPU, SIGXFSZ) or
-    // a failed allocation (SIGABRT), which server/files.mjs reports as that limit.
+    // written up to file_bytes(), as the server's limit), 4 RLIMIT_CORE (no core dump) and 9
+    // RLIMIT_AS (address space: 512 MiB, or eight times file_bytes() when that is more, since
+    // reading a file back as JSON takes about 4.5 times its size). Soft and hard limits are
+    // equal, so the process cannot raise them again. A limit reached stops the process with a
+    // signal (SIGXCPU, SIGXFSZ) or a failed allocation (SIGABRT), which server/files.mjs
+    // reports as that limit.
+    //
+    // A crafted upload that stops the process this way must not also leave a core dump of up
+    // to the memory limit on the server's disk, once for every rejected upload. RLIMIT_CORE
+    // covers core files; PR_SET_DUMPABLE (4) set to 0 also covers a core_pattern that pipes
+    // to a collector such as systemd-coredump.
+    if unsafe { prctl(4, 0 as std::os::raw::c_ulong) } != 0 {
+        return Err("Could not apply conversion resource limits".into());
+    }
     let memory = (512 << 20).max(8 * file_bytes());
-    for (resource, size) in [(0, 20), (1, file_bytes()), (9, memory)] {
+    for (resource, size) in [(0, 20), (1, file_bytes()), (4, 0), (9, memory)] {
         let limit = Limit {
             current: size as c_ulong,
             maximum: size as c_ulong,
