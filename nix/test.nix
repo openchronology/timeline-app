@@ -2,7 +2,8 @@
 # The NixOS test of services.openchronology (#461): a machine with the module and nginx in
 # front, whose server answers through nginx; PostgreSQL has pgmp; the client (test-client.mjs)
 # signs in as the configured administrator, saves, searches and downloads a timeline as .och;
-# and the generated key survives a restart. Run: nix build .#checks.x86_64-linux.nixos
+# the generated key survives a restart; and the syslog receiver runs as its own user, which
+# cannot read the server's key or log in to its database (#501). Run: nix build .#checks.x86_64-linux.nixos
 { pkgs, module }:
 pkgs.testers.runNixOSTest {
   name = "openchronology";
@@ -26,6 +27,13 @@ pkgs.testers.runNixOSTest {
         ADMIN_USERNAME=nixadmin
         ADMIN_INITIAL_PASSWORD=a long test password for nixos
       '';
+      syslog = {
+        enable = true;
+        settings.SYSLOG_ROUTES_JSON = ''{"default":"00000000-0000-0000-0000-000000000000"}'';
+        environmentFile = pkgs.writeText "openchronology-syslog-test.env" ''
+          OCH_API_KEY=och_key_test
+        '';
+      };
     };
   };
 
@@ -48,5 +56,18 @@ pkgs.testers.runNixOSTest {
     machine.systemctl("restart openchronology-setup.service openchronology.service")
     machine.wait_until_succeeds("curl -fs http://127.0.0.1:5173/healthz", timeout=1800)
     assert key == machine.succeed("cat /var/lib/openchronology/generated.env"), "the key changed"
+    # The syslog receiver, as openchronology-logs: listening, without the server's key or database.
+    machine.wait_until_succeeds(
+        "journalctl -u openchronology-syslog.service | grep -q 'syslog: listening'", timeout=600
+    )
+    machine.succeed(
+        "test \"$(stat -c %U /proc/$(systemctl show -P MainPID openchronology-syslog.service))\" "
+        "= openchronology-logs"
+    )
+    machine.fail("runuser -u openchronology-logs -- cat /var/lib/openchronology/generated.env")
+    machine.fail(
+        "runuser -u openchronology-logs -- ${pkgs.postgresql}/bin/psql -h /run/postgresql "
+        "-d openchronology -Atc 'SELECT 1'"
+    )
   '';
 }
