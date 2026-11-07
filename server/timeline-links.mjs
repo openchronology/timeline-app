@@ -17,6 +17,8 @@ import { entityWhen } from './library-search.mjs';
 
 const uuid = /^[0-9a-f]{8}(?:-[0-9a-f]{4}){3}-[0-9a-f]{12}$/i;
 const entityId = /^[A-Za-z0-9_.:-]{1,128}$/;
+/** What resolve answers both for an address with no timeline and for one the reader may not see. */
+const UNREACHABLE = 'There is no timeline you can open at that address. Sign in if it is private.';
 /** A window answers at most this many arcs, as a timeline's own arcs (docs/relationships.md). */
 export const LINK_ARCS = 256;
 
@@ -254,7 +256,8 @@ export class TimelineLinks {
    * related, not linked), `canWrite` whether `userId` may save it, `full` whether it has as
    * many links as it may. 400 for an address that names no timeline on this site (`origin`),
    * 404 for a timeline `userId` may not read or an entity it lacks (read through a fork's
-   * source, as links are).
+   * source, as links are). An address with no timeline and one with a timeline `userId` may
+   * not read get the same answer, so a private timeline's address cannot be confirmed.
    */
   async resolve(id, userId, address, origin) {
     if (typeof address !== 'string' || address.length > 4096)
@@ -265,13 +268,20 @@ export class TimelineLinks {
         400,
         'That isn’t the address of a timeline, moment or duration on this site.',
       );
-    const target =
-      named.timeline.id ?? (await this.store.addressed(named.timeline.owner, named.timeline.name));
-    if (!target) throw new HttpError(404, 'There is no timeline at that address.');
     return this.store.transaction(async (c) => {
       await c.query('SET TRANSACTION ISOLATION LEVEL REPEATABLE READ');
       await this.store.access(id, userId, c);
-      const access = await this.store.access(target, userId, c);
+      const target =
+        named.timeline.id ??
+        (await this.store.addressed(named.timeline.owner, named.timeline.name));
+      let access;
+      try {
+        if (!target) throw new HttpError(404, UNREACHABLE);
+        access = await this.store.access(target, userId, c);
+      } catch (error) {
+        if (error.status === 404) throw new HttpError(404, UNREACHABLE);
+        throw error;
+      }
       const { rows } = await c.query(
         `SELECT t.id,t.title,t.slug,t.presentation,t.link_count,u.username AS owner
         FROM oc_timelines t JOIN oc_users u ON u.id=t.owner_id WHERE t.id=$1`,

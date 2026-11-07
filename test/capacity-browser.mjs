@@ -58,6 +58,17 @@ export async function checkCapacity(page, restore, { offline = false } = {}) {
     await imported(large);
     await page.evaluate(() => new Promise((done) => setTimeout(done, 500)));
     assert(await notice.isHidden());
+    // What's kept is a hash, not the timeline's title, and a value another page of the same
+    // origin wrote can't break the editor: it counts as no dismissals.
+    const stored = await page.evaluate(() =>
+      JSON.parse(localStorage.getItem('och-capacity-dismissed') ?? '[]'),
+    );
+    assert(stored.length > 0 && stored.every((v) => /^h[0-9a-f]+$/.test(v)), String(stored));
+    await page.evaluate(() => localStorage.setItem('och-capacity-dismissed', '1'));
+    await imported(large);
+    await notice.waitFor();
+    await page.locator('#capacity-dismiss').click();
+    await notice.waitFor({ state: 'hidden' });
     // On a slow device the advice follows this device's own measurement of opening.
     if (page.context().browser()?.browserType().name() === 'chromium') {
       const cdp = await page.context().newCDPSession(page);

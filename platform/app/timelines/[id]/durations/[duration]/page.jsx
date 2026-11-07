@@ -8,6 +8,7 @@ import EntitySummary from '../../../../../components/entity-summary.jsx';
 import TimelineSummary from '../../../../../components/timeline-summary.jsx';
 import { accessibleTimeline, versionInfo } from '../../../../../lib/timeline.js';
 import { timelinePath } from '../../../../../../src/addresses.ts';
+import { publicPage } from '../../../../../lib/analytics.js';
 import {
   durationOf,
   durationTitle,
@@ -19,9 +20,12 @@ import {
   entityStructuredData,
   jsonLd,
   linksOf,
+  pageTitle,
   presentTime,
   relatedOf,
+  sharedPath,
   siteName,
+  timelineTitle,
 } from '../../../../../lib/sharing.js';
 export const dynamic = 'force-dynamic';
 async function load(params) {
@@ -65,7 +69,14 @@ export default async function DurationPage({ params }) {
   });
   const trail = entityBreadcrumbs(timeline, entity, durationTitle(duration));
   return (
-    <main className="editor-page">
+    <main
+      className="editor-page"
+      {...publicPage(
+        timeline,
+        sharedPath(timeline, entity),
+        pageTitle(durationTitle(duration), timelineTitle(timeline)),
+      )}
+    >
       {data && (
         <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: jsonLd(data) }} />
       )}

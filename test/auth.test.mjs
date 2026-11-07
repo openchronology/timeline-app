@@ -1,11 +1,12 @@
 // Copyright (c) 2026 Athan Clark. SPDX-License-Identifier: GPL-3.0-only
 // Signing in (server/auth.mjs, server/oauth.mjs): provider settings and PKCE, anonymous sign-in,
 // session expiry, Google, Microsoft and Facebook token checks, OAuth state, and older password
-// hashes.
+// hashes, and the addresses per-address limits count.
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { generateKeyPairSync, sign, createHmac, scryptSync } from 'node:crypto';
 import {
+  addressKey,
   Auth,
   tokenHash,
   passwordMatches,
@@ -508,4 +509,20 @@ test('password checks share CPU-sized slots and wait a bounded time for one', as
   } finally {
     configurePasswordWork({ concurrency: passwordConcurrency(), waitMs: 5000 });
   }
+});
+test('per-address limits count an IPv6 client by its /64 network', () => {
+  for (const [address, key] of [
+    ['203.0.113.9', '203.0.113.9'],
+    ['::ffff:203.0.113.9', '203.0.113.9'],
+    ['2001:db8:1:2::1', '2001:db8:1:2::/64'],
+    ['2001:0db8:0001:0002:ffff:0:0:1', '2001:db8:1:2::/64'],
+    ['2001:db8::1', '2001:db8:0:0::/64'],
+    ['::1', '0:0:0:0::/64'],
+    ['fe80::1%eth0', 'fe80:0:0:0::/64'],
+    ['64:ff9b::203.0.113.9', '64:ff9b:0:0::/64'],
+    ['unknown', 'unknown'],
+  ])
+    assert.equal(addressKey(address), key, address);
+  // Applying it again changes nothing.
+  assert.equal(addressKey(addressKey('2001:db8:1:2::1')), '2001:db8:1:2::/64');
 });

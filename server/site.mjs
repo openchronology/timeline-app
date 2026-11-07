@@ -2,7 +2,8 @@
 /**
  * How a platform presents itself: its name (PLATFORM_NAME, such as `timescale.info`) in its
  * header, page titles and link previews, where visitors can support it (SUPPORT_URL), and
- * Google Analytics (GOOGLE_ANALYTICS_ID), which visitors' browsers load only once they accept it.
+ * Google Analytics (GOOGLE_ANALYTICS_ID), which visitors' browsers load only once they accept it;
+ * also whether its pages ask browsers to keep to https (HSTS).
  */
 export class SiteError extends Error {}
 
@@ -64,4 +65,11 @@ export function analyticsPolicy(env = process.env) {
           ' https://*.google-analytics.com https://*.analytics.google.com https://*.googletagmanager.com',
       }
     : { script: '', connect: '' };
+}
+/**
+ * The Strict-Transport-Security header's value when the site is served over https (APP_ORIGIN):
+ * browsers then use https alone for a year. Null over plain http, where browsers ignore it.
+ */
+export function transportSecurity(env = process.env) {
+  return env.APP_ORIGIN?.startsWith('https:') ? 'max-age=31536000' : null;
 }

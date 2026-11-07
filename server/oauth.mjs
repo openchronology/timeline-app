@@ -10,7 +10,7 @@ import {
   verify,
 } from 'node:crypto';
 import { HttpError } from './store.mjs';
-import { tokenHash } from './auth.mjs';
+import { limitAddress, tokenHash } from './auth.mjs';
 import { DIRECTORY_ONLY } from './account-security.mjs';
 /** A new 256-bit random secret in hex: OAuth state, PKCE verifier, OpenID nonce. */
 const secret = () => randomBytes(32).toString('hex');
@@ -157,7 +157,7 @@ export class OAuth {
         throw new HttpError(403, DIRECTORY_ONLY);
     } else if (!session) this.auth.requireLogin(req);
     else this.auth.require(session, req);
-    await this.auth.rateLimit(req.clientAddress ?? req.socket.remoteAddress ?? 'unknown');
+    await this.auth.rateLimit(limitAddress(req));
     const returnTo = input.returnTo ?? '/';
     if (
       !['/', '/editor', '/account', '/plugins'].includes(returnTo) &&

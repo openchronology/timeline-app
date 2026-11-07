@@ -5,6 +5,7 @@
 import { readFileSync } from 'node:fs';
 import { Client } from 'ldapts';
 import { HttpError } from './store.mjs';
+import { limitAddress } from './auth.mjs';
 import { availableUsername } from '../dist/core.mjs';
 
 /** The same answer for an unknown account, a wrong password and one outside the group. */
@@ -89,7 +90,9 @@ export function directoryFromEnv(env = process.env) {
  * groups with LDAP_NESTED_GROUPS=1 on Active Directory).
  */
 export function userFilter(config, username) {
-  const person = config.filter.replaceAll('{username}', escapeFilter(username));
+  // A function, not a string, as the replacement: a string's `$&`, `$\`` and `$'` would splice
+  // parts of the configured filter into the name.
+  const person = config.filter.replaceAll('{username}', () => escapeFilter(username));
   return config.group ? `(&${person}${groupFilter(config)})` : person;
 }
 /** Membership of LDAP_REQUIRED_GROUP as a filter (through nested groups when asked), or null. */
@@ -314,7 +317,7 @@ export class Directory {
    * confirming an email address and year of birth for a new account).
    */
   async signIn(req, input, kind = 'web') {
-    await this.auth.rateLimit(req.clientAddress ?? 'unknown');
+    await this.auth.rateLimit(limitAddress(req));
     const name = Directory.username(input);
     const found = await this.authenticate(name, input.password);
     // The directory lets them in again: a later departure is ended again (directory-check.mjs).
@@ -342,7 +345,7 @@ export class Directory {
     if (!Number.isFinite(started) || Date.now() - started > 5 * 60000)
       throw new HttpError(403, 'Sign in again before linking a directory account.');
     const name = Directory.username(input);
-    await this.auth.rateLimit(req.clientAddress ?? 'unknown');
+    await this.auth.rateLimit(limitAddress(req));
     await this.auth.rateLimit('ldap-link:' + session.id);
     const found = await this.authenticate(name, input.password);
     await this.oauth.identity('ldap', found.subject, session.id);

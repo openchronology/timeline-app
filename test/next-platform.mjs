@@ -205,6 +205,38 @@ try {
   assert(html.includes(`nonce="${nonce}"`), 'Next hydration scripts must use the response nonce');
   const again = await fetch(origin);
   assert.notEqual(again.headers.get('content-security-policy'), csp);
+  // Every page gets the security headers, not only those a list names: comparisons, the legal
+  // pages, and pages that don't exist, at a timeline's address or anywhere else. Over plain
+  // http, no HSTS.
+  for (const [path, status] of [
+    ['/compare', 200],
+    ['/privacy', 200],
+    ['/terms', 200],
+    ['/no-such/page/at-all', 404],
+    ['/nobody-here/no-timeline', 404],
+    ['/timelines/not-an-id', 404],
+  ]) {
+    const r = await fetch(origin + path),
+      page = await r.text();
+    assert.equal(r.status, status, path);
+    const policy = r.headers.get('content-security-policy') ?? '';
+    assert.match(policy, /frame-ancestors 'none'/, path);
+    assert.match(policy, /object-src 'none'/, path);
+    assert(page.includes(`nonce="${policy.match(/'nonce-([^']+)'/)[1]}"`), path);
+    assert.equal(r.headers.get('referrer-policy'), 'no-referrer', path);
+    assert.equal(r.headers.get('x-content-type-options'), 'nosniff', path);
+    assert.equal(r.headers.get('strict-transport-security'), null, path);
+  }
+  // The editor's frame and embeds keep their own policies, which let pages frame them.
+  {
+    const frame = await fetch(origin + '/editor/frame');
+    assert.match(frame.headers.get('content-security-policy'), /frame-ancestors 'self'/);
+    assert.doesNotMatch(frame.headers.get('content-security-policy'), /nonce-/);
+    const embed = await fetch(origin + '/embed/00000000-0000-0000-0000-000000000001');
+    assert.equal(embed.status, 404);
+    assert.match(embed.headers.get('content-security-policy'), /frame-ancestors \*/);
+    assert.equal(embed.headers.get('referrer-policy'), 'strict-origin-when-cross-origin');
+  }
   // The IndexNow key's file (#389): the key as plain text, and no other key's.
   {
     const file = await fetch(origin + '/platform-test-key-389.txt');
@@ -368,11 +400,25 @@ try {
       const config = await page.evaluate(() =>
         window.dataLayer.map((entry) => Array.from(entry)).find((entry) => entry[0] === 'config'),
       );
+      // Google's own page views are off; the site sends each, with the address and title
+      // platform/lib/analytics.js allows (test/analytics.test.mjs).
+      const shown = { page_location: origin + '/', page_title: 'timescale.test' };
       assert.deepEqual(config, [
         'config',
         'G-TEST12345',
-        { allow_google_signals: false, allow_ad_personalization_signals: false },
+        {
+          allow_google_signals: false,
+          allow_ad_personalization_signals: false,
+          send_page_view: false,
+          ...shown,
+        },
       ]);
+      const views = await page.evaluate(() =>
+        window.dataLayer
+          .map((entry) => Array.from(entry))
+          .filter((entry) => entry[0] === 'event' && entry[1] === 'page_view'),
+      );
+      assert.deepEqual(views, [['event', 'page_view', { ...shown, page_referrer: '' }]]);
       // Remembered: the next page loads it without asking.
       await page.reload();
       await page.waitForFunction(() => window.tagLoaded === true);

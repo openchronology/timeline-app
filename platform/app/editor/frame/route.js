@@ -8,6 +8,7 @@ import { editorHtml, editorPolicy } from '../../../lib/editor-html.js';
 import { currentSession } from '../../../lib/session.js';
 import { momentsText } from '../../../../src/wording.ts';
 import { profilePath } from '../../../../src/addresses.ts';
+import { transportSecurity } from '../../../../server/site.mjs';
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
 const UUID = /^[a-f0-9]{8}(?:-[a-f0-9]{4}){3}-[a-f0-9]{12}$/i;
@@ -48,6 +49,8 @@ export async function GET(request) {
       'Referrer-Policy': 'no-referrer',
       // Indexed only as part of the timeline's page that frames it, never on its own.
       'X-Robots-Tag': 'noindex, indexifembedded',
+      // Over https, browsers keep to it here as on the site's other pages (proxy.js).
+      ...(transportSecurity() ? { 'Strict-Transport-Security': transportSecurity() } : {}),
     },
   });
 }
