@@ -36,7 +36,7 @@ The receiver has no TLS or sender authentication: keep it on a trusted network (
 
 ## Running it as a service
 
-Every [server package](../README.md#server-packages-debian-ubuntu-rocky-linux-rhel-fedora-arch-linux-freebsd-macos-and-windows) installs the receiver as a service of its system, stopped until you configure it. Set `OCH_API_KEY` in its `syslog.env`, write the routes to `syslog-routes.json` beside it, then start it:
+Every [server package](install.md#server-packages) installs the receiver as a service of its system, stopped until you configure it. Set `OCH_API_KEY` in its `syslog.env`, write the routes to `syslog-routes.json` beside it, then start it:
 
 | Installed with                      | Configuration                                    | Start it, and at every boot or login                                                          | Its log                                              |
 | ----------------------------------- | ------------------------------------------------ | --------------------------------------------------------------------------------------------- | ---------------------------------------------------- |
