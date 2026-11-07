@@ -252,7 +252,8 @@ try {
   // Email recovery cannot remove MFA or keep old application sessions alive.
   const pendingDevice = client();
   const device = await pendingDevice.request('auth/device/start', {});
-  await owner.request('auth/device/approve', { userCode: device.userCode });
+  // Each test client has its own address, so this one is on another network: confirmed.
+  await owner.request('auth/device/approve', { userCode: device.userCode, otherNetwork: true });
   const recovery = client();
   await recovery.request('session');
   // An address kept with capitals (as the bootstrap administrator's may be) resets too (#177).

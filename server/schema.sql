@@ -693,6 +693,11 @@ ALTER TABLE oc_device_logins ADD COLUMN IF NOT EXISTS mfa_verified boolean NOT N
 ALTER TABLE oc_device_logins ADD COLUMN IF NOT EXISTS created_at timestamptz NOT NULL DEFAULT now();
 ALTER TABLE oc_device_logins ADD COLUMN IF NOT EXISTS client_address text;
 ALTER TABLE oc_device_logins ADD COLUMN IF NOT EXISTS user_agent text;
+-- The computer the desktop app says it runs on, shown on the approval page and named in the
+-- approval email: device_name, as the app reports it (at most 64 printable characters), and
+-- device_platform (Linux, macOS or Windows); NULL when not given. The requester chooses both.
+ALTER TABLE oc_device_logins ADD COLUMN IF NOT EXISTS device_name text;
+ALTER TABLE oc_device_logins ADD COLUMN IF NOT EXISTS device_platform text;
 
 -- Transactional, cross-process live invalidation. No timeline contents are broadcast.
 -- Each change to a timeline row (or to its memberships, below) notifies the channel

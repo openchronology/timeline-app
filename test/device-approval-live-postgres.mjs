@@ -1,7 +1,8 @@
 // Copyright (c) 2026 Athan Clark. SPDX-License-Identifier: GPL-3.0-only
 // Approving the desktop app's sign-in in a live browser (/connect/desktop/<code>): the page
-// shows when and where the request started and the program it named, does not fill in the code
-// from its link, approves only once the code is typed as the desktop app shows it, and the
+// shows when and where the request started and the computer and program it named, does not
+// fill in the code from its link, approves only once the code is typed as the desktop app shows
+// it (and, for a request from another network, once confirmed a second time), and the
 // desktop's poll then gets its session.
 import assert from 'node:assert/strict';
 import { spawn } from 'node:child_process';
@@ -84,7 +85,8 @@ try {
     });
     return { status: response.status, body: await response.json() };
   };
-  const started = (await call('start', {})).body;
+  const started = (await call('start', { device: { name: 'Studio laptop', platform: 'linux' } }))
+    .body;
   assert.match(started.verificationUri, /\/connect\/desktop\/[A-Z2-9]{10}$/);
   await tab.goto(started.verificationUri);
   const card = tab.locator('.account-card');
@@ -92,10 +94,14 @@ try {
     .getByText('Approve only if you just started signing in on your own computer')
     .waitFor();
   await card.getByText(program, { exact: true }).waitFor();
+  await card.getByText('Studio laptop (Linux)', { exact: true }).waitFor();
   await card.getByText('just now', { exact: false }).waitFor();
+  // The desktop app and this browser are both on this computer (loopback): one network, so no
+  // second confirmation is asked.
+  assert.equal(await card.getByRole('checkbox').count(), 0);
   // The code is not on the page or in its field; approving waits for it to be typed.
   assert(!(await card.textContent()).includes(started.userCode));
-  const field = card.getByLabel('The code your desktop app shows'),
+  const field = card.getByLabel('The code in the OpenChronology window on your computer'),
     approve = card.getByRole('button', { name: 'Approve connection' });
   assert.equal(await field.inputValue(), '');
   assert(await approve.isDisabled());
@@ -116,9 +122,28 @@ try {
   assert.equal(polled.status, 200, JSON.stringify(polled.body));
   assert.equal(polled.body.user.username, username);
   assert.match(polled.body.token, /^[a-f0-9]{64}$/);
+
+  // A request from another network: warned about, and approved only once the person confirms
+  // a second time that it is theirs.
+  const distant = (await call('start', {})).body;
+  await pool.query('UPDATE oc_device_logins SET client_address=$2 WHERE user_code=$1', [
+    distant.userCode,
+    '203.0.113.9',
+  ]);
+  await tab.goto(distant.verificationUri);
+  await card.getByText('This request came from another network than this browser.').waitFor();
+  await card.getByText('Not given', { exact: true }).first().waitFor();
+  await card
+    .getByLabel('The code in the OpenChronology window on your computer')
+    .fill(distant.userCode);
+  const mine = card.getByRole('checkbox', { name: 'I started this sign-in myself', exact: false });
+  assert(await approve.isDisabled());
+  await mine.check();
+  await approve.click();
+  await card.getByText('Approved. Return to the desktop application.').waitFor();
   assert.deepEqual(errors, []);
   console.log(
-    'PASS desktop approval in a browser: request details shown, code typed, desktop signed in.',
+    'PASS desktop approval in a browser: request details shown, code typed, another network confirmed, desktop signed in.',
   );
 } finally {
   await browser?.close();

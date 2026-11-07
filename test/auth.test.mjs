@@ -1,7 +1,8 @@
 // Copyright (c) 2026 Athan Clark. SPDX-License-Identifier: GPL-3.0-only
-// Signing in (server/auth.mjs, server/oauth.mjs): provider settings and PKCE, anonymous sign-in,
-// session expiry, Google, Microsoft and Facebook token checks, OAuth state, and older password
-// hashes, and the addresses per-address limits count.
+// Signing in (server/auth.mjs, server/oauth.mjs, server/device-auth.mjs): provider settings and
+// PKCE, anonymous sign-in, session expiry, Google, Microsoft and Facebook token checks, OAuth
+// state, older password hashes, the addresses per-address limits count, and whether a desktop
+// sign-in came from the approving browser's network.
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { generateKeyPairSync, sign, createHmac, scryptSync } from 'node:crypto';
@@ -16,6 +17,7 @@ import {
   configurePasswordWork,
 } from '../server/auth.mjs';
 import { MICROSOFT_CONSUMERS, OAuth, pkce, providersFromEnv } from '../server/oauth.mjs';
+import { network } from '../server/device-auth.mjs';
 
 const rejects = (status) => (error) => error.status === status;
 test('provider configuration fails closed and PKCE follows the RFC vector', () => {
@@ -510,6 +512,27 @@ test('password checks share CPU-sized slots and wait a bounded time for one', as
     configurePasswordWork({ concurrency: passwordConcurrency(), waitMs: 5000 });
   }
 });
+
+test("a desktop sign-in is on the browser's network only from its address or its /64", () => {
+  // IPv4: one public address is one network (a household behind its router); mapped alike.
+  assert.equal(network('203.0.113.7', '203.0.113.7'), 'same');
+  assert.equal(network('::ffff:203.0.113.7', '203.0.113.7'), 'same');
+  assert.equal(network('203.0.113.7', '203.0.113.8'), 'different');
+  // IPv6: devices pick their own last 64 bits, so the /64 is the network.
+  assert.equal(network('2001:db8:1:2::1', '2001:db8:1:2:a:b:c:d'), 'same');
+  assert.equal(network('2001:db8:1:2:0:0:0:1', '2001:DB8:1:2::ffff'), 'same');
+  assert.equal(network('2001:db8:1:2::1', '2001:db8:1:3::1'), 'different');
+  assert.equal(network('2001:db8::1', '2001:db8:0:0:1::'), 'same');
+  assert.equal(network('2001:db8::1', '2001:db9::1'), 'different');
+  assert.equal(network('64:ff9b::192.0.2.1', '64:ff9b::198.51.100.2'), 'same');
+  // Loopback, of either kind, is this computer.
+  assert.equal(network('127.0.0.1', '::1'), 'same');
+  // Different kinds, or an address missing, can't be compared: never the same.
+  assert.equal(network('203.0.113.7', '2001:db8::1'), 'unknown');
+  assert.equal(network(null, '203.0.113.7'), 'unknown');
+  assert.equal(network('unknown', 'unknown'), 'unknown');
+});
+
 test('per-address limits count an IPv6 client by its /64 network', () => {
   for (const [address, key] of [
     ['203.0.113.9', '203.0.113.9'],

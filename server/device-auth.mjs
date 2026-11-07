@@ -1,8 +1,9 @@
 // Copyright (c) 2026 Athan Clark. SPDX-License-Identifier: GPL-3.0-only
 // Desktop sign-in by device code: the app starts a request and polls with its device code
 // while the person approves the short user code in a browser where they are signed in, after
-// seeing where and when the request was started and typing the code their desktop app shows.
+// seeing which computer asked, from where and when, and typing the code their desktop app shows.
 import { randomBytes } from 'node:crypto';
+import { isIP } from 'node:net';
 import { addressKey, limitAddress, tokenHash } from './auth.mjs';
 import { HttpError } from './store.mjs';
 /**
@@ -13,9 +14,11 @@ import { HttpError } from './store.mjs';
  * and the resulting session never pass through the desktop's webview.
  *
  * The approval page cannot know who opened its link, so it shows what the server saw when the
- * request started (time, client address, User-Agent) and warns when that address differs from
- * the approving browser's, in the manner of RFC 8628 §5.4; each approval is emailed to the
- * account as well.
+ * request started (time, client address, User-Agent, and the computer's name and system as the
+ * app reported them) and warns when that address is on another network than the approving
+ * browser's, in the manner of RFC 8628 §5.4. Approving a request from another network, or one
+ * whose network can't be compared, takes a second, explicit confirmation, checked here as well
+ * as on the page. Each approval is emailed to the account too.
  */
 /**
  * Refuses all but a browser session (401 signed out, 403 otherwise): approving desktop sign-ins
@@ -39,6 +42,58 @@ function client(userAgent) {
     .slice(0, 200);
   return text || null;
 }
+/** The systems the desktop app is built for, as Rust's `std::env::consts::OS` names them. */
+const PLATFORMS = { linux: 'Linux', macos: 'macOS', windows: 'Windows' };
+/**
+ * The computer the desktop app says it runs on, as recorded for the approval page: its name
+ * (printable, at most 64 characters) and its system (Linux, macOS or Windows), each null when
+ * not given. Like the User-Agent, whoever starts a request chooses them.
+ */
+function computer(value) {
+  const name = String(value?.name ?? '')
+    .replace(/\p{C}/gu, '')
+    .trim()
+    .slice(0, 64);
+  return {
+    name: name || null,
+    platform: Object.hasOwn(PLATFORMS, value?.platform ?? '') ? PLATFORMS[value.platform] : null,
+  };
+}
+/** An address as compared: IPv4 written as such (also when mapped into IPv6), else as given. */
+function plain(address) {
+  const text = String(address ?? '').trim(),
+    mapped = /^::ffff:(\d+\.\d+\.\d+\.\d+)$/i.exec(text);
+  return mapped ? mapped[1] : text;
+}
+/** The first four 16-bit groups (the /64 network) of an IPv6 address. */
+function prefix(address) {
+  const [head, tail] = address.split('%')[0].split('::'),
+    left = head ? head.split(':') : [],
+    right = tail ? tail.split(':') : [];
+  // A trailing IPv4 part is two groups; only the network part matters, so it counts as two.
+  if (right.at(-1)?.includes('.') || (tail === undefined && left.at(-1)?.includes('.')))
+    (tail === undefined ? left : right).push('0');
+  const zeros = tail === undefined ? [] : Array(8 - left.length - right.length).fill('0');
+  return [...left, ...zeros, ...right].slice(0, 4).map((group) => parseInt(group, 16));
+}
+/**
+ * Whether two client addresses are on the same network, as far as the server can tell: 'same'
+ * for one IPv4 address (a household or an office behind one public address), one IPv6 /64 (a
+ * network, whose devices pick their own last 64 bits), or both loopback; 'different' when they
+ * differ; 'unknown' when either is missing or they are of different kinds (on a network with
+ * both, a computer and a browser may each use either).
+ */
+export function network(a, b) {
+  const x = plain(a),
+    y = plain(b),
+    loopback = (address) => /^127\./.test(address) || address === '::1';
+  if (loopback(x) && loopback(y)) return 'same';
+  const kind = isIP(x);
+  if (!kind || kind !== isIP(y)) return 'unknown';
+  if (kind === 4) return x === y ? 'same' : 'different';
+  const [px, py] = [prefix(x), prefix(y)];
+  return px.every((group, i) => group === py[i]) ? 'same' : 'different';
+}
 export class DeviceAuth {
   /** `auth` is the Auth instance, for its pool, sessions and rate limits. */
   constructor(auth) {
@@ -46,12 +101,13 @@ export class DeviceAuth {
     this.pool = auth.pool;
   }
   /**
-   * Starts a desktop sign-in for client address `ip` (rate-limited), recording `ip` and the
-   * request's `userAgent` header for the approval page. Result: the device code (for the app to
+   * Starts a desktop sign-in for client address `ip` (rate-limited), recording `ip`, the
+   * request's `userAgent` header and the computer the app describes in `device` (`{ name,
+   * platform }`, either may be missing) for the approval page. Result: the device code (for the app to
    * keep and poll with), the ten-character user code and the page to approve it on, the polling
    * interval (three seconds) and the lifetime (ten minutes).
    */
-  async start(ip, userAgent) {
+  async start(ip, userAgent, device) {
     await this.auth.rateLimit(addressKey(ip));
     const deviceCode = randomBytes(32).toString('hex'),
       alphabet = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
@@ -61,9 +117,17 @@ export class DeviceAuth {
     // Sweeps expired requests (oc_device_expiry), then records this one, unapproved (no user),
     // for ten minutes. user_code is unique; a collision would fail this insert.
     await this.pool.query('DELETE FROM oc_device_logins WHERE expires_at<=now()');
+    const { name, platform } = computer(device);
     await this.pool.query(
-      "INSERT INTO oc_device_logins(device_hash,user_code,expires_at,client_address,user_agent) VALUES($1,$2,now()+interval '10 minutes',$3,$4)",
-      [tokenHash(deviceCode), userCode, String(ip ?? 'unknown').slice(0, 64), client(userAgent)],
+      "INSERT INTO oc_device_logins(device_hash,user_code,expires_at,client_address,user_agent,device_name,device_platform) VALUES($1,$2,now()+interval '10 minutes',$3,$4,$5,$6)",
+      [
+        tokenHash(deviceCode),
+        userCode,
+        String(ip ?? 'unknown').slice(0, 64),
+        client(userAgent),
+        name,
+        platform,
+      ],
     );
     return {
       deviceCode,
@@ -76,8 +140,9 @@ export class DeviceAuth {
   /**
    * What the approval page shows about the pending desktop request with user code `code`, to a
    * signed-in browser session (ten a minute per address): when it started and expires, the
-   * client address and User-Agent it started from, and whether that address is the one this
-   * browser is using. Throws 400 if the request expired, was approved or never existed.
+   * client address and User-Agent it started from, the computer's name and system as the app
+   * gave them, and whether that address is on this browser's network (`network`, as
+   * `network()` answers it; `sameAddress`, the exact address, for pages from before). Throws 400 if the request expired, was approved or never existed.
    */
   async describe(session, req, code) {
     browser(session);
@@ -90,7 +155,7 @@ export class DeviceAuth {
       'Too many requests. Please wait a minute.',
     );
     const { rows } = await this.pool.query(
-      'SELECT created_at,expires_at,client_address,user_agent FROM oc_device_logins WHERE user_code=$1 AND user_id IS NULL AND expires_at>now()',
+      'SELECT created_at,expires_at,client_address,user_agent,device_name,device_platform FROM oc_device_logins WHERE user_code=$1 AND user_id IS NULL AND expires_at>now()',
       [code],
     );
     if (!rows.length) throw new HttpError(400, 'Desktop request expired or was already approved.');
@@ -100,8 +165,11 @@ export class DeviceAuth {
       expiresAt: row.expires_at,
       clientAddress: row.client_address,
       userAgent: row.user_agent,
+      deviceName: row.device_name,
+      devicePlatform: row.device_platform,
       // A request recorded before these columns existed has no address; it is not this one.
       sameAddress: row.client_address === address,
+      network: network(row.client_address, address),
     };
   }
   /**
@@ -110,9 +178,12 @@ export class DeviceAuth {
    * minutes (so an old, unattended browser session cannot be used to hand out desktop
    * sessions), and is rate-limited per address. Records whether this browser session completed
    * two-factor authentication, which the desktop session inherits, and emails the account about
-   * the approval. Throws 400 if the request expired or was already approved.
+   * the approval. A request from another network than this browser's, or one whose network
+   * can't be compared (`network()`), is approved only with `otherNetwork` true: the person
+   * confirmed a second time that it is theirs (409 otherwise). Throws 400 if the request
+   * expired or was already approved.
    */
-  async approve(session, req, code) {
+  async approve(session, req, code, otherNetwork = false) {
     browser(session);
     this.auth.require(session, req);
     if (
@@ -121,6 +192,7 @@ export class DeviceAuth {
     )
       throw new HttpError(403, 'Sign in again before approving a desktop connection.');
     if (!/^[A-Z2-9]{10}$/.test(code ?? '')) throw new HttpError(400, 'Invalid desktop code.');
+    const address = req.clientAddress ?? req.socket.remoteAddress ?? 'unknown';
     await this.auth.rateLimit(limitAddress(req));
     const security = this.auth.security;
     const result = await security.transaction(async (c) => {
@@ -135,18 +207,34 @@ export class DeviceAuth {
       // Claims the request only if it is still unapproved and unexpired; the condition on
       // user_id makes approval one-time even with concurrent approvals.
       const claimed = await c.query(
-        'UPDATE oc_device_logins SET user_id=$2,mfa_verified=$3 WHERE user_code=$1 AND user_id IS NULL AND expires_at>now() RETURNING created_at,client_address',
+        'UPDATE oc_device_logins SET user_id=$2,mfa_verified=$3 WHERE user_code=$1 AND user_id IS NULL AND expires_at>now() RETURNING created_at,client_address,device_name,device_platform',
         [code, session.id, !!live.mfa_verified],
       );
       if (!claimed.rows.length)
         throw new HttpError(400, 'Desktop request expired or was already approved.');
+      const {
+        created_at: started,
+        client_address: from,
+        device_name: name,
+        device_platform: platform,
+      } = claimed.rows[0];
+      // Checked here as well as on the page, so the second confirmation can't be skipped by
+      // calling this directly; throwing rolls the claim back.
+      if (!otherNetwork && network(from, address) !== 'same')
+        throw new HttpError(
+          409,
+          'This request came from another network than this browser. Confirm that you started it yourself to approve it.',
+        );
       // Sent only if the approval commits. The User-Agent is left out: the requester chose it.
-      const { created_at: started, client_address: from } = claimed.rows[0];
+      // The computer's name is the requester's too, so it is quoted as the name it gave.
+      const named = name
+        ? ` on a computer that called itself "${name}"${platform ? ` (${platform})` : ''}`
+        : '';
       await security.notify(
         c,
         user,
         'A desktop app was signed in to your OpenChronology account, approved in your browser. ' +
-          `It started signing in at ${new Date(started).toUTCString()} ` +
+          `It started signing in${named} at ${new Date(started).toUTCString()} ` +
           `from ${from ?? 'an unknown address'}. If this was not you, choose ` +
           'Sign out other sessions on your account page and change your password.',
       );

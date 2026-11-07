@@ -55,21 +55,32 @@ In the desktop app, a moment whose source is a photo or video on this computer s
   - **Photos:** their own small preview, which most cameras and phones store in the photo's EXIF and many raw files carry too, or else the photo itself scaled down. Each is turned the way the photo was taken.
   - **Videos:** the cover picture an MP4 or MOV file carries, where it has one.
   - **Otherwise** (most videos, and HEIC, AVIF and raw photos without their own preview), the system's own thumbnail, as its file manager shows it. On Linux, that is the one the file manager has already made (in `~/.cache/thumbnails`), or else one made by an installed thumbnailer, such as `ffmpegthumbnailer` for videos or `heif-thumbnailer` for HEIC. On macOS it is Quick Look's, and on Windows Explorer's. The app bundles no video decoder, so a video the system can't picture shows no thumbnail.
-- **Whose files the system pictures:** the system's thumbnailers are separate programs that decode every kind of file with your rights, outside any sandbox, and a timeline from someone else can name any file on your computer. So the app asks them only about files you chose: those in the folders (or the files) you populated a timeline from, which it remembers, and those of a timeline you trusted by opening one of its files. Any other file gets only what the app reads itself (a photo's preview or the photo, a video's cover) and the thumbnail your file manager already keeps.
+- **Whose files the system pictures:** the system's thumbnailers are separate programs that decode every kind of file with your rights, outside any sandbox, and a timeline from someone else can name any file on your computer. So the app asks them only about files you chose: those in the folders (or the files) you populated a timeline from, which it remembers, and those of any timeline you [trust](#which-files-a-timeline-may-show). Any other file gets only what the app reads itself (a photo's preview or the photo, a video's cover) and the thumbnail your file manager already keeps.
 - **Where they are kept:** in the app's cache folder, which only you can read (as are its thumbnails, on Linux and macOS), at most 160 pixels a side, named by the file's path, size and modification time, so a changed file gets a new one. Deleting the folder only means they're made again. The page holds them while it shows them; they are never saved into the timeline or sent anywhere.
-- **Which files:** JPEG, PNG, WebP, TIFF, GIF and BMP are scaled down when they carry no preview of their own. Photos over 256 MB without one aren't read by the app itself. Sound shows no picture.
+- **Which files:** JPEG, PNG, WebP, TIFF, GIF and BMP are scaled down when they carry no preview of their own. Photos over 256 MB without one aren't read by the app itself. Sound shows no picture. Only files the timeline [may show](#which-files-a-timeline-may-show) get one: those in folders you chose, or any once you trust the timeline.
 - **Elsewhere:** on the website and in the offline file, which can't read your files, these moments keep their usual markers.
 
 ## Opening a moment's file
 
 A moment's source that is a file shows its name. In the desktop app:
 
-- **Clicking the name** opens the file in your system's app for it, if it is a photo, video, sound or document (below), or else shows it in its folder. The first time you open a file from a timeline, the app asks first, naming the file: open files from a timeline only when you trust where the timeline came from.
-- **Show in folder** opens the folder holding it in your file manager (on macOS and Windows with the file selected).
+- **Clicking the name** opens the file in your system's app for it, if it is a photo, video, sound or document (below), or else shows it in its folder. The first time you open a file from a timeline, the app asks first, in a dialog of its own naming the file: open files from a timeline only when you trust where the timeline came from. Saying yes trusts the timeline ([below](#which-files-a-timeline-may-show)), so it isn't asked again. A timeline you made with the populator is yours, and isn't asked about.
+- **Show in folder** opens the folder holding it in your file manager (on macOS and Windows with the file selected). For a file outside the [folders you chose](#which-files-a-timeline-may-show), it asks the same first.
 
 Only files whose apps show them, rather than run them, are opened from a timeline: the photos, videos and sounds the populator knows, and documents: PDF, plain text, Markdown, CSV, RTF, EPUB, OpenDocument (`.odt`, `.ods`, `.odp`, `.odg`), Word, Excel and PowerPoint without macros (`.docx`, `.xlsx`, `.pptx`), GIF and BMP. Anything else (programs, scripts, installers, shortcuts, help files, macro documents, web pages, and every type not listed) is shown in its folder instead, where you can open it yourself; so is anything that is a link to one, and, on Linux and macOS, any executable file that isn't a photo, video or sound (photos on a memory card are often marked executable). A file that has been moved or deleted, or is on another computer, can't be opened.
 
 A source can also be typed as a `file:///` path in the **Sources** field, one per line, alongside HTTPS links.
+
+## Which files a timeline may show
+
+A timeline can come from anyone, and its sources can name any file on your computer, so the app doesn't take a timeline's word for which files to read. It pictures, shows in their folder or opens only:
+
+- **files in folders you chose:** the folders (and files) you populated a timeline from, remembered for every timeline; and the folder of the timeline file open, which you picked when opening it, for that timeline;
+- **any file, once you trust the timeline:** by saying yes when the app asks before opening one of its files, or showing one outside those folders. The app asks in its own dialog, which the timeline's page can't answer or imitate, and remembers the answer for that timeline's file (by its path), so a trusted timeline isn't asked about again. A timeline saved from a trusted one is trusted too. A new timeline, or one from a server, has no file, so it is trusted only until you open a file.
+
+Any other file gets no thumbnail and isn't opened, and the app doesn't look at it at all: whether a link may be followed is decided from the path it writes, before anything on the disk is touched. So a timeline from someone else learns nothing of which files you have, and a link into a network folder doesn't make your computer contact another (on macOS, merely looking at `/net/<server>/…` mounts that server's shares). Network automount folders (`/net`, `/Network`) are never followed from a timeline, trusted or not, unless you populated from them. A file a link reaches through a shortcut (a symbolic link) must itself be in a folder you chose.
+
+Trusting a timeline also shows its [images from other sites](images.md#in-the-desktop-app). What you trusted, the folders you populated from and the timelines whose images you showed are kept in `access.json` in the app's settings folder, readable only by you: the latest 64 folders and 256 timelines. Delete it to be asked again.
 
 ## Your file paths stay on your computer
 

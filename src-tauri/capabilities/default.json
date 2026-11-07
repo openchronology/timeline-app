@@ -1,6 +1,32 @@
 {
   "identifier": "main",
-  "description": "The bundled offline editor window",
+  "description": "The editor window: the app's own commands, and none of Tauri's or its plugins' (the editor uses no window, menu, event or dialog API from the page; dialogs are opened by the commands)",
   "windows": ["main"],
-  "permissions": ["core:default"]
+  "permissions": [
+    "allow-desktop-open-image",
+    "allow-desktop-open-file",
+    "allow-desktop-reveal-file",
+    "allow-desktop-thumbnails",
+    "allow-desktop-trust",
+    "allow-desktop-show-images",
+    "allow-desktop-populate-pick",
+    "allow-desktop-populate-clear",
+    "allow-desktop-populate-cancel",
+    "allow-desktop-populate",
+    "allow-desktop-open",
+    "allow-desktop-accept-open",
+    "allow-desktop-stage",
+    "allow-desktop-import",
+    "allow-desktop-query",
+    "allow-desktop-document",
+    "allow-desktop-save",
+    "allow-desktop-stage-patch",
+    "allow-desktop-restore-baseline",
+    "allow-desktop-servers",
+    "allow-desktop-connect",
+    "allow-desktop-disconnect",
+    "allow-desktop-request",
+    "allow-desktop-auth-start",
+    "allow-desktop-auth-poll"
+  ]
 }

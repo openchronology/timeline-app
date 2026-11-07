@@ -1,6 +1,7 @@
 // Copyright (c) 2026 Athan Clark. SPDX-License-Identifier: GPL-3.0-only
 // Images a timeline carries with it: copied into the document as data (for files and the
-// offline HTML), and shown from those copies instead of fetching their URLs.
+// offline HTML), and shown from those copies instead of fetching their URLs; and images from
+// other sites held back, in the desktop app, until the reader shows them.
 import { imageURL } from './plugins.js';
 import { isLocalFileLink } from './local-files.js';
 import type { TimelineDocument } from './core.js';
@@ -15,13 +16,33 @@ let localImages: ((url: string) => string | null) | null = null;
 export function useLocalImages(thumbnail: (url: string) => string | null) {
   localImages = thumbnail;
 }
+/**
+ * Whether images from other sites wait (in the desktop app, a timeline from a file the reader
+ * hasn't chosen to show them for), and what to call when one is held back; none elsewhere.
+ */
+let holding: { held: () => boolean; notice: () => void } | null = null;
+/**
+ * Holds back images from other sites while `held()` says so, calling `notice()` whenever one is:
+ * fetching one tells its site the reader's address and when they looked. Copies a timeline
+ * carries still show. The desktop app sets it.
+ */
+export function holdRemoteImages(held: () => boolean, notice: () => void) {
+  holding = { held, notice };
+}
 export function configureImages(value?: Record<string, string> | null, localOnly = false) {
   assets = value ?? {};
   offline = localOnly;
 }
 export function imageSource(url: string | null): string | null {
   if (url && isLocalFileLink(url)) return localImages?.(url) ?? null;
-  return url ? (assets[url] ?? (offline ? null : url)) : null;
+  if (!url) return null;
+  if (assets[url]) return assets[url];
+  if (offline) return null;
+  if (holding?.held()) {
+    holding.notice();
+    return null;
+  }
+  return url;
 }
 export function imagesOffline() {
   return offline;
@@ -72,7 +93,8 @@ export async function embedImages(
       total += data.length;
     }
   }
-  if (!localOnly) {
+  // Images held back aren't fetched to be copied either.
+  if (!localOnly && !holding?.held()) {
     const queue = [...urls].filter((url) => !result[url]).slice(0, 64),
       deadline = Date.now() + 6000;
     await Promise.all(

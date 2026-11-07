@@ -11,7 +11,7 @@ The desktop app's shell, built with [Tauri](https://tauri.app/): a native window
 | [`capabilities/`](capabilities/README.md)            | The permissions the app's window has.                                                                                                              |
 | [`icons/`](icons/README.md)                          | The app's icons for Linux, macOS and Windows.                                                                                                      |
 | [`src/`](src/README.md)                              | The app's Rust code: its commands and its server connections.                                                                                      |
-| [`build.rs`](build.rs)                               | Tauri's build step, which generates the app's context from its configuration.                                                                      |
+| [`build.rs`](build.rs)                               | Tauri's build step, which generates the app's context from its configuration and the permissions of the app's commands, which it lists.            |
 | [`Cargo.lock`](Cargo.lock)                           | The desktop crate's locked dependency versions.                                                                                                    |
 | [`Cargo.toml`](Cargo.toml)                           | The desktop crate: Tauri, its dialog plugin, the native store and an HTTP client.                                                                  |
 | [`tauri.conf.json`](tauri.conf.json)                 | Tauri's configuration: the window, its content security policy, how the editor is built and loaded, and the Linux packages with their legal files. |
