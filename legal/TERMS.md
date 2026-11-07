@@ -1,6 +1,6 @@
 # timescale.info — terms of service
 
-Effective 25 October 2026. Operator: Athan Clark, an individual (the "operator").
+Effective 7 November 2026. Operator: Athan Clark, an individual (the "operator").
 Contact: **privacy@timescale.info**. The [privacy policy](/privacy) describes how
 information is handled.
 These terms cover the hosted service at timescale.info and desktop connections
