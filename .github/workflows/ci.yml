@@ -20,6 +20,7 @@ jobs:
     env:
       COMPOSE_PROJECT_NAME: openchronology-ci
       POSTGRES_PASSWORD: ci-only-password-with-punctuation-!@
+      APP_DATABASE_PASSWORD: ci-only-app-password-with-punctuation-'#$
       APP_ORIGIN: http://localhost:5173
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1

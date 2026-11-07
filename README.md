@@ -79,7 +79,7 @@ For a local container deployment:
 
 ```sh
 cp .env.example .env
-# Set a strong POSTGRES_PASSWORD in .env.
+# Set strong, different POSTGRES_PASSWORD and APP_DATABASE_PASSWORD in .env.
 docker compose up --build --wait
 docker compose logs -f app
 ```
