@@ -495,9 +495,31 @@ export const paths = {
       tags: ['Sign-in'],
       summary: 'Start signing in the desktop app through a browser',
       description:
-        'The desktop app’s **Sign in using your browser**: it shows `userCode` and opens `verificationUri`, where a signed-in browser approves it (`POST /api/auth/device/approve`), then polls `POST /api/auth/device/poll` with `deviceCode`, which it keeps to itself. The request expires in ten minutes. The caller’s address and `User-Agent` header are recorded with it, for the approval page to show (`GET /api/auth/device/request`). Send an empty JSON object.',
+        'The desktop app’s **Sign in using your browser**: it shows `userCode` and opens `verificationUri`, where a signed-in browser approves it (`POST /api/auth/device/approve`), then polls `POST /api/auth/device/poll` with `deviceCode`, which it keeps to itself. The request expires in ten minutes. The caller’s address and `User-Agent` header are recorded with it, and the computer it describes in `device`, for the approval page to show (`GET /api/auth/device/request`).',
       security: ANYONE,
-      requestBody: body({ type: 'object' }),
+      requestBody: body({
+        type: 'object',
+        properties: {
+          device: {
+            type: 'object',
+            description:
+              'The computer the app runs on, as it describes itself, so the person approving can tell their own from someone else’s. Optional, as is each field.',
+            properties: {
+              name: {
+                type: 'string',
+                description:
+                  'The computer’s name; control characters are dropped and it is cut to 64 characters.',
+                example: 'Studio laptop',
+              },
+              platform: {
+                type: 'string',
+                description: 'Its system; any other value is not recorded.',
+                enum: ['linux', 'macos', 'windows'],
+              },
+            },
+          },
+        },
+      }),
       responses: {
         200: json(ref('DeviceSignIn'), 'The pending desktop sign-in.'),
         ...errors(400, 403, 413, 429, 503),
@@ -547,7 +569,7 @@ export const paths = {
       tags: ['Sign-in'],
       summary: 'What is known about a pending desktop sign-in',
       description:
-        'For the approval page: when the desktop sign-in showing `userCode` started and expires, the address and `User-Agent` it started from, and whether that address is this browser’s. A browser session only (403 for a desktop session). Limited to ten a minute per client address (429). An expired, approved or unknown code is refused (400).',
+        'For the approval page: when the desktop sign-in showing `userCode` started and expires, the address and `User-Agent` it started from, the computer it named, and whether it came from this browser’s network. A browser session only (403 for a desktop session). Limited to ten a minute per client address (429). An expired, approved or unknown code is refused (400).',
       security: [{ session: [] }],
       parameters: [
         queryParam(
@@ -569,7 +591,7 @@ export const paths = {
       tags: ['Sign-in'],
       summary: 'Approve a desktop sign-in',
       description:
-        'Approves the desktop app showing `userCode`, signing it in to this account. Needs a browser session (403 for a desktop session) signed in within the last five minutes. The approval is emailed to the account’s confirmed address, with when and where the request started. Clients should have the person type the code from the desktop app rather than take it from a link, and show `GET /api/auth/device/request` first.',
+        'Approves the desktop app showing `userCode`, signing it in to this account. Needs a browser session (403 for a desktop session) signed in within the last five minutes. A request from another network than this browser’s, or one whose network can’t be compared (`network` other than `same` in `GET /api/auth/device/request`), needs `otherNetwork: true` as well, once the person has confirmed a second time that it is theirs; without it, 409, and the request stays pending. The approval is emailed to the account’s confirmed address, with when and where the request started and the computer it named. Clients should have the person type the code from the desktop app rather than take it from a link, and show `GET /api/auth/device/request` first.',
       security: [{ session: [], csrf: [] }],
       requestBody: body({
         type: 'object',
@@ -581,11 +603,16 @@ export const paths = {
             description: 'The ten-character code the desktop app shows.',
             example: 'K7MPQ2XRTA',
           },
+          otherNetwork: {
+            type: 'boolean',
+            description:
+              'The person confirmed that a request from another network (or one that can’t be compared) is theirs.',
+          },
         },
       }),
       responses: {
         200: json(ref('Ok'), 'Approved.'),
-        ...errors(400, 401, 403, 413, 429, 503),
+        ...errors(400, 401, 403, 409, 413, 429, 503),
       },
     },
   },
@@ -1218,7 +1245,16 @@ export const schemas = {
   },
   DeviceSignInRequest: {
     type: 'object',
-    required: ['requestedAt', 'expiresAt', 'clientAddress', 'userAgent', 'sameAddress'],
+    required: [
+      'requestedAt',
+      'expiresAt',
+      'clientAddress',
+      'userAgent',
+      'deviceName',
+      'devicePlatform',
+      'sameAddress',
+      'network',
+    ],
     properties: {
       requestedAt: { type: 'string', format: 'date-time', description: 'When it started.' },
       expiresAt: { type: 'string', format: 'date-time', description: 'When it expires.' },
@@ -1231,9 +1267,25 @@ export const schemas = {
         description:
           'The `User-Agent` it started with, as sent (printable, at most 200 characters); null when none. The requester chooses it.',
       },
+      deviceName: {
+        type: ['string', 'null'],
+        description:
+          'The computer’s name, as the desktop app gave it (at most 64 printable characters); null when none. The requester chooses it.',
+      },
+      devicePlatform: {
+        type: ['string', 'null'],
+        enum: ['Linux', 'macOS', 'Windows', null],
+        description: 'The computer’s system, as the desktop app gave it; null when none.',
+      },
       sameAddress: {
         type: 'boolean',
         description: 'Whether it started from the address this request comes from.',
+      },
+      network: {
+        type: 'string',
+        enum: ['same', 'different', 'unknown'],
+        description:
+          'Whether it started on this browser’s network: `same` for the same IPv4 address, IPv6 /64 or loopback, `different` otherwise, `unknown` when the two can’t be compared (IPv4 and IPv6, or an address missing). Approving anything but `same` takes `otherNetwork`.',
       },
     },
   },

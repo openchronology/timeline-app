@@ -999,15 +999,16 @@ export function createRequestHandler({
           );
         }
         // Desktop sign-in by code (device-auth.mjs): the desktop app starts and polls without a
-        // session, its address and User-Agent recorded; the approval page reads them back
-        // (device/request), and a browser session signed in within five minutes approves the
-        // code (CSRF token and rate limit checked in DeviceAuth.approve).
+        // session, its address, User-Agent and computer recorded; the approval page reads them
+        // back (device/request), and a browser session signed in within five minutes approves
+        // the code (CSRF token, rate limit and the other-network confirmation checked in
+        // DeviceAuth.approve).
         if (pathname === '/api/auth/device/start' && method === 'POST') {
-          await body(req);
+          const input = await body(req);
           return response(
             res,
             200,
-            await devices.start(req.clientAddress, req.headers['user-agent']),
+            await devices.start(req.clientAddress, req.headers['user-agent'], input?.device),
           );
         }
         if (pathname === '/api/auth/device/request' && method === 'GET')
@@ -1022,12 +1023,14 @@ export function createRequestHandler({
           );
         if (pathname === '/api/auth/device/poll' && method === 'POST')
           return response(res, 200, await devices.poll((await body(req)).deviceCode));
-        if (pathname === '/api/auth/device/approve' && method === 'POST')
+        if (pathname === '/api/auth/device/approve' && method === 'POST') {
+          const input = await body(req);
           return response(
             res,
             200,
-            await devices.approve(session, req, (await body(req)).userCode),
+            await devices.approve(session, req, input.userCode, input.otherNetwork === true),
           );
+        }
         // Agreeing to the terms and privacy policy in force (#277): a signed-in browser or desktop
         // session, with the CSRF token; `acceptTerms` is the version agreed to.
         if (pathname === '/api/auth/terms' && method === 'POST') {

@@ -75,6 +75,39 @@ fn device_destination(target: &Url, configured: &Url, code: &str) -> bool {
         && ((target.path() == format!("/connect/desktop/{code}") && target.fragment().is_none())
             || (target.path() == "/" && target.fragment() == Some(&format!("desktop/{code}"))))
 }
+/// This computer as a device sign-in describes it to the server, for the approval page to show:
+/// its name (as the system's settings give it, at most 64 printable characters) and its system
+/// (`linux`, `macos` or `windows`). The person approving can then tell their own computer from
+/// another's; the server keeps them only while the sign-in is pending.
+fn computer() -> Value {
+    #[cfg(windows)]
+    let name = std::env::var("COMPUTERNAME").ok();
+    // The name the Sharing settings show, which people know their Mac by.
+    #[cfg(target_os = "macos")]
+    let name = std::process::Command::new("/usr/sbin/scutil")
+        .args(["--get", "ComputerName"])
+        .output()
+        .ok()
+        .filter(|output| output.status.success())
+        .and_then(|output| String::from_utf8(output.stdout).ok());
+    #[cfg(all(unix, not(target_os = "macos")))]
+    let name = std::fs::read_to_string("/proc/sys/kernel/hostname")
+        .or_else(|_| std::fs::read_to_string("/etc/hostname"))
+        .ok();
+    #[cfg(not(any(unix, windows)))]
+    let name: Option<String> = None;
+    let name = name
+        .map(|text| {
+            text.chars()
+                .filter(|c| !c.is_control())
+                .take(64)
+                .collect::<String>()
+                .trim()
+                .to_string()
+        })
+        .filter(|text| !text.is_empty());
+    json!({ "name": name, "platform": std::env::consts::OS })
+}
 /// Takes the session token out of a reply body, so it never reaches the webview, and stores
 /// it, ending any password or device sign-in in progress. The token is removed even when it
 /// is malformed (not 64 lowercase hex digits), which is an error.
@@ -385,8 +418,9 @@ impl Server {
         }
         Ok(Reply { status, body })
     }
-    /// Starts a device sign-in: a new generation (dropping replies to anything in flight), a
-    /// device code from the server (kept here, removed from the reply), and the verification
+    /// Starts a device sign-in, describing this computer (`computer`): a new generation
+    /// (dropping replies to anything in flight), a device code from the server (kept here,
+    /// removed from the reply), and the verification
     /// URL, checked with `device_destination` and opened in the system browser. Resolves to the
     /// server's reply plus `browserOpened`. Errors when the server refuses, the reply is
     /// malformed or points elsewhere, or the connection changed meanwhile.
@@ -405,7 +439,7 @@ impl Server {
                 &server,
                 "auth/device/start",
                 "POST",
-                Some(json!({})),
+                Some(json!({ "device": computer() })),
                 None,
                 None,
                 Some(epoch),
@@ -526,6 +560,20 @@ fn open_browser(url: &str) -> Result<(), String> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    /// A device sign-in names this computer and its system, in printable text of at most 64
+    /// characters.
+    #[test]
+    fn device_sign_in_describes_this_computer() {
+        let described = computer();
+        assert_eq!(described["platform"], std::env::consts::OS);
+        if let Some(name) = described["name"].as_str() {
+            assert!(!name.is_empty() && name.chars().count() <= 64);
+            assert!(!name.chars().any(char::is_control));
+            assert_eq!(name, name.trim());
+        } else {
+            assert!(described["name"].is_null());
+        }
+    }
     #[test]
     fn desktop_sign_in_accepts_canonical_next_routes_and_legacy_links_only() {
         let configured = Url::parse("https://timescale.info").unwrap();

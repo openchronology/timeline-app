@@ -7095,7 +7095,12 @@ function desktopLogin(origin: string, status: string) {
       userCode: string;
       verificationUri: string;
     }>('desktop_auth_start', { server: origin });
-    text(status, `Enter code ${result.userCode} in your browser. ${result.verificationUri}`);
+    // Grouped to be read and typed easily; the approval page takes it with or without the dash.
+    const shown = `${result.userCode.slice(0, 5)}-${result.userCode.slice(5)}`;
+    text(
+      status,
+      `Type the code ${shown} on the page your browser opens, to approve this computer. ${result.verificationUri}`,
+    );
     const deadline = Date.now() + 600000;
     const poll = async () => {
       if (attempt !== desktopLoginAttempt || Date.now() > deadline) return;

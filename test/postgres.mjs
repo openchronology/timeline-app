@@ -89,6 +89,7 @@ function client(bearer) {
   clientAddresses.push(ip);
   let csrf = '';
   return {
+    ip,
     async request(path, method = 'GET', data, expected = 200, withCsrf = true, binary = false) {
       const res = await fetch(origin + '/api/' + path, {
         method,
@@ -540,36 +541,71 @@ try {
 
   // Native approval requires an authenticated browser and cannot be replayed.
   const deviceClient = client(),
-    challenge = await deviceClient.request('auth/device/start', 'POST', {});
+    challenge = await deviceClient.request('auth/device/start', 'POST', {
+      device: { name: 'Studio\u0007 laptop'.padEnd(80, '!'), platform: 'macos' },
+    });
   assert.match(challenge.verificationUri, /\/connect\/desktop\/[A-Z2-9]{10}$/);
   assert.deepEqual(
     await deviceClient.request('auth/device/poll', 'POST', { deviceCode: challenge.deviceCode }),
     { pending: true },
   );
   // The approval page shows what the server recorded when the request started: its time, its
-  // address (each test client sends its own X-Forwarded-For) and its User-Agent, and that the
-  // address is not the approving browser's.
+  // address (each test client sends its own X-Forwarded-For), its User-Agent and the computer it
+  // named (printable, at most 64 characters), and that the address is on another network than
+  // the approving browser's.
   const pending = 'auth/device/request?userCode=' + challenge.userCode;
   await anonymous.request(pending, 'GET', undefined, 401);
   await owner.request('auth/device/request?userCode=nope', 'GET', undefined, 400);
   const details = await owner.request(pending);
   assert.equal(details.clientAddress, clientAddresses.at(-1));
   assert.equal(details.sameAddress, false);
+  assert.equal(details.network, 'different');
+  assert.equal(details.deviceName, 'Studio laptop'.padEnd(64, '!'));
+  assert.equal(details.devicePlatform, 'macOS');
   assert.equal(typeof details.userAgent, 'string');
   assert(Date.now() - new Date(details.requestedAt).getTime() < 60000);
   assert(new Date(details.expiresAt) > new Date(details.requestedAt));
   await anonymous.request('auth/device/approve', 'POST', { userCode: challenge.userCode }, 401);
   await owner.request('auth/device/approve', 'POST', { userCode: challenge.userCode }, 403, false);
-  await owner.request('auth/device/approve', 'POST', { userCode: challenge.userCode });
-  await owner.request('auth/device/approve', 'POST', { userCode: challenge.userCode }, 400);
+  // From another network, it takes the second confirmation; refused without it, and still
+  // pending afterwards.
+  await owner.request('auth/device/approve', 'POST', { userCode: challenge.userCode }, 409);
+  await owner.request(pending);
+  await owner.request('auth/device/approve', 'POST', {
+    userCode: challenge.userCode,
+    otherNetwork: true,
+  });
+  await owner.request(
+    'auth/device/approve',
+    'POST',
+    { userCode: challenge.userCode, otherNetwork: true },
+    400,
+  );
   await owner.request(pending, 'GET', undefined, 400);
-  // The account is told, with when and where the request started.
+  // The account is told, with when and where the request started and the computer it named.
   await flushMail(pool, mailer, securityKey);
   const notice = delivered.findLast(
     (m) => m.to === `owner_${suffix}@example.test` && m.text.includes('desktop app was signed in'),
   );
   assert(notice, 'desktop approval email queued');
   assert(notice.text.includes(details.clientAddress));
+  assert(notice.text.includes(`"${details.deviceName}" (macOS)`));
+  // A request from the browser's own address needs no second confirmation, and names no
+  // computer when the app gave none (here approved by another account, whose address the
+  // request is given, so as not to use up the owner's approvals a minute).
+  const local = await deviceClient.request('auth/device/start', 'POST', {
+    device: { platform: 'plan9' },
+  });
+  await pool.query('UPDATE oc_device_logins SET client_address=$2 WHERE user_code=$1', [
+    local.userCode,
+    viewer.ip,
+  ]);
+  const near = await viewer.request('auth/device/request?userCode=' + local.userCode);
+  assert.equal(near.network, 'same');
+  assert.equal(near.deviceName, null);
+  assert.equal(near.devicePlatform, null);
+  await viewer.request('auth/device/approve', 'POST', { userCode: local.userCode });
+  await pool.query('DELETE FROM oc_device_logins WHERE user_code=$1', [local.userCode]);
   await pool.query(
     "UPDATE oc_device_logins SET last_poll_at=now()-interval '4 seconds' WHERE user_code=$1",
     [challenge.userCode],
