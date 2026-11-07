@@ -34,7 +34,7 @@ jobs:
           # The build identity and development versions read the commit and its tags.
           fetch-depth: 0
           persist-credentials: false
-      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
         with:
           node-version: 24
       # The Node.js tarball the package bundles, downloaded once and cached by version, so the
@@ -61,7 +61,7 @@ jobs:
       - name: Install, run, upgrade and remove it in a fresh container
         timeout-minutes: 10
         run: node "test/server-${{ matrix.format }}.mjs" "server-artifacts/openchronology-server-${{ matrix.target }}-amd64.${{ matrix.format }}"
-      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: server-${{ matrix.target }}
           path: server-artifacts/openchronology-server-${{ matrix.target }}-amd64.${{ matrix.format }}
@@ -80,13 +80,13 @@ jobs:
           ref: ${{ inputs.tag || github.sha }}
           fetch-depth: 0
           persist-credentials: false
-      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
         with:
           node-version: 24
       - name: Build the platform
         timeout-minutes: 10
         run: node scripts/server-package.mjs platform
-      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: server-platform
           path: server-artifacts/openchronology-server-platform.tar.gz
@@ -106,7 +106,7 @@ jobs:
           ref: ${{ inputs.tag || github.sha }}
           fetch-depth: 0
           persist-credentials: false
-      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
         with:
           node-version: 24
       - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.1
@@ -139,7 +139,7 @@ jobs:
           ref: ${{ inputs.tag || github.sha }}
           fetch-depth: 0
           persist-credentials: false
-      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
         with:
           node-version: 24
       - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.1
@@ -150,7 +150,7 @@ jobs:
         run: node scripts/server-package.mjs "${{ matrix.target }}"
       - name: Build the package on FreeBSD ${{ matrix.release }}
         timeout-minutes: 15
-        uses: vmactions/freebsd-vm@4469451fe39bee80be4066836c5170362e9349f3 # v1.5.7
+        uses: vmactions/freebsd-vm@c46abacb49f09938ca4e1702d15d836285d694cc # v1.5.9
         with:
           release: ${{ matrix.release }}
           usesh: true
@@ -159,7 +159,7 @@ jobs:
           sync: rsync
           copyback: true
           run: sh deploy/freebsd-server/build.sh
-      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: server-${{ matrix.target }}
           path: server-artifacts/openchronology-server-${{ matrix.target }}-amd64.pkg
@@ -187,7 +187,7 @@ jobs:
           path: server-artifacts/
       - name: Install, run, upgrade and remove it on FreeBSD ${{ matrix.release }}
         timeout-minutes: 15
-        uses: vmactions/freebsd-vm@4469451fe39bee80be4066836c5170362e9349f3 # v1.5.7
+        uses: vmactions/freebsd-vm@c46abacb49f09938ca4e1702d15d836285d694cc # v1.5.9
         with:
           release: ${{ matrix.release }}
           usesh: true
@@ -215,7 +215,7 @@ jobs:
           ref: ${{ inputs.tag || github.sha }}
           fetch-depth: 0
           persist-credentials: false
-      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
         with:
           node-version: 24
       - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.1
@@ -255,7 +255,7 @@ jobs:
           ref: ${{ inputs.tag || github.sha }}
           fetch-depth: 0
           persist-credentials: false
-      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
         with:
           node-version: 24
       - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.1
@@ -293,7 +293,7 @@ jobs:
       - name: Install, run, upgrade and remove it
         timeout-minutes: 10
         run: node test/server-windows.mjs server-artifacts/openchronology-server-windows-amd64-setup.exe
-      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: server-windows
           path: server-artifacts/openchronology-server-windows-amd64-setup.exe
