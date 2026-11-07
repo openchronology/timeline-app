@@ -2,7 +2,7 @@
 
 Copyright (c) 2026 Athan Clark. SPDX-License-Identifier: GPL-3.0-only
 
-OpenChronology is one codebase for four editions: the website (a Next.js platform over a Node server and PostgreSQL), the desktop app (Tauri, with a native SQLite store), the offline HTML file and the plain browser editor. They share one editor, `src/`. Start with the [README](README.md) to run it, and the [architecture](docs/architecture.md) for how the parts fit. This page says where everything is and the conventions that keep it findable.
+OpenChronology is one codebase for four editions: the website (a Next.js platform over a Node server and PostgreSQL), the desktop app (Tauri, with a native SQLite store), the offline HTML file and the plain browser editor. They share one editor, `src/`. Start with [building and testing](docs/development.md) to run it, and the [architecture](docs/architecture.md) for how the parts fit. This page says where everything is and the conventions that keep it findable.
 
 ## Contents
 

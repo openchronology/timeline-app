@@ -280,6 +280,7 @@ export const HELP_SECTIONS = [
   {
     title: 'Running a server',
     pages: [
+      'install',
       'administration',
       'docker',
       'nix',
@@ -290,7 +291,7 @@ export const HELP_SECTIONS = [
       'licensing',
     ],
   },
-  { title: 'How it works', pages: ['architecture', 'benchmarks'] },
+  { title: 'How it works', pages: ['architecture', 'development', 'benchmarks'] },
 ];
 
 const SOURCE = 'https://github.com/openchronology/timeline-app/blob/main/';

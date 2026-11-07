@@ -2,7 +2,7 @@
 
 Copyright (c) 2026 Athan Clark. SPDX-License-Identifier: GPL-3.0-only
 
-The documentation: how to use OpenChronology, run a server and work on the code. The site's help area (`/help`) presents these same files as the site runs ([`server/help.mjs`](../server/help.mjs)), grouped into sections there, so a change here changes the help with the code it ships with; this README is for reading the repository and is not a help page. Start with [Using OpenChronology](guide.md) or the [frequently asked questions](faq.md); the project's [README](../README.md) covers installing and building. The [technical disclosures](disclosures/README.md) describe the code's mechanisms in implementable detail, as a dated public record; they are for reading the repository and are not help pages. Link between docs with relative links such as `[durations](durations.md)`, which the help area turns into its own addresses.
+The documentation: how to use OpenChronology, run a server and work on the code. The site's help area (`/help`) presents these same files as the site runs ([`server/help.mjs`](../server/help.mjs)), grouped into sections there, so a change here changes the help with the code it ships with; this README is for reading the repository and is not a help page. Start with [Using OpenChronology](guide.md) or the [frequently asked questions](faq.md); [installing a server](install.md) and [building and testing](development.md) cover running and building it. The [technical disclosures](disclosures/README.md) describe the code's mechanisms in implementable detail, as a dated public record; they are for reading the repository and are not help pages. Link between docs with relative links such as `[durations](durations.md)`, which the help area turns into its own addresses.
 
 ## Contents
 
@@ -18,6 +18,7 @@ The documentation: how to use OpenChronology, run a server and work on the code.
 | [`capacity.md`](capacity.md)                   | How large a timeline can be, and which platform stays comfortable at which size.                                                           |
 | [`collaboration.md`](collaboration.md)         | The dashboard and working together: custody and permissions, forks, saving while others save, and pull requests.                           |
 | [`comparison.md`](comparison.md)               | Comparing timelines side by side, live refresh, and saved public comparisons.                                                              |
+| [`development.md`](development.md)             | Building and testing every edition from source: package managers, the offline file and editions, the desktop app, CI and releases.         |
 | [`docker.md`](docker.md)                       | Deploying with Docker Compose: building and running, public hosting, upgrades and backups, and mail.                                       |
 | [`durations.md`](durations.md)                 | Durations: entities with a start and an end, each a fixed time or anchored to a moment.                                                    |
 | [`faq.md`](faq.md)                             | Short answers to common questions, from the basics to running your own server.                                                             |
@@ -25,6 +26,7 @@ The documentation: how to use OpenChronology, run a server and work on the code.
 | [`guest-editing.md`](guest-editing.md)         | Editing without an account, in the guest editor and the standalone HTML file, where timelines live only in memory.                         |
 | [`guide.md`](guide.md)                         | Using OpenChronology: a walk through the app, task by task, linking to the detailed pages.                                                 |
 | [`images.md`](images.md)                       | How timelines show images by linking to them rather than storing copies, and why (#109).                                                   |
+| [`install.md`](install.md)                     | Installing a server: the packages for each system, Docker Compose, Nix, from source, and running behind a proxy.                           |
 | [`journald.md`](journald.md)                   | Following the systemd journal into timelines with the journald follower (#151).                                                            |
 | [`licensing.md`](licensing.md)                 | Copyright, the GPLv3 and distributions: source for releases, contributions and license changes.                                            |
 | [`log-import.md`](log-import.md)               | Importing historic log files into timelines with `och-import-logs`.                                                                        |
