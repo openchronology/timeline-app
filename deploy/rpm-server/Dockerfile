@@ -144,6 +144,7 @@ RUN set -eu; \
     install -D -m 0755 /root/shared/openchronology-reset-admin-password "$ROOT/usr/sbin/openchronology-reset-admin-password"; \
     install -D -m 0755 /root/rpm/openchronology-setup "$ROOT/usr/sbin/openchronology-setup"; \
     install -D -m 0755 /root/shared/och-import-logs "$ROOT/usr/bin/och-import-logs"; \
+    install -D -m 0755 /root/shared/openchronology-log-files "$APP/bin/openchronology-log-files"; \
     find "$ROOT" -type d -exec chmod 0755 {} +; \
     sed -e "s/@VERSION@/$RPM_VERSION/" -e "s/@RELEASE@/$RPM_RELEASE/" \
         -e "s/@PG_MAJOR@/$PG_MAJOR/g" -e "s/@NODE_VERSION@/$NODE_VERSION/" \

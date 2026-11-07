@@ -46,6 +46,7 @@ mv "$WORK/lib/openchronology" "$APP"
 mv "$WORK/doc" "$DOC"
 mkdir -p "$APP/bin" "$DOC/pgmp"
 install -m 0755 native-store/target/release/och-convert "$APP/bin/och-convert"
+install -m 0755 "$SHARED/openchronology-log-files" "$APP/bin/openchronology-log-files"
 install -m 0644 "$WORK/pgmp/COPYING" "$DOC/pgmp/COPYING"
 sed "s/@PG_MAJOR@/$PG_MAJOR/g" "$HERE/README.FreeBSD" >"$DOC/README.FreeBSD"
 # The Linux packages' templates, with FreeBSD's paths: configuration under /usr/local/etc,

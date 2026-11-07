@@ -9,11 +9,12 @@ if [ "$1" = purge ]; then
   cat <<MSG
 
 The OpenChronology configuration was removed. The PostgreSQL database and the openchronology
-system user remain. To delete them as well:
+and openchronology-logs system users remain. To delete them as well:
 
   sudo -u postgres dropdb openchronology
   sudo -u postgres dropuser openchronology
   sudo deluser --system openchronology
+  sudo deluser --system openchronology-logs
 
 MSG
 fi
