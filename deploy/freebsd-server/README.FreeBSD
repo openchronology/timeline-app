@@ -14,7 +14,8 @@ PostgreSQL @PG_MAJOR@, GMP and SQLite. Like FreeBSD's ports, the package starts 
 itself (pkg ends whatever its scripts leave running); openchronology-setup finishes the
 first installation:
 
-  - creates the `openchronology` system user;
+  - creates the `openchronology` system user, and `openchronology-logs` for the syslog
+    receiver;
   - initializes PostgreSQL @PG_MAJOR@ if it is not yet (/var/db/postgres/data@PG_MAJOR@, with
     peer authentication on its local socket), and enables and starts it;
   - writes /usr/local/etc/openchronology/openchronology.env, with a new
@@ -61,6 +62,10 @@ should allow request bodies of at least 32 MiB and streaming responses (live upd
 The syslog receiver (syslog.md) is configured in /usr/local/etc/openchronology/syslog.env
 with routes in /usr/local/etc/openchronology/syslog-routes.json; then
 `sysrc openchronology_syslog_enable=YES && service openchronology_syslog start`.
+It runs as its own user, openchronology-logs, which cannot read openchronology.env or log
+in to the database (#501): syslog.env is root:openchronology-logs, mode 0640, and so must
+be the routes file (`chown root:openchronology-logs FILE && chmod 0640 FILE`). See
+syslog.md, "Its own account".
 
 `och-import-logs` imports historic log files (log-import.md), with OCH_API_URL and
 OCH_API_KEY from the environment or syslog.env: `och-import-logs --help`.
@@ -83,16 +88,22 @@ openchronology-migrate is safe to run more than once. `--no-restart` migrates on
 nothing. Releases up to 0.12.1 started only the server; after upgrading from one, start an
 enabled receiver with `service openchronology_syslog start` (#374).
 
+Upgrading from a version before #501 moves syslog.env and the routes file it names
+(SYSLOG_ROUTES) from the openchronology user to openchronology-logs, keeping their modes:
+only regular files with one link, reached through no symbolic link, in folders only root
+can change. It lists what it moved and what it left for you to change.
+
 Remove
 ------
 
 `pkg delete openchronology-server` stops and removes the server. The configuration
-(including AUTH_ENCRYPTION_KEY), the database and the system user remain; delete them with:
+(including AUTH_ENCRYPTION_KEY), the database and the system users remain; delete them with:
 
     sysrc -x openchronology_enable openchronology_mail_enable openchronology_syslog_enable
     rm -rf /usr/local/etc/openchronology /var/db/openchronology
     su -l postgres -c 'dropdb openchronology && dropuser openchronology'
     pw userdel openchronology
+    pw userdel openchronology-logs
 
 Layout
 ------

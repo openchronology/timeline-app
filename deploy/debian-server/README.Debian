@@ -9,7 +9,8 @@ Install
 apt installs the PostgreSQL server this package needs. (`dpkg -i` does not install
 dependencies; after it, run `sudo apt -f install`.) The first installation:
 
-  - creates the `openchronology` system user;
+  - creates the `openchronology` system user, and `openchronology-logs` for the log
+    importers;
   - writes /etc/openchronology/openchronology.env, with a new AUTH_ENCRYPTION_KEY;
   - creates the `openchronology` PostgreSQL role and database in the local cluster
     ("main"), with the bundled pgmp extension;
@@ -64,6 +65,13 @@ The journald follower (journald.md) streams this machine's systemd journal, or a
 machine's over SSH, into timelines. Configure it in /etc/openchronology/journald.env (the timeline or
 routes, and which units); then `sudo systemctl enable --now openchronology-journald`.
 
+The log importers run as their own system user, openchronology-logs, which cannot read
+openchronology.env or log in to the database (#501); the journald follower has the
+systemd-journal group as well. syslog.env and journald.env are root:openchronology-logs,
+mode 0640, and so must be the files they name (routes, the journald SSH key and known
+hosts): `sudo chown root:openchronology-logs FILE && sudo chmod 0640 FILE`. See syslog.md
+and journald.md, "Its own account".
+
 `och-import-logs` imports historic log files (log-import.md), with OCH_API_URL and
 OCH_API_KEY from the environment or syslog.env: `och-import-logs --help`.
 
@@ -89,15 +97,23 @@ worker stopped and account email waiting (#371), and enabled log importers stopp
 not imported (#374); start them with, for example,
 `sudo systemctl start openchronology-mail openchronology-syslog`.
 
+Upgrading from a version before #501 moves syslog.env, journald.env and the files they name
+(SYSLOG_ROUTES, JOURNALD_ROUTES, JOURNALD_SSH_KEY, JOURNALD_KNOWN_HOSTS) from the
+openchronology user to openchronology-logs, keeping their modes: only regular files with one
+link, reached through no symbolic link, in folders only root can change. It lists what it
+moved and what it left for you to change.
+
 Remove
 ------
 
 `sudo apt remove openchronology-server` stops and removes the server and keeps the
 configuration and database. `sudo apt purge openchronology-server` also removes
-/etc/openchronology. The database is never dropped automatically:
+/etc/openchronology. The database and the system users are never removed automatically:
 
     sudo -u postgres dropdb openchronology
     sudo -u postgres dropuser openchronology
+    sudo deluser --system openchronology
+    sudo deluser --system openchronology-logs
 
 Layout
 ------

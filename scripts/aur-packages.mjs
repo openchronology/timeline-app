@@ -28,6 +28,7 @@ export const SERVER_FILES = {
     'openchronology-migrate',
     'openchronology-reset-admin-password',
     'och-import-logs',
+    'openchronology-log-files',
   ],
   'deploy/arch': [
     'openchronology-setup',

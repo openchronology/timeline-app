@@ -7,8 +7,9 @@ After=network.target openchronology.service
 
 [Service]
 Type=simple
-User=openchronology
-Group=openchronology
+# Its own user (#501): it cannot read the server's configuration or log in to its database.
+User=openchronology-logs
+Group=openchronology-logs
 EnvironmentFile=/etc/openchronology/syslog.env
 Environment=NODE_ENV=production
 WorkingDirectory=/usr/lib/openchronology
@@ -38,6 +39,8 @@ SystemCallArchitectures=native
 SystemCallFilter=@system-service
 SystemCallErrorNumber=EPERM
 UMask=0077
+# Other users' processes are hidden from it.
+ProtectProc=invisible
 
 [Install]
 WantedBy=multi-user.target

@@ -93,7 +93,7 @@ await checkSyslogService({
     assert.match(await sh('service openchronology_syslog status'), /is running/);
   },
   stop: async () => {
-    assert.match(await sh('ps -U openchronology -o command='), /server\/syslog-receiver\.mjs/);
+    assert.match(await sh('ps -U openchronology-logs -o command='), /server\/syslog-receiver\.mjs/);
     await sh('service openchronology_syslog stop && sysrc openchronology_syslog_enable=NO');
   },
   logs: () => sh('grep openchronology_syslog /var/log/messages | tail -40', { allowFailure: true }),
@@ -141,7 +141,7 @@ assert.deepEqual(await healthy(), { status: 'ok', storage: 'postgresql' });
 
 // Removing it stops the service and keeps the configuration and the database.
 const remove = await sh('env ASSUME_ALWAYS_YES=yes pkg delete -y openchronology-server 2>&1');
-assert.match(remove, /the PostgreSQL database and the openchronology system user remain/i);
+assert.match(remove, /the PostgreSQL database and the openchronology and openchronology-logs\s+system users remain/i);
 assert.match(await sh(`test -e ${configFile} && echo present || echo gone`), /present/);
 assert.equal(await psql("SELECT count(*) FROM oc_users WHERE username='kept'"), '1');
 await assert.rejects(fetch('http://127.0.0.1:5173/healthz'));
