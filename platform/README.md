@@ -6,12 +6,12 @@ The hosted platform: the Next.js application that serves the dashboard, accounts
 
 ## Contents
 
-| File                                  | What it is for                                                                                                                                                         |
-| ------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| [`app/`](app/README.md)               | The site's pages and routes (Next.js App Router), one folder per address.                                                                                              |
-| [`content/`](content/README.md)       | Copy the pages read as they run: the landing and audience pages' Markdown (#379).                                                                                      |
-| [`components/`](components/README.md) | React components the pages are built from: the framed editor, account, administration, sharing, reports and lists of timelines.                                        |
-| [`icons/`](icons/README.md)           | The web-app icons and the header's logo, copied into `public/` when the site is built.                                                                                 |
-| [`lib/`](lib/README.md)               | Helpers the pages share: the visitor's session, loading timelines, link previews, the API reference and the download page's releases.                                  |
-| [`next.config.mjs`](next.config.mjs)  | The Next.js configuration: a standalone server build, with the files it reads as it runs (`dist/`, `docs/`, the legal texts) traced into it.                           |
-| [`proxy.js`](proxy.js)                | Runs before the site's pages: gives them their content security policy, and rewrites a timeline's address `/<owner>/<slug>/…` to its `/timelines/<id>/…` pages (#148). |
+| File                                  | What it is for                                                                                                                                                      |
+| ------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| [`app/`](app/README.md)               | The site's pages and routes (Next.js App Router), one folder per address.                                                                                           |
+| [`content/`](content/README.md)       | Copy the pages read as they run: the landing and audience pages' Markdown (#379).                                                                                   |
+| [`components/`](components/README.md) | React components the pages are built from: the framed editor, account, administration, sharing, reports and lists of timelines.                                     |
+| [`icons/`](icons/README.md)           | The web-app icons and the header's logo, copied into `public/` when the site is built.                                                                              |
+| [`lib/`](lib/README.md)               | Helpers the pages share: the visitor's session, loading timelines, link previews, the API reference and the download page's releases.                               |
+| [`next.config.mjs`](next.config.mjs)  | The Next.js configuration: a standalone server build, with the files it reads as it runs (`dist/`, `docs/`, the legal texts) traced into it.                        |
+| [`proxy.js`](proxy.js)                | Runs before the site's pages: gives every page its security headers, and rewrites a timeline's address `/<owner>/<slug>/…` to its `/timelines/<id>/…` pages (#148). |

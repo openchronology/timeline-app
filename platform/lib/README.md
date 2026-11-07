@@ -2,12 +2,13 @@
 
 Copyright (c) 2026 Athan Clark. SPDX-License-Identifier: GPL-3.0-only
 
-Helpers the platform's pages and components share. Files that import `server-only` run only on the server (they read the session, the database or the built editor); [`api.js`](api.js), [`navigation.js`](navigation.js), [`releases.js`](releases.js), [`second-factor.js`](second-factor.js), [`passkey-autofill.js`](passkey-autofill.js), [`timeline-lists.js`](timeline-lists.js), [`use-search-result.js`](use-search-result.js) and [`api-reference.js`](api-reference.js) work anywhere. Storage and the API's logic are in [`server/`](../../server/README.md).
+Helpers the platform's pages and components share. Files that import `server-only` run only on the server (they read the session, the database or the built editor); [`analytics.js`](analytics.js), [`api.js`](api.js), [`navigation.js`](navigation.js), [`releases.js`](releases.js), [`second-factor.js`](second-factor.js), [`passkey-autofill.js`](passkey-autofill.js), [`timeline-lists.js`](timeline-lists.js), [`use-search-result.js`](use-search-result.js) and [`api-reference.js`](api-reference.js) work anywhere. Storage and the API's logic are in [`server/`](../../server/README.md).
 
 ## Contents
 
 | File                                           | What it is for                                                                                                                                                                              |
 | ---------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| [`analytics.js`](analytics.js)                 | What Google Analytics is told of a page: its address and title, with nothing naming a timeline that isn't public, a comparison's timelines, a sign-in code or a search.                     |
 | [`api-reference.js`](api-reference.js)         | Reads the API's OpenAPI description for its reference page: operations by tag, who may call them, schema types and example bodies.                                                          |
 | [`api.js`](api.js)                             | Calls the platform's HTTP API from the browser, with the CSRF token and any human-verification challenge.                                                                                   |
 | [`editor-html.js`](editor-html.js)             | The built editor's page (`dist/index.html`) as the platform serves it, and its content security policy.                                                                                     |
