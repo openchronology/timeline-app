@@ -43,18 +43,33 @@ The person is the one assigned, the reviewer whose review was requested or given
 | ------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `assignments` | `assigned`, `unassigned`                                                                                                                                                      |
 | `labels`      | `labeled`, `unlabeled`, with `label:<name>`                                                                                                                                   |
-| `milestones`  | `milestoned`, `demilestoned`, with `milestone:<title>`                                                                                                                        |
+| `milestones`  | `milestoned`, `demilestoned`, with `milestone:<title>`. Each milestone is also a duration from creation to closing (ongoing while open), with a `due` moment at its due date  |
 | `state`       | `closed`, `reopened`, `merged`: who did it, besides the duration's end                                                                                                        |
 | `renames`     | `renamed`, titled with the old title                                                                                                                                          |
 | `reviews`     | `review requested`, `review request removed`, `reviewed` (with `review:approved`, `review:changes requested` or `review:commented`), `ready for review`, `converted to draft` |
 | `mentions`    | `mentioned`, on the item named, with the naming item's tag, and a link between the two: one moment per pair, however often it is named again                                  |
 | `relations`   | `sub-issue added`/`removed`, `parent issue added`/`removed` (with the other item's tag, and a link), `marked as duplicate`, `unmarked as duplicate`                           |
-| `status`      | `moved`, with `status:<column>` and `project:<name>`: a move on a project board                                                                                               |
+| `status`      | `moved`, with `status:<column>` and `project:<name>`: a move on a project board. The time in each column is also a duration, tagged `in column`                               |
+| `releases`    | `released`: each published release, a moment on its repository, with `release:<tag>` (and `prerelease`)                                                                       |
 | `other`       | `locked`, `unlocked`, `pinned`, `unpinned`, `transferred`                                                                                                                     |
 
 All kinds are recorded unless the routing rules list some (`"events": ["labels", "reviews"]`), or the importer is given `--events`. A comment's text is never copied: comments only add the `mentioned` moments of the items they name.
 
 **Project boards.** A move is recorded live from GitHub's `projects_v2_item` deliveries, which GitHub sends for organization projects only. The receiver needs a `GITHUB_TOKEN` to name the moved item, since deliveries identify it by node ID. The importer records the moves an item's timeline lists. GitHub's timelines have [mostly stopped recording status changes since September 2026](https://github.com/orgs/community/discussions/209484), so history before the receiver started may be missing.
+
+**Time in each column.** Each stay in a board column is its own duration, such as `#412 in Review (Roadmap)`:
+
+- it starts when the item was moved there;
+- it ends when the item moved on or closed, and is ongoing until then.
+
+Separating by `status:` tags turns the board's columns into rows, so it shows how long work waits in each. The receiver remembers which column each item is in, so a move can end the stay before it. Set `GITHUB_STATE` to a file to keep that across restarts. The importer works the stays out from an item's moves, so its history has the same gaps as the moves themselves (above).
+
+**Releases and milestones** belong to the repository, not to an item:
+
+- a release is a moment when it was published;
+- a milestone is a duration, with its due date as a moment.
+
+Items in a milestone carry its `milestone:<title>` tag, so separating by that tag lines them up against it. Deleting a release, or a milestone, removes it.
 
 Every moment's ID is made from its item, what happened, to what and when. So the importer and the receiver write the same event as one moment.
 
@@ -149,7 +164,7 @@ Then, in the repository's or organization's **Settings → Webhooks → Add webh
 - **Payload URL:** the receiver's address.
 - **Content type:** `application/json`.
 - **Secret:** the same value as `GITHUB_WEBHOOK_SECRET`.
-- **Events:** **Issues**, **Pull requests**, **Pull request reviews**, **Issue comments** (for mentions) and **Sub-issues**. On an organization, also **Projects v2 items**, for moves on its boards; these need `GITHUB_TOKEN`.
+- **Events:** **Issues**, **Pull requests**, **Pull request reviews**, **Issue comments** (for mentions), **Sub-issues**, **Releases** and **Milestones**. On an organization, also **Projects v2 items**, for moves on its boards; these need `GITHUB_TOKEN`.
 
 GitHub's first delivery is a ping, which the receiver answers.
 
@@ -160,6 +175,7 @@ GitHub's first delivery is a ping, which the receiver answers.
 | `GITHUB_ROUTES`              | `github-routes.json`     | Path of the routing rules; `GITHUB_ROUTES_JSON` may hold them inline instead.              |
 | `GITHUB_HOST`, `GITHUB_PORT` | `127.0.0.1`, `5580`      | Address and port to listen on.                                                             |
 | `GITHUB_FLUSH_MS`            | `1000`                   | How long changes gather before they are saved.                                             |
+| `GITHUB_STATE`               | (none)                   | A file in which to remember each item's open column, across restarts.                      |
 | `GITHUB_TOKEN`               | (none)                   | A token that can read the organization's issues, to name the items of project board moves. |
 | `GITHUB_API_URL`             | `https://api.github.com` | GitHub Enterprise's API, for that.                                                         |
 

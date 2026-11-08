@@ -18,6 +18,7 @@ import {
   NOTES_LIMIT,
 } from '../server/github-source.mjs';
 import {
+  StintTracker,
   eventKinds,
   mentionChanges,
   projectStatusChange,
@@ -551,6 +552,16 @@ function fakeGithub() {
     ],
     3: [
       {
+        event: 'moved_columns_in_project',
+        created_at: '2026-11-01T09:00:00Z',
+        project_card: { column_name: 'In progress' },
+      },
+      {
+        event: 'moved_columns_in_project',
+        created_at: '2026-11-01T13:30:00Z',
+        project_card: { column_name: 'Review' },
+      },
+      {
         event: 'reviewed',
         submitted_at: '2026-11-01T14:00:00Z',
         state: 'approved',
@@ -558,12 +569,47 @@ function fakeGithub() {
       },
     ],
   };
+  const releases = [
+    {
+      id: 70,
+      tag_name: 'v1.0.0',
+      name: 'First',
+      published_at: '2026-11-01T15:00:00Z',
+      author: { login: 'mona' },
+    },
+    { id: 71, tag_name: 'v1.1.0-draft', draft: true, published_at: null },
+  ];
+  const milestones = [
+    {
+      number: 5,
+      title: 'v1',
+      state: 'closed',
+      created_at: '2026-10-01T00:00:00Z',
+      closed_at: '2026-11-01T15:00:00Z',
+      updated_at: '2026-11-01T15:00:00Z',
+      due_on: '2026-11-01T00:00:00Z',
+    },
+    {
+      number: 6,
+      title: 'v2',
+      state: 'open',
+      created_at: '2026-11-01T16:00:00Z',
+      updated_at: '2026-11-01T16:00:00Z',
+      due_on: null,
+    },
+  ];
   const seen = [];
   const fetcher = async (url, options) => {
     seen.push({ url, headers: options.headers });
     const u = new URL(url);
     const number = /\/issues\/(\d+)\/timeline$/.exec(u.pathname)?.[1];
-    const list = number ? timelines[number] : items;
+    const list = number
+      ? timelines[number]
+      : u.pathname.endsWith('/releases')
+        ? releases
+        : u.pathname.endsWith('/milestones')
+          ? milestones
+          : items;
     const page = Number(u.searchParams.get('page') ?? '1');
     const slice = list.slice((page - 1) * 2, page * 2);
     const next = page * 2 < list.length ? new URL(url) : null;
@@ -582,17 +628,38 @@ test('the importer reads every page of issues and their timelines, and links wha
   const reader = new GithubReader({ token: 'ghp_x', fetcher: github.fetcher });
   const changes = await readRepository(reader, 'acme/app');
   assert.deepEqual(
-    changes.durations.map((d) => [d.id, typeof d.end === 'string' ? 'closed' : 'open']),
+    changes.durations.map((d) => [d.metadata.title, typeof d.end === 'string' ? 'closed' : 'open']),
     [
-      ['gh:acme:app:1', 'closed'],
-      ['gh:acme:app:2', 'open'],
-      ['gh:acme:app:3', 'open'],
+      ['#1 Fix the login loop', 'closed'],
+      ['#2 Fix the login loop', 'open'],
+      ['#3 Fix the login loop', 'open'],
+      // #3's time in each column: In progress until it moved to Review, still there.
+      ['#3 in In progress', 'closed'],
+      ['#3 in Review', 'open'],
+      ['Milestone v1', 'closed'],
+      ['Milestone v2', 'open'],
     ],
   );
+  assert.equal(changes.durations[3].end, String(Date.parse('2026-11-01T13:30:00Z') / 1000));
   assert.deepEqual(
-    changes.moments.map((m) => m.metadata.tags[3]),
-    ['closed', 'assigned', 'labeled', 'mentioned', 'unassigned', 'reviewed'],
+    changes.moments.map((m) => m.metadata.tags[3] ?? m.metadata.tags[2]),
+    [
+      'closed',
+      'assigned',
+      'labeled',
+      'mentioned',
+      'unassigned',
+      'moved',
+      'moved',
+      'reviewed',
+      'release:v1.0.0',
+      'milestone:v1',
+    ],
   );
+  assert.equal(changes.moments.at(-2).metadata.title, 'Released v1.0.0 First');
+  assert.equal(changes.moments.at(-1).metadata.title, 'Due: milestone v1');
+  // v2 has no due date: any earlier one is removed.
+  assert.deepEqual(changes.removedMoments, ['gh:acme:app:milestone:6:due']);
   assert.ok(!JSON.stringify(changes).includes('private words'), 'comments are not copied');
   // #3 closes #2 and mentions it: one link. #99 was not read, so no link to it.
   assert.equal(changes.links.length, 1);
@@ -604,7 +671,7 @@ test('the importer reads every page of issues and their timelines, and links wha
   const recent = await readRepository(reader, 'acme/app', { since: '2026-11-01T12:30:00Z' });
   assert.deepEqual(
     recent.moments.map((m) => m.metadata.tags[3]),
-    ['closed', 'unassigned', 'reviewed'],
+    ['closed', 'unassigned', 'moved', 'reviewed', 'release:v1.0.0', 'milestone:v1'],
   );
   assert.ok(
     github.seen.some((r) => new URL(r.url).searchParams.get('since') === '2026-11-01T12:30:00Z'),
@@ -646,7 +713,7 @@ test('the command checks its arguments, and a dry run writes nothing', async () 
   }
   assert.match(
     lines[0],
-    /acme\/app → .*: would import 3 issues and pull requests \(2 open\), 6 events, 1 links\./,
+    /acme\/app → .*: would import 3 issues and pull requests \(2 open\), 4 other durations \(milestones, time in columns\), 10 events, 1 links\./,
   );
 });
 
@@ -668,4 +735,110 @@ test('assignment moments carry who and what', () => {
     'unassigned',
     'github/octo',
   ]);
+});
+
+test("the receiver keeps each item's time in its board's columns", async () => {
+  const server = fakeServer();
+  const github = async () => ({
+    status: 200,
+    json: async () => ({
+      data: {
+        item: {
+          number: 412,
+          title: 'Fix the login loop',
+          url: 'https://github.com/acme/app/issues/412',
+          repository: { nameWithOwner: 'acme/app' },
+        },
+        project: { title: 'Roadmap' },
+      },
+    }),
+  });
+  const written = [];
+  const stints = new StintTracker('state.json', { write: (file, value) => written.push(value) });
+  const ingest = new GithubIngest({
+    api: 'http://och.test',
+    key: KEY,
+    secret: 's3cret',
+    routes: githubRoutes({ default: TIMELINE }),
+    fetcher: async (url, options) =>
+      url.endsWith('/graphql') ? github() : server.fetcher(url, options),
+    flushMs: 60000,
+    token: 'ghp_x',
+    stints,
+  });
+  const move = (column, at) =>
+    delivery(ingest, 'projects_v2_item', {
+      action: 'edited',
+      projects_v2_item: {
+        content_type: 'Issue',
+        content_node_id: 'I_1',
+        project_node_id: 'PVT_1',
+        updated_at: at,
+      },
+      changes: { field_value: { field_name: 'Status', to: { name: column } } },
+      sender: { login: 'mona' },
+    });
+  assert.equal(move('In progress', '2026-11-01T09:00:00Z'), 202);
+  await ingest.drain();
+  assert.equal(move('Review', '2026-11-01T13:00:00Z'), 202);
+  await ingest.drain();
+  assert.equal(
+    delivery(ingest, 'issues', {
+      action: 'closed',
+      issue: issue({ state: 'closed', closed_at: '2026-11-02T00:00:00Z' }),
+      repository: { full_name: 'acme/app' },
+    }),
+    202,
+  );
+  await ingest.drain();
+  const stintsSaved = new Map();
+  for (const save of server.saves)
+    for (const c of save.body.durationChanges ?? [])
+      if (c.duration.metadata.tags.includes('in column')) stintsSaved.set(c.id, c.duration);
+  const s = (t) => String(Date.parse(t) / 1000);
+  assert.deepEqual(
+    [...stintsSaved.values()].map((d) => [d.metadata.title, d.start, d.end]),
+    [
+      ['#412 in In progress (Roadmap)', s('2026-11-01T09:00:00Z'), s('2026-11-01T13:00:00Z')],
+      ['#412 in Review (Roadmap)', s('2026-11-01T13:00:00Z'), s('2026-11-02T00:00:00Z')],
+    ],
+  );
+  // What it remembered was written down at each step, and is empty once the item closed.
+  assert.deepEqual(written.at(-1), {});
+  assert.equal(written.length, 3);
+});
+
+test('releases and milestones arrive as moments and durations, and leave when deleted', () => {
+  const repository = { full_name: 'acme/app' };
+  const release = {
+    id: 70,
+    tag_name: 'v1.0.0',
+    name: 'First',
+    published_at: '2026-11-01T15:00:00Z',
+  };
+  const [published] = deliveryChanges('release', { action: 'published', release, repository });
+  assert.equal(published.moments[0].metadata.title, 'Released v1.0.0 First');
+  const [deleted] = deliveryChanges('release', { action: 'deleted', release, repository });
+  assert.deepEqual(deleted.removedMoments, [published.moments[0].id]);
+  const milestone = {
+    number: 5,
+    title: 'v1',
+    state: 'open',
+    created_at: '2026-10-01T00:00:00Z',
+    due_on: '2026-11-01T00:00:00Z',
+  };
+  const [created] = deliveryChanges('milestone', { action: 'created', milestone, repository });
+  assert.deepEqual(created.durations[0].end, { ongoing: true });
+  assert.equal(created.moments[0].metadata.title, 'Due: milestone v1');
+  const [gone] = deliveryChanges('milestone', { action: 'deleted', milestone, repository });
+  assert.deepEqual(gone.removed, ['gh:acme:app:milestone:5']);
+  assert.deepEqual(gone.removedMoments, ['gh:acme:app:milestone:5:due']);
+  assert.deepEqual(
+    deliveryChanges(
+      'release',
+      { action: 'published', release, repository },
+      eventKinds(['labels']),
+    ),
+    [],
+  );
 });

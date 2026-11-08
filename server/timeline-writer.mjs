@@ -135,14 +135,18 @@ export class TimelineWriter {
   /**
    * Saves one batch, in saves of at most limit(timeline) entries each, moments before
    * durations (which may name them): a save the server stops as too slow is sent again
-   * halved. `removed` (duration IDs to delete) and `links` (relationship changes, which may
+   * halved. `removed` (duration IDs to delete), `removedMoments` (moment IDs to delete) and
+   * `links` (relationship changes, which may
    * name the entities saved before them) go with the last save. Resolves with the last save's
    * answer when all are saved; otherwise throws an
    * error carrying `status` (none when the server could not be reached), the response
    * `value` and `retryAfter`. Saves already made stay (sending them again overwrites them
    * with the same).
    */
-  async send(timeline, { moments = [], durations = [], removed = [], links = [] }) {
+  async send(
+    timeline,
+    { moments = [], durations = [], removed = [], removedMoments = [], links = [] },
+  ) {
     const items = [
       ...moments.map((event) => ({ event })),
       ...durations.map((duration) => ({ duration })),
@@ -158,7 +162,7 @@ export class TimelineWriter {
         value = await this.save(timeline, {
           moments: part.filter((p) => p.event).map((p) => p.event),
           durations: part.filter((p) => p.duration).map((p) => p.duration),
-          ...(last ? { removed, links } : {}),
+          ...(last ? { removed, removedMoments, links } : {}),
         });
       } catch (error) {
         if (!TOO_SLOW.has(error.status) || size <= BATCH_MIN) throw error;
@@ -174,7 +178,7 @@ export class TimelineWriter {
     return value;
   }
   /** One save (see send). */
-  async save(timeline, { moments, durations, removed = [], links = [] }) {
+  async save(timeline, { moments, durations, removed = [], removedMoments = [], links = [] }) {
     for (let attempt = 0; ; attempt++) {
       let state = this.states.get(timeline);
       if (!state) {
@@ -188,7 +192,10 @@ export class TimelineWriter {
         body: JSON.stringify({
           revision: state.revision,
           settings: state.settings,
-          changes: moments.map((event) => ({ id: event.id, event })),
+          changes: [
+            ...moments.map((event) => ({ id: event.id, event })),
+            ...removedMoments.map((id) => ({ id, event: null })),
+          ],
           ...(durations.length || removed.length
             ? {
                 durationChanges: [

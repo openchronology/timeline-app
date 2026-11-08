@@ -13,6 +13,10 @@ import {
   eventKinds,
   keeps,
   mentionChanges,
+  milestoneChanges,
+  milestoneId,
+  releaseId,
+  releaseMoment,
   subIssueChanges,
   timelineEvent,
 } from './github-events.mjs';
@@ -220,12 +224,44 @@ export function loadRoutes(env = process.env) {
  * - `issue_comment`: "mentioned" moments for the items a new or edited comment names. The
  *   comment itself is not copied.
  * - `sub_issues`: both items' moments and their link.
+ * - `release`: a published release's moment; deleting or unpublishing it removes it.
+ * - `milestone`: the milestone's duration and due moment; deleting it removes them.
  * `projects_v2_item` needs GraphQL, so the receiver resolves it (projectStatusChange).
  */
 export function deliveryChanges(event, payload, kinds = eventKinds()) {
   const repository = payload?.repository?.full_name;
   if (event === 'sub_issues') return subIssueChanges(payload, kinds);
   if (!repositoryName(repository)) return [];
+  const none = { durations: [], moments: [], removed: [], removedMoments: [], links: [] };
+  if (event === 'release' && payload.release) {
+    if (!keeps(kinds, 'released')) return [];
+    const moment = ['deleted', 'unpublished'].includes(payload.action)
+      ? null
+      : releaseMoment(repository, payload.release);
+    return [
+      {
+        ...none,
+        repository,
+        ...(moment
+          ? { moments: [moment] }
+          : { removedMoments: [releaseId(repository, payload.release)] }),
+      },
+    ];
+  }
+  if (event === 'milestone' && payload.milestone) {
+    if (!keeps(kinds, 'milestone')) return [];
+    if (payload.action === 'deleted')
+      return [
+        {
+          ...none,
+          repository,
+          removed: [milestoneId(repository, payload.milestone)],
+          removedMoments: milestoneChanges(repository, { ...payload.milestone, due_on: null })
+            .removedMoments,
+        },
+      ];
+    return [{ ...none, repository, ...milestoneChanges(repository, payload.milestone) }];
+  }
   const mentions = (source, text, by) =>
     keeps(kinds, 'mentioned') ? mentionChanges(source, text, source.time, by) : [];
   if (event === 'issue_comment') {
