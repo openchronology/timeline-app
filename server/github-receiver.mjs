@@ -12,6 +12,7 @@ import { realpathSync } from 'node:fs';
 import { pathToFileURL } from 'node:url';
 import { TimelineWriter, temporary } from './timeline-writer.mjs';
 import { deliveryChanges, loadRoutes, validSignature } from './github-source.mjs';
+import { keeps, projectStatusChange } from './github-events.mjs';
 import { loadConfiguration } from './env-file.mjs';
 import { relationshipKey } from '../dist/core.mjs';
 
@@ -56,12 +57,29 @@ export class GithubIngest {
    * @param {typeof fetch} [options.fetcher]
    * @param {number} [options.flushMs] how long changes wait to be batched with others
    * @param {Console} [options.log]
+   * @param {string} [options.token] a GitHub token, to name the issues of project status
+   *   changes (deliveries give node IDs only); without one those are not recorded
+   * @param {string} [options.githubApi] GitHub's API origin (GitHub Enterprise)
    */
-  constructor({ api, key, secret, routes, fetcher = fetch, flushMs = 1000, log = console }) {
+  constructor({
+    api,
+    key,
+    secret,
+    routes,
+    fetcher = fetch,
+    flushMs = 1000,
+    log = console,
+    token,
+    githubApi = 'https://api.github.com',
+  }) {
     if (!secret) throw new Error('GITHUB_WEBHOOK_SECRET must be the webhook’s secret.');
     this.writer = new TimelineWriter({ api, key, fetcher });
     this.secret = secret;
     this.routes = routes;
+    this.fetcher = fetcher;
+    this.token = token;
+    this.githubApi = githubApi;
+    this.resolving = new Set();
     this.flushMs = flushMs;
     this.log = log;
     this.pending = new Map();
@@ -101,17 +119,39 @@ export class GithubIngest {
     }
     this.stats.deliveries++;
     if (event === 'ping') return 204;
-    const changes = deliveryChanges(event, payload);
-    const timeline = changes && this.routes.route(changes.repository);
-    if (!timeline) {
+    if (event === 'projects_v2_item') {
+      // A board's status change names its issue by node ID: resolved, then queued.
+      if (!this.token || !keeps(this.routes.kinds, 'moved')) {
+        this.stats.ignored++;
+        return 204;
+      }
+      const resolving = projectStatusChange(payload, this.token, this.fetcher, this.githubApi)
+        .then((change) => {
+          if (!change || !this.queue(change)) this.stats.ignored++;
+        })
+        .catch((error) => this.log.error('github: a project status change:', error.message))
+        .finally(() => this.resolving.delete(resolving));
+      this.resolving.add(resolving);
+      return 202;
+    }
+    let queued = false;
+    for (const change of deliveryChanges(event, payload, this.routes.kinds))
+      queued = this.queue(change) || queued;
+    if (!queued) {
       this.stats.ignored++;
       return 204;
     }
+    return 202;
+  }
+  /** Queues one repository's changes on its timeline; whether a route chose one. */
+  queue(changes) {
+    const timeline = this.routes.route(changes.repository);
+    if (!timeline) return false;
     let queue = this.pending.get(timeline);
     if (!queue) this.pending.set(timeline, (queue = new Pending()));
     queue.add(changes);
     this.schedule(timeline, this.flushMs);
-    return 202;
+    return true;
   }
   schedule(timeline, delay) {
     if (this.timers.has(timeline)) return;
@@ -198,6 +238,7 @@ export class GithubIngest {
   /** Sends everything queued, for up to `ms`; whether nothing was left. */
   async drain(ms = 10000) {
     const until = Date.now() + ms;
+    await Promise.all([...this.resolving]);
     while (Date.now() < until) {
       for (const [timeline, timer] of this.timers) {
         clearTimeout(timer);
@@ -265,6 +306,8 @@ export async function main(env = process.env) {
     secret: env.GITHUB_WEBHOOK_SECRET,
     routes: loadRoutes(env),
     flushMs: env.GITHUB_FLUSH_MS ? Number(env.GITHUB_FLUSH_MS) : undefined,
+    token: env.GITHUB_TOKEN || undefined,
+    githubApi: env.GITHUB_API_URL || undefined,
   });
   await ingest.check();
   const listening = await listenGithub(ingest, {

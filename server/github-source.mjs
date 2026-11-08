@@ -8,6 +8,14 @@
  */
 import { createHash, createHmac, timingSafeEqual } from 'node:crypto';
 import { readFileSync } from 'node:fs';
+import {
+  deliveryMoments,
+  eventKinds,
+  keeps,
+  mentionChanges,
+  subIssueChanges,
+  timelineEvent,
+} from './github-events.mjs';
 
 /** The User-Agent GitHub requires of API clients: the project, never a person. */
 export const USER_AGENT =
@@ -117,36 +125,11 @@ export function itemDuration(repository, item) {
 }
 
 /**
- * The moment of an assignment or unassignment (`event.event` or a webhook's `action`):
- * `assigned` or `unassigned`, of `assignee` to the item, at `time`, keyed by the event's ID
- * when GitHub gives one (the importer), else by the item, the person, the action and the
- * time (a webhook delivery), so delivering it twice writes it once.
+ * The moment of an assignment or unassignment (`action`) of `assignee` to the item at `time`,
+ * as github-events.mjs builds every event's moment.
  */
-export function assignmentMoment(repository, item, { action, assignee, time, id }) {
-  const login = assignee?.login ?? 'someone';
-  return {
-    id: entityId(
-      repository,
-      String(item.number),
-      action,
-      id ? String(id) : `${login.replace(/[^A-Za-z0-9_.-]/g, '-')}:${seconds(time)}`,
-    ),
-    time: seconds(time),
-    metadata: {
-      title:
-        `${action === 'assigned' ? 'Assigned' : 'Unassigned'} ${login}: #${item.number} ${item.title ?? ''}`
-          .trim()
-          .slice(0, 300),
-      ...(item.html_url ? { url: item.html_url } : {}),
-      tags: [
-        'github',
-        repositoryTag(repository),
-        itemTag(repository, item.number),
-        action === 'assigned' ? 'assigned' : 'unassigned',
-        personTag(login),
-      ].map(tag),
-    },
-  };
+export function assignmentMoment(repository, item, { action, assignee, time }) {
+  return timelineEvent(repository, item, { event: action, assignee, created_at: time }).moments[0];
 }
 
 /**
@@ -183,7 +166,8 @@ export function validSignature(secret, body, header) {
  * Routing rules: which timeline each repository's events go to.
  * `{"routes": [{"repository": "owner/name" | "owner/*", "timeline": "<uuid>"}, …],
  *   "default": "<uuid>"}`. The first rule that matches wins; then `default`; else the event
- * is not kept. Names compare without regard to case, as GitHub's do.
+ * is not kept. Names compare without regard to case, as GitHub's do. `"events": ["labels",
+ * …]` records only those kinds of event as moments (all of them without it).
  */
 export function githubRoutes(config) {
   const uuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
@@ -205,6 +189,9 @@ export function githubRoutes(config) {
   const fallback = config.default?.toLowerCase() ?? null;
   return {
     timelines: [...new Set([...routes.map((r) => r.timeline), ...(fallback ? [fallback] : [])])],
+    // The kinds of event recorded as moments (github-events.mjs EVENT_KINDS): all, unless
+    // `events` lists some.
+    kinds: eventKinds(config.events),
     route(repository) {
       const [owner, name] = repository.toLowerCase().split('/');
       return (
@@ -222,41 +209,76 @@ export function loadRoutes(env = process.env) {
 }
 
 /**
- * What one webhook delivery changes, or null for events it does not keep: `{repository,
- * durations, moments, removed, links}`. Issues and pull requests: any action rewrites the
- * item's duration (so edits, labels, milestones, closing and reopening all show), `assigned`
- * and `unassigned` also add a moment, `deleted` removes the duration, and a pull request's
- * "closes #n" adds links.
+ * What one webhook delivery changes, as a list of `{repository, durations, moments, removed,
+ * links}` (usually one; a mention or a sub-issue may touch another repository's items), of
+ * the kinds of event in `kinds` (all by default):
+ * - `issues` and `pull_request`: any action rewrites the item's duration (so edits, labels,
+ *   milestones, closing and reopening all show), `deleted` removes it, and the action adds its
+ *   moment (github-events.mjs); a pull request's "closes #n" adds links, and the items its
+ *   text mentions get "mentioned" moments and links when it is opened or edited.
+ * - `pull_request_review`: the review's moment, and the pull request's duration.
+ * - `issue_comment`: "mentioned" moments for the items a new or edited comment names. The
+ *   comment itself is not copied.
+ * - `sub_issues`: both items' moments and their link.
+ * `projects_v2_item` needs GraphQL, so the receiver resolves it (projectStatusChange).
  */
-export function deliveryChanges(event, payload) {
+export function deliveryChanges(event, payload, kinds = eventKinds()) {
   const repository = payload?.repository?.full_name;
-  if (!repositoryName(repository)) return null;
+  if (event === 'sub_issues') return subIssueChanges(payload, kinds);
+  if (!repositoryName(repository)) return [];
+  const mentions = (source, text, by) =>
+    keeps(kinds, 'mentioned') ? mentionChanges(source, text, source.time, by) : [];
+  if (event === 'issue_comment') {
+    const item = payload.issue;
+    if (!item?.number || !['created', 'edited'].includes(payload.action)) return [];
+    return mentions(
+      { repository, number: item.number, time: payload.comment?.updated_at ?? item.updated_at },
+      payload.comment?.body,
+      payload.comment?.user?.login ?? payload.sender?.login,
+    );
+  }
   const item =
-    event === 'issues' ? payload.issue : event === 'pull_request' ? payload.pull_request : null;
-  if (!item || !Number.isInteger(item.number)) return null;
-  if (payload.action === 'deleted')
-    return {
-      repository,
-      durations: [],
-      moments: [],
-      removed: [itemId(repository, item.number)],
-      links: [],
-    };
-  const moments =
-    payload.action === 'assigned' || payload.action === 'unassigned'
-      ? [
-          assignmentMoment(repository, item, {
-            action: payload.action,
-            assignee: payload.assignee,
-            time: item.updated_at ?? new Date().toISOString(),
-          }),
-        ]
-      : [];
-  const links =
-    event === 'pull_request'
+    event === 'issues' || event === 'pull_request' || event === 'pull_request_review'
+      ? (payload.issue ?? payload.pull_request)
+      : null;
+  if (!item || !Number.isInteger(item.number)) return [];
+  if (payload.action === 'deleted' && event !== 'pull_request_review')
+    return [
+      {
+        repository,
+        durations: [],
+        moments: [],
+        removed: [itemId(repository, item.number)],
+        links: [],
+      },
+    ];
+  const happened = deliveryMoments(event, payload, repository, item, kinds);
+  const links = [
+    ...happened.links,
+    ...(event === 'pull_request'
       ? closedIssues(`${item.title ?? ''}\n${item.body ?? ''}`)
           .filter((n) => n !== item.number)
           .map((n) => closesLink(repository, item.number, n))
+      : []),
+  ];
+  const own = {
+    repository,
+    durations: [itemDuration(repository, item)],
+    moments: happened.moments,
+    removed: [],
+    links,
+  };
+  const mentioned =
+    event !== 'pull_request_review' && ['opened', 'edited'].includes(payload.action)
+      ? mentions(
+          {
+            repository,
+            number: item.number,
+            time: payload.action === 'opened' ? item.created_at : item.updated_at,
+          },
+          `${item.title ?? ''}\n${item.body ?? ''}`,
+          payload.sender?.login,
+        )
       : [];
-  return { repository, durations: [itemDuration(repository, item)], moments, removed: [], links };
+  return [own, ...mentioned];
 }

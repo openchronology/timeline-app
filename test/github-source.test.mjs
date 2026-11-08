@@ -17,6 +17,12 @@ import {
   validSignature,
   NOTES_LIMIT,
 } from '../server/github-source.mjs';
+import {
+  eventKinds,
+  mentionChanges,
+  projectStatusChange,
+  timelineEvent,
+} from '../server/github-events.mjs';
 import { GithubIngest, listenGithub } from '../server/github-receiver.mjs';
 import { GithubReader, main, readRepository } from '../server/import-github.mjs';
 import { validateDuration, Q } from '../dist/core.mjs';
@@ -129,41 +135,223 @@ test('routes choose a timeline by repository, then the default', () => {
   assert.throws(() => githubRoutes({ routes: [{ repository: 'acme', timeline: TIMELINE }] }));
 });
 
-test('deliveries become changes: edits, assignments, deletions and links', () => {
+test('deliveries become changes: edits, events, deletions, mentions and links', () => {
   const repository = { full_name: 'acme/app' };
-  const edited = deliveryChanges('issues', { action: 'labeled', issue: issue(), repository });
-  assert.equal(edited.durations[0].id, 'gh:acme:app:412');
-  assert.equal(edited.moments.length, 0);
-  const assigned = deliveryChanges('issues', {
-    action: 'assigned',
+  const sender = { login: 'mona' };
+  const [labeled] = deliveryChanges('issues', {
+    action: 'labeled',
+    label: { name: 'Bug' },
     issue: issue(),
-    assignee: { login: 'octo' },
     repository,
+    sender,
   });
-  assert.equal(assigned.moments[0].metadata.title, 'Assigned octo: #412 Fix the login loop');
-  // The same delivery twice is the same moment.
-  assert.equal(
-    assigned.moments[0].id,
+  assert.equal(labeled.durations[0].id, 'gh:acme:app:412');
+  assert.equal(labeled.moments[0].metadata.title, 'Labelled Bug: #412 Fix the login loop');
+  assert.deepEqual(labeled.moments[0].metadata.tags.slice(3), [
+    'labeled',
+    'label:bug',
+    'github/mona',
+  ]);
+  const assigned = () =>
     deliveryChanges('issues', {
       action: 'assigned',
       issue: issue(),
       assignee: { login: 'octo' },
       repository,
+      sender,
+    })[0].moments[0];
+  assert.equal(assigned().metadata.title, 'Assigned octo: #412 Fix the login loop');
+  // The same delivery twice is the same moment, and so is the importer's reading of it.
+  assert.equal(assigned().id, assigned().id);
+  assert.equal(
+    assigned().id,
+    timelineEvent('acme/app', issue(), {
+      event: 'assigned',
+      assignee: { login: 'octo' },
+      created_at: issue().updated_at,
     }).moments[0].id,
   );
   assert.deepEqual(
-    deliveryChanges('issues', { action: 'deleted', issue: issue(), repository }).removed,
+    deliveryChanges('issues', { action: 'deleted', issue: issue(), repository })[0].removed,
     ['gh:acme:app:412'],
   );
+  // A pull request: "closes" links, and the items it names are marked mentioned.
   const pull = deliveryChanges('pull_request', {
     action: 'opened',
-    pull_request: { ...issue({ number: 413, body: 'Fixes #412' }), merged_at: null },
+    pull_request: {
+      ...issue({ number: 413, body: 'Fixes #412, see other/lib#7' }),
+      merged_at: null,
+    },
     repository,
+    sender,
   });
-  assert.deepEqual(pull.links, [
+  assert.deepEqual(pull[0].links, [
     { a: { duration: 'gh:acme:app:413' }, b: { duration: 'gh:acme:app:412' }, related: true },
   ]);
-  assert.equal(deliveryChanges('star', { action: 'created', repository }), null);
+  assert.deepEqual(
+    pull.slice(1).map((c) => [c.repository, c.moments[0].metadata.title]),
+    [
+      ['acme/app', 'Mentioned in acme/app#413: #412'],
+      ['other/lib', 'Mentioned in acme/app#413: #7'],
+    ],
+  );
+  // A comment's mentions, without its text.
+  const [comment] = deliveryChanges('issue_comment', {
+    action: 'created',
+    issue: issue(),
+    comment: { body: 'Same as #9', user: { login: 'mona' }, updated_at: '2026-11-06T00:00:00Z' },
+    repository,
+  });
+  assert.equal(comment.moments[0].metadata.title, 'Mentioned in acme/app#412: #9');
+  assert.ok(!JSON.stringify(comment).includes('Same as'));
+  // A review, a merge and a rename.
+  const [review] = deliveryChanges('pull_request_review', {
+    action: 'submitted',
+    review: { state: 'approved', user: { login: 'octo' }, submitted_at: '2026-11-06T01:00:00Z' },
+    pull_request: { ...issue({ number: 413 }), merged_at: null },
+    repository,
+  });
+  assert.equal(review.moments[0].metadata.title, 'Approved by octo: #413 Fix the login loop');
+  assert.ok(review.moments[0].metadata.tags.includes('review:approved'));
+  const [merged] = deliveryChanges('pull_request', {
+    action: 'closed',
+    pull_request: {
+      ...issue({ number: 413, state: 'closed', closed_at: '2026-11-07T00:00:00Z' }),
+      merged: true,
+      merged_at: '2026-11-07T00:00:00Z',
+    },
+    repository,
+    sender,
+  });
+  assert.ok(merged.moments[0].metadata.tags.includes('merged'));
+  const [renamed] = deliveryChanges('issues', {
+    action: 'edited',
+    changes: { title: { from: 'Login loops' } },
+    issue: issue(),
+    repository,
+    sender,
+  });
+  assert.equal(
+    renamed.moments[0].metadata.title,
+    'Renamed from “Login loops”: #412 Fix the login loop',
+  );
+  // Sub-issues: both ends, and their link.
+  const sub = deliveryChanges('sub_issues', {
+    action: 'sub_issue_added',
+    parent_issue: issue({ number: 1 }),
+    sub_issue: issue({ number: 2 }),
+    repository,
+    sender,
+  });
+  assert.deepEqual(
+    sub.map((c) => c.moments[0].metadata.tags[3]),
+    ['sub-issue added', 'parent issue added'],
+  );
+  assert.equal(sub[0].links.length, 1);
+  // Kinds left out are not recorded; events it does not know are ignored.
+  const quiet = deliveryChanges(
+    'issues',
+    { action: 'labeled', label: { name: 'Bug' }, issue: issue(), repository },
+    eventKinds(['assignments']),
+  );
+  assert.equal(quiet[0].moments.length, 0);
+  assert.equal(quiet[0].durations.length, 1);
+  assert.deepEqual(deliveryChanges('star', { action: 'created', repository }), []);
+  assert.throws(() => eventKinds(['labels', 'stars']), /Unknown kind/);
+});
+
+test('every timeline event the importer reads becomes its moment', () => {
+  const item = issue();
+  const at = '2026-11-03T00:00:00Z';
+  const title = (event) =>
+    timelineEvent('acme/app', item, {
+      created_at: at,
+      actor: { login: 'mona' },
+      ...event,
+    })?.moments[0].metadata.title.replace(': #412 Fix the login loop', '');
+  assert.equal(title({ event: 'milestoned', milestone: { title: 'v2' } }), 'Added to milestone v2');
+  assert.equal(title({ event: 'closed' }), 'Closed');
+  assert.equal(
+    title({ event: 'review_requested', requested_reviewer: { login: 'octo' } }),
+    'Review requested from octo',
+  );
+  assert.equal(title({ event: 'ready_for_review' }), 'Ready for review');
+  assert.equal(title({ event: 'convert_to_draft' }), 'Converted to draft');
+  assert.equal(title({ event: 'marked_as_duplicate' }), 'Marked as a duplicate');
+  assert.equal(title({ event: 'pinned' }), 'Pinned');
+  assert.equal(
+    title({ event: 'moved_columns_in_project', project_card: { column_name: 'In progress' } }),
+    'Moved to In progress',
+  );
+  assert.equal(title({ event: 'commented' }), undefined);
+  const mention = timelineEvent('acme/app', item, {
+    event: 'cross-referenced',
+    created_at: at,
+    source: { issue: { number: 9, title: 'Root cause', repository: { full_name: 'acme/app' } } },
+  });
+  assert.equal(
+    mention.moments[0].metadata.title,
+    'Mentioned in acme/app#9 Root cause: #412 Fix the login loop',
+  );
+  assert.ok(mention.moments[0].metadata.tags.includes('github/acme/app#9'));
+  assert.equal(mention.links.length, 1);
+  // A mention read by the importer and one seen by the receiver are the same moment.
+  assert.equal(
+    mention.moments[0].id,
+    mentionChanges({ repository: 'acme/app', number: 9 }, '#412', at, 'mona')[0].moments[0].id,
+  );
+});
+
+test('a project status change names its issue through GraphQL', async () => {
+  const calls = [];
+  const fetcher = async (url, options) => {
+    calls.push({ url, body: JSON.parse(options.body), auth: options.headers.Authorization });
+    return {
+      status: 200,
+      json: async () => ({
+        data: {
+          item: {
+            number: 412,
+            title: 'Fix the login loop',
+            url: 'https://github.com/acme/app/issues/412',
+            repository: { nameWithOwner: 'acme/app' },
+          },
+          project: { title: 'Roadmap' },
+        },
+      }),
+    };
+  };
+  const payload = {
+    action: 'edited',
+    projects_v2_item: {
+      content_type: 'Issue',
+      content_node_id: 'I_1',
+      project_node_id: 'PVT_1',
+      updated_at: '2026-11-04T00:00:00Z',
+    },
+    changes: { field_value: { field_name: 'Status', to: { name: 'In review' } } },
+    sender: { login: 'mona' },
+  };
+  const change = await projectStatusChange(payload, 'ghp_x', fetcher);
+  assert.equal(change.repository, 'acme/app');
+  assert.equal(
+    change.moments[0].metadata.title,
+    'Moved to In review in Roadmap: #412 Fix the login loop',
+  );
+  assert.ok(change.moments[0].metadata.tags.includes('status:in review'));
+  assert.ok(change.moments[0].metadata.tags.includes('project:roadmap'));
+  assert.equal(calls[0].url, 'https://api.github.com/graphql');
+  assert.equal(calls[0].auth, 'Bearer ghp_x');
+  // Without a token, or for another field, nothing.
+  assert.equal(await projectStatusChange(payload, undefined, fetcher), null);
+  assert.equal(
+    await projectStatusChange(
+      { ...payload, changes: { field_value: { field_name: 'Priority', to: { name: 'P1' } } } },
+      'ghp_x',
+      fetcher,
+    ),
+    null,
+  );
 });
 
 /** A fake OpenChronology API: a Gregorian timeline per ID; saves recorded; failures scripted. */
@@ -243,7 +431,8 @@ test('the receiver checks, routes, coalesces and saves deliveries', async () => 
     202,
   );
   await ingest.drain();
-  // One save of both items (the issue's last state), then the link on its own.
+  // One save of both items (the issue's last state), its close and the mention, then the
+  // link (from "Closes #412", and the mention) on its own.
   assert.equal(server.saves.length, 2);
   const [entities, links] = server.saves;
   assert.equal(entities.path, `/api/timelines/${TIMELINE}/changes`);
@@ -255,7 +444,11 @@ test('the receiver checks, routes, coalesces and saves deliveries', async () => 
     ],
   );
   assert.equal(links.body.relationshipChanges.length, 1);
-  assert.deepEqual(ingest.stats, { deliveries: 5, rejected: 1, ignored: 1, saved: 2, failed: 0 });
+  assert.deepEqual(
+    entities.body.changes.map((c) => c.event.metadata.title),
+    ['Closed: #412 Fix the login loop', 'Mentioned in acme/app#413: #412'],
+  );
+  assert.deepEqual(ingest.stats, { deliveries: 5, rejected: 1, ignored: 1, saved: 4, failed: 0 });
 });
 
 test('the receiver retries what the server could not take, and drops what it refused', async () => {
@@ -341,28 +534,36 @@ function fakeGithub() {
     issue({ number: 2 }),
     { ...issue({ number: 3, body: 'Fixes #2 and #99' }), pull_request: { merged_at: null } },
   ];
-  const events = [
-    {
-      id: 501,
-      event: 'assigned',
-      created_at: '2026-11-01T11:00:00Z',
-      assignee: { login: 'octo' },
-      issue: items[1],
-    },
-    { id: 502, event: 'labeled', created_at: '2026-11-01T12:00:00Z', issue: items[1] },
-    {
-      id: 503,
-      event: 'unassigned',
-      created_at: '2026-11-01T13:00:00Z',
-      assignee: { login: 'octo' },
-      issue: items[1],
-    },
-  ];
+  // Each item's timeline: #2 is assigned, labelled, mentioned by #3 and unassigned; #3 is
+  // reviewed; #1 is closed.
+  const timelines = {
+    1: [{ event: 'closed', created_at: '2026-11-02T00:00:00Z', actor: { login: 'octo' } }],
+    2: [
+      { event: 'assigned', created_at: '2026-11-01T11:00:00Z', assignee: { login: 'octo' } },
+      { event: 'labeled', created_at: '2026-11-01T12:00:00Z', label: { name: 'bug' } },
+      { event: 'commented', created_at: '2026-11-01T12:10:00Z', body: 'private words' },
+      {
+        event: 'cross-referenced',
+        created_at: '2026-11-01T12:20:00Z',
+        source: { issue: { number: 3, repository: { full_name: 'acme/app' } } },
+      },
+      { event: 'unassigned', created_at: '2026-11-01T13:00:00Z', assignee: { login: 'octo' } },
+    ],
+    3: [
+      {
+        event: 'reviewed',
+        submitted_at: '2026-11-01T14:00:00Z',
+        state: 'approved',
+        user: { login: 'mona' },
+      },
+    ],
+  };
   const seen = [];
   const fetcher = async (url, options) => {
     seen.push({ url, headers: options.headers });
     const u = new URL(url);
-    const list = u.pathname.endsWith('/issues/events') ? events : items;
+    const number = /\/issues\/(\d+)\/timeline$/.exec(u.pathname)?.[1];
+    const list = number ? timelines[number] : items;
     const page = Number(u.searchParams.get('page') ?? '1');
     const slice = list.slice((page - 1) * 2, page * 2);
     const next = page * 2 < list.length ? new URL(url) : null;
@@ -376,7 +577,7 @@ function fakeGithub() {
   return { fetcher, seen };
 }
 
-test('the importer reads every page of issues and assignments, and links what closes what', async () => {
+test('the importer reads every page of issues and their timelines, and links what it read', async () => {
   const github = fakeGithub();
   const reader = new GithubReader({ token: 'ghp_x', fetcher: github.fetcher });
   const changes = await readRepository(reader, 'acme/app');
@@ -389,24 +590,34 @@ test('the importer reads every page of issues and assignments, and links what cl
     ],
   );
   assert.deepEqual(
-    changes.moments.map((m) => m.id),
-    ['gh:acme:app:2:assigned:501', 'gh:acme:app:2:unassigned:503'],
+    changes.moments.map((m) => m.metadata.tags[3]),
+    ['closed', 'assigned', 'labeled', 'mentioned', 'unassigned', 'reviewed'],
   );
-  // #99 was not read, so only the link to #2 is made.
+  assert.ok(!JSON.stringify(changes).includes('private words'), 'comments are not copied');
+  // #3 closes #2 and mentions it: one link. #99 was not read, so no link to it.
   assert.equal(changes.links.length, 1);
   assert.ok(github.seen.every((r) => r.headers.Authorization === 'Bearer ghp_x'));
   assert.ok(
     github.seen.every((r) => /^OpenChronology-github-source/.test(r.headers['User-Agent'])),
   );
-  // Since a time: the listing asks GitHub for it, and earlier assignments are left out.
+  // Since a time: the listing asks GitHub for it, and earlier events are left out.
   const recent = await readRepository(reader, 'acme/app', { since: '2026-11-01T12:30:00Z' });
   assert.deepEqual(
-    recent.moments.map((m) => m.id),
-    ['gh:acme:app:2:unassigned:503'],
+    recent.moments.map((m) => m.metadata.tags[3]),
+    ['closed', 'unassigned', 'reviewed'],
   );
   assert.ok(
     github.seen.some((r) => new URL(r.url).searchParams.get('since') === '2026-11-01T12:30:00Z'),
   );
+  // Only some kinds; or none, which reads no timelines.
+  const labels = await readRepository(reader, 'acme/app', { kinds: eventKinds(['labels']) });
+  assert.deepEqual(
+    labels.moments.map((m) => m.metadata.tags[3]),
+    ['labeled'],
+  );
+  github.seen.length = 0;
+  await readRepository(reader, 'acme/app', { kinds: new Set() });
+  assert.ok(github.seen.every((r) => !r.url.includes('/timeline')));
 });
 
 test('the command checks its arguments, and a dry run writes nothing', async () => {
@@ -415,6 +626,10 @@ test('the command checks its arguments, and a dry run writes nothing', async () 
   assert.equal(await main(['--repo', 'not-a-repo', '--timeline', TIMELINE], {}, out), 2);
   assert.equal(
     await main(['--repo', 'acme/app', '--timeline', TIMELINE, '--since', 'soon'], {}, out),
+    2,
+  );
+  assert.equal(
+    await main(['--repo', 'acme/app', '--timeline', TIMELINE, '--events', 'stars'], {}, out),
     2,
   );
   const github = fakeGithub();
@@ -431,7 +646,7 @@ test('the command checks its arguments, and a dry run writes nothing', async () 
   }
   assert.match(
     lines[0],
-    /acme\/app → .*: would import 3 issues and pull requests \(2 open\), 2 assignments, 1 links\./,
+    /acme\/app → .*: would import 3 issues and pull requests \(2 open\), 6 events, 1 links\./,
   );
 });
 
@@ -440,9 +655,11 @@ test('assignment moments carry who and what', () => {
     action: 'unassigned',
     assignee: { login: 'octo' },
     time: '2026-11-01T13:00:00Z',
-    id: 7,
   });
-  assert.equal(m.id, 'gh:acme:app:412:unassigned:7');
+  assert.equal(
+    m.id,
+    `gh:acme:app:412:unassigned:octo:${Date.parse('2026-11-01T13:00:00Z') / 1000}`,
+  );
   // It carries its item's tag, so separating by it gathers the item and its assignments.
   assert.deepEqual(m.metadata.tags, [
     'github',

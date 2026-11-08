@@ -15,15 +15,17 @@ import { parseArgs } from 'node:util';
 import { TimelineWriter } from './timeline-writer.mjs';
 import {
   USER_AGENT,
-  assignmentMoment,
   closedIssues,
   closesLink,
   githubRoutes,
   isPullRequest,
   itemDuration,
+  itemId,
   loadRoutes,
   repositoryName,
 } from './github-source.mjs';
+import { EVENT_KINDS, eventKinds, timelineEvent } from './github-events.mjs';
+import { relationshipKey } from '../dist/core.mjs';
 import { loadConfiguration } from './env-file.mjs';
 
 const sleep = (ms) => new Promise((resume) => setTimeout(resume, ms));
@@ -97,10 +99,13 @@ export class GithubReader {
 
 /**
  * Reads one repository into timeline changes: `{durations, moments, links}`. Issues and pull
- * requests updated since `since` (all of them without it); assignments made since then; links
- * from pull requests to the issues they close, when both were read.
+ * requests updated since `since` (all of them without it), and, unless `kinds` is empty, what
+ * happened to each since then, from its timeline (one listing per item): labels, milestones,
+ * assignments, reviews, mentions and the rest (github-events.mjs), of the kinds in `kinds`.
+ * Links (a pull request closing an issue, mentions, sub-issues) are kept when both items were
+ * read, since a link to one the timeline lacks would be refused.
  */
-export async function readRepository(reader, repository, { since, events = true } = {}) {
+export async function readRepository(reader, repository, { since, kinds = eventKinds() } = {}) {
   const durations = [],
     numbers = new Map();
   for await (const item of reader.list(`/repos/${repository}/issues`, {
@@ -112,35 +117,39 @@ export async function readRepository(reader, repository, { since, events = true 
     durations.push(itemDuration(repository, item));
     numbers.set(item.number, item);
   }
-  const moments = [];
-  if (events)
-    for await (const event of reader.list(`/repos/${repository}/issues/events`)) {
-      if (event.event !== 'assigned' && event.event !== 'unassigned') continue;
-      if (since && Date.parse(event.created_at) < Date.parse(since)) continue;
-      if (!event.issue) continue;
-      moments.push(
-        assignmentMoment(repository, event.issue, {
-          action: event.event,
-          assignee: event.assignee,
-          time: event.created_at,
-          id: event.id,
-        }),
-      );
-    }
-  const links = [];
+  const moments = [],
+    links = [];
+  if (kinds.size)
+    for (const item of numbers.values())
+      for await (const event of reader.list(
+        `/repos/${repository}/issues/${item.number}/timeline`,
+      )) {
+        const time = event.created_at ?? event.submitted_at;
+        if (since && time && Date.parse(time) < Date.parse(since)) continue;
+        const changes = timelineEvent(repository, item, event, kinds);
+        if (!changes) continue;
+        moments.push(...changes.moments);
+        links.push(...changes.links);
+      }
   for (const item of numbers.values())
     if (isPullRequest(item))
       for (const issue of closedIssues(`${item.title ?? ''}\n${item.body ?? ''}`))
-        if (issue !== item.number && numbers.has(issue))
-          links.push(closesLink(repository, item.number, issue));
-  return { durations, moments, links };
+        if (issue !== item.number) links.push(closesLink(repository, item.number, issue));
+  // Only links between items read here, each once.
+  const ids = new Set([...numbers.keys()].map((n) => itemId(repository, n)));
+  const read = (ref) => ids.has(ref.duration);
+  const unique = new Map(
+    links.filter((l) => read(l.a) && read(l.b)).map((l) => [relationshipKey(l), l]),
+  );
+  return { durations, moments, links: [...unique.values()] };
 }
 
 const USAGE = `Usage: och-import-github --repo owner/name [--repo …] (--timeline <uuid> | --config <routes.json>)
-  [--since <ISO time>] [--no-events] [--dry-run]
+  [--since <ISO time>] [--events labels,milestones,…] [--no-events] [--dry-run]
 
 Environment: OCH_API_URL and OCH_API_KEY (not needed for --dry-run), GITHUB_TOKEN (recommended;
-needed for private repositories), GITHUB_API_URL (GitHub Enterprise; default https://api.github.com).`;
+needed for private repositories), GITHUB_API_URL (GitHub Enterprise; default https://api.github.com).
+Kinds of event: ${Object.keys(EVENT_KINDS).join(', ')} (all by default, or the routes' "events").`;
 
 /** The command: exit 0 imported, 1 something failed, 2 a usage error. */
 export async function main(argv = process.argv.slice(2), env = process.env, out = console) {
@@ -153,6 +162,7 @@ export async function main(argv = process.argv.slice(2), env = process.env, out 
         timeline: { type: 'string' },
         config: { type: 'string' },
         since: { type: 'string' },
+        events: { type: 'string' },
         'no-events': { type: 'boolean' },
         'dry-run': { type: 'boolean' },
         help: { type: 'boolean' },
@@ -184,6 +194,17 @@ export async function main(argv = process.argv.slice(2), env = process.env, out 
     out.error(error.message);
     return 2;
   }
+  let kinds;
+  try {
+    kinds = options['no-events']
+      ? new Set()
+      : options.events !== undefined
+        ? eventKinds(options.events)
+        : routes.kinds;
+  } catch (error) {
+    out.error(error.message);
+    return 2;
+  }
   const since = options.since ? new Date(options.since).toISOString() : undefined;
   const reader = new GithubReader({
     api: env.GITHUB_API_URL || undefined,
@@ -204,14 +225,14 @@ export async function main(argv = process.argv.slice(2), env = process.env, out 
     }
     let changes;
     try {
-      changes = await readRepository(reader, repository, { since, events: !options['no-events'] });
+      changes = await readRepository(reader, repository, { since, kinds });
     } catch (error) {
       out.error(`${repository}: ${error.message}`);
       failed = true;
       continue;
     }
     const open = changes.durations.filter((d) => typeof d.end !== 'string').length;
-    const summary = `${changes.durations.length} issues and pull requests (${open} open), ${changes.moments.length} assignments, ${changes.links.length} links`;
+    const summary = `${changes.durations.length} issues and pull requests (${open} open), ${changes.moments.length} events, ${changes.links.length} links`;
     if (!writer) {
       out.log(`${repository} → ${timeline}: would import ${summary}.`);
       for (const d of changes.durations.slice(0, 3)) out.log('  ' + JSON.stringify(d));
