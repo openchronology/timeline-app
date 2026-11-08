@@ -9,7 +9,9 @@ import {
   pluginMetadata,
   validateDocument,
   durationTree,
-  isOngoing,
+  withOngoing,
+  summariesWithOngoing,
+  nowCoordinate,
   OVERVIEW_URL_LIMIT,
   fixMissingAnchors,
   coalesceGroups,
@@ -2295,6 +2297,28 @@ export class PostgresStore {
       // earliest time (min_time) is at most the window's end and its latest (max_time) at
       // least the window's start.
       const pruned = 'n.min_time<=$3::mpq AND n.max_time>=$2::mpq';
+      // Ongoing durations (#537). Their trees hold each as a placeholder, a point at its start,
+      // since "now" cannot be stored: the queries below leave the placeholders out and add
+      // these instead, resolved at the server's clock. Read through the partial index
+      // oc_duration_nodes_ongoing, so a timeline without any pays one empty index scan.
+      // Without a "now" (a timeline no longer Gregorian) they stay points at their starts.
+      const now = nowCoordinate(t.presentation ?? undefined, Date.now());
+      const placeholder = `coalesce(band->'end'->>'ongoing'='true',false)`;
+      let ongoingRows;
+      const ongoing = async () => {
+        if (!now) return [];
+        ongoingRows ??= (
+          await c.query(
+            `SELECT band FROM ${from('durations')} x WHERE band->'end'->>'ongoing'='true'
+            ORDER BY first_time,band->>'id' COLLATE "C" LIMIT ${ONGOING_LIMIT}`,
+            [tree],
+          )
+        ).rows.map((r) => {
+          const last = now.compare(Q.parse(r.band.first)) > 0 ? now.toString() : r.band.first;
+          return { ...r.band, last, endTime: last };
+        });
+        return ongoingRows;
+      };
       if (query.kind === 'overview') {
         // The server's minimum resolution: at most 1,025 groups however small the requested
         // threshold (docs/architecture.md, window summaries).
@@ -2387,23 +2411,58 @@ export class PostgresStore {
               }
             : {}),
         }));
-        const durationClusters = durationGroups(
-          collapsed.rows.map((r) => ({
-            first: r.first_time,
-            last: r.last_time,
-            count: r.duration_count,
-            ...(r.band ? { band: r.band } : {}),
-          })),
+        const lower = Q.parse(query.lower),
+          upper = Q.parse(query.upper),
+          active = await ongoing();
+        let summaries = collapsed.rows.map((r) => ({
+          first: r.first_time,
+          last: r.last_time,
+          count: Number(r.duration_count),
+          ...(r.band ? { band: r.band } : {}),
+        }));
+        if (active.length) {
+          // Each placeholder is a zero-length duration, so the walk summarized it in the
+          // cluster holding its start: take it out of that count, then add it as resolved.
+          for (const band of active) {
+            const start = Q.parse(band.first);
+            if (start.compare(lower) < 0 || start.compare(upper) > 0) continue;
+            const cluster = summaries.find(
+              (s) => Q.parse(s.first).compare(start) <= 0 && Q.parse(s.last).compare(start) >= 0,
+            );
+            if (!cluster) continue;
+            cluster.count -= 1;
+            if (cluster.band?.id === band.id) delete cluster.band;
+          }
+          summaries = summariesWithOngoing(
+            summaries.filter((s) => s.count > 0),
+            active,
+            lower,
+            upper,
+            Q.parse(threshold),
+          );
+        }
+        const durationClusters = durationGroups(summaries);
+        // The bands: the walk never meets a placeholder, since the threshold is above zero
+        // for any window and a placeholder has no length.
+        const bands = withOngoing(
+          {
+            durations: intervals.rows.map((r) => r.band),
+            durationsTruncated: total > 256,
+            ...(total > 256
+              ? {
+                  durationsTotal: Math.min(total, DURATION_COUNT_CAP),
+                  ...(total > DURATION_COUNT_CAP ? { durationsTotalMore: true } : {}),
+                }
+              : {}),
+          },
+          active,
+          lower,
+          upper,
+          256,
+          Q.parse(threshold).compare(Q.zero) > 0 ? Q.parse(threshold) : null,
         );
         return {
-          durations: intervals.rows.map((r) => r.band),
-          durationsTruncated: total > 256,
-          ...(total > 256
-            ? {
-                durationsTotal: Math.min(total, DURATION_COUNT_CAP),
-                ...(total > DURATION_COUNT_CAP ? { durationsTotalMore: true } : {}),
-              }
-            : {}),
+          ...bands,
           edges,
           edgesTruncated: arcs.rows.length > 256,
           revision: t.revision,
@@ -2540,20 +2599,54 @@ export class PostgresStore {
         }[query.sort ?? 'extent'];
         const where = `first_time<=$3::mpq AND last_time>=$2::mpq
           AND ($4::mpq='0'::mpq OR last_time-first_time>=$4::mpq)
-          AND ($5='' OR strpos(lower(band->'metadata'->>'title'),lower($5))>0)`;
+          AND ($5='' OR strpos(lower(band->'metadata'->>'title'),lower($5))>0)
+          AND NOT ${placeholder}`;
         const params = [tree, query.lower, query.upper, query.threshold ?? '0', query.text ?? ''];
+        // Ongoing durations (#537) are matched here, resolved, and merged into the page: the
+        // stored rows are read from the start of the order up to the page's end, so the merge
+        // places the page exactly (offsets stop at the cap, so this stays bounded).
+        const offset = query.offset ?? 0,
+          lower = Q.parse(query.lower),
+          upper = Q.parse(query.upper),
+          threshold = Q.parse(query.threshold ?? '0'),
+          text = (query.text ?? '').toLowerCase();
+        const active = (await ongoing()).filter(
+          (band) =>
+            Q.parse(band.first).compare(upper) <= 0 &&
+            Q.parse(band.last).compare(lower) >= 0 &&
+            Q.parse(band.last).sub(Q.parse(band.first)).compare(threshold) >= 0 &&
+            String(band.metadata.title ?? '')
+              .toLowerCase()
+              .includes(text),
+        );
         const { rows } = await c.query(
           `SELECT band FROM ${from('durations')} x WHERE ${where} ORDER BY ${order} LIMIT $6 OFFSET $7`,
-          [...params, query.limit + 1, query.offset ?? 0],
+          active.length
+            ? [...params, offset + query.limit + 1, 0]
+            : [...params, query.limit + 1, offset],
         );
         const counted = await c.query(
           `SELECT count(*)::int AS n FROM (SELECT 1 FROM ${from('durations')} x WHERE ${where} LIMIT ${DURATION_COUNT_CAP + 1}) c`,
           params,
         );
-        const total = counted.rows[0].n;
+        const total = counted.rows[0].n + active.length;
+        let page = rows.map((r) => r.band);
+        if (active.length) {
+          const extent = (b) => Q.parse(b.last).sub(Q.parse(b.first)),
+            id = (a, b) => (a.id < b.id ? -1 : a.id > b.id ? 1 : 0),
+            start = (a, b) => Q.parse(a.first).compare(Q.parse(b.first)) || id(a, b),
+            title = (b) => String(b.metadata.title ?? '').toLowerCase();
+          const compare = {
+            extent: (a, b) => extent(b).compare(extent(a)) || start(a, b),
+            start,
+            title: (a, b) =>
+              (title(a) < title(b) ? -1 : title(a) > title(b) ? 1 : 0) || start(a, b),
+          }[query.sort ?? 'extent'];
+          page = [...page, ...active].sort(compare).slice(offset, offset + query.limit + 1);
+        }
         return {
-          durations: rows.slice(0, query.limit).map((r) => r.band),
-          next: rows.length > query.limit ? (query.offset ?? 0) + query.limit : null,
+          durations: page.slice(0, query.limit),
+          next: page.length > query.limit ? offset + query.limit : null,
           total: Math.min(total, DURATION_COUNT_CAP),
           ...(total > DURATION_COUNT_CAP ? { totalMore: true } : {}),
           revision: t.revision,
@@ -2565,7 +2658,7 @@ export class PostgresStore {
         // tell whether another follows. A scan of the tree's rows, filtered by time.
         const { rows } = await c.query(
           `SELECT band,oc_qtext(first_time) AS first FROM ${from('durations')} x
-          WHERE first_time>=$2::mpq AND last_time<=$3::mpq
+          WHERE first_time>=$2::mpq AND last_time<=$3::mpq AND NOT ${placeholder}
           AND ($4::mpq IS NULL OR first_time>$4::mpq OR (first_time=$4::mpq AND band->>'id' COLLATE "C">$5))
           ORDER BY first_time,band->>'id' COLLATE "C" LIMIT $6`,
           [
@@ -2577,11 +2670,31 @@ export class PostgresStore {
             query.limit + 1,
           ],
         );
-        const page = rows.slice(0, query.limit);
+        // Ongoing durations (#537) wholly inside, resolved, after the cursor, merged in order.
+        const lower = Q.parse(query.lower),
+          upper = Q.parse(query.upper),
+          after = query.after ? Q.parse(query.after.first) : null;
+        const active = (await ongoing()).filter((band) => {
+          const first = Q.parse(band.first);
+          if (first.compare(lower) < 0 || Q.parse(band.last).compare(upper) > 0) return false;
+          const order = after ? first.compare(after) : 1;
+          return order > 0 || (order === 0 && band.id > query.after.id);
+        });
+        const merged = [
+          ...rows.map((r) => ({ band: r.band, first: r.first })),
+          ...active.map((band) => ({ band, first: band.first })),
+        ]
+          .sort(
+            (a, b) =>
+              Q.parse(a.first).compare(Q.parse(b.first)) ||
+              (a.band.id < b.band.id ? -1 : a.band.id > b.band.id ? 1 : 0),
+          )
+          .slice(0, query.limit + 1);
+        const page = merged.slice(0, query.limit);
         return {
           durations: page.map((r) => r.band),
           next:
-            rows.length > query.limit
+            merged.length > query.limit
               ? { first: page.at(-1).first, id: page.at(-1).band.id }
               : null,
           revision: t.revision,
@@ -2594,9 +2707,15 @@ export class PostgresStore {
           `SELECT definition,band FROM ${index('oc_duration_nodes')} x WHERE band->>'id'=$2 AND definition IS NOT NULL LIMIT 1`,
           [id, query.id],
         );
+        let band = rows[0]?.band ?? null;
+        // An ongoing duration's band ends now (#537), where the timeline has a "now".
+        if (band?.end?.ongoing === true && now) {
+          const last = now.compare(Q.parse(band.first)) > 0 ? now.toString() : band.first;
+          band = { ...band, last, endTime: last };
+        }
         return {
           duration: rows[0]?.definition ?? null,
-          band: rows[0]?.band ?? null,
+          band,
           revision: t.revision,
         };
       }
@@ -2679,14 +2798,16 @@ async function writeNodes(client, table, id, tree) {
   );
 }
 /**
+ * The most ongoing durations (#537) a query resolves for one timeline: each is read and
+ * resolved at the server's clock on every window, so their number is bounded.
+ */
+const ONGOING_LIMIT = DURATION_COUNT_CAP;
+/**
  * Writes the augmented duration interval tree; returns its root and resolved bands in tree
  * order. Each duration's start and end are resolved against `document`'s moments (a
  * duration may be anchored to a moment's time) before the tree is built.
  */
 async function writeDurationNodes(client, table, id, document) {
-  // Its trees cannot place an end that moves with the clock yet (#537).
-  if ((document.durations ?? []).some((d) => isOngoing(d.end)))
-    throw new HttpError(400, 'This server cannot save ongoing durations yet (#537).');
   const times = new Map(document.events.map((e) => [e.id, e.time]));
   return writeIntervalNodes(
     client,

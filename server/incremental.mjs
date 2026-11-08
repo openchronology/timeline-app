@@ -185,8 +185,10 @@ export async function applyIncrementally(c, t, patch) {
         fail(error.message);
       }
       if (duration.id !== change.id) fail('Changed duration ID mismatch.');
-      // Its trees cannot place an end that moves with the clock yet (#537).
-      if (isOngoing(duration.end)) fail('This server cannot save ongoing durations yet (#537).');
+      // "Now" exists only on Gregorian timelines (#537), as validateDocument requires of
+      // whole documents: a sparse save checks against the settings it sends.
+      if (isOngoing(duration.end) && settings.presentation?.mode !== 'gregorian')
+        fail('Only timelines with the Gregorian time display can have ongoing durations.');
       durationChanges.set(change.id, duration);
     }
   }
