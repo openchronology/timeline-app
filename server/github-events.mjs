@@ -31,6 +31,10 @@ import {
  * and the verbs each records. All are on unless a list names some.
  */
 export const EVENT_KINDS = {
+  items: ['item'],
+  commits: ['commit'],
+  branches: ['branch', 'branch created', 'branch deleted'],
+  forks: ['forked'],
   assignments: ['assigned', 'unassigned'],
   labels: ['labeled', 'unlabeled'],
   milestones: ['milestoned', 'demilestoned', 'milestone', 'due'],
@@ -59,16 +63,27 @@ export const EVENT_KINDS = {
 const KIND_OF = new Map(
   Object.entries(EVENT_KINDS).flatMap(([kind, verbs]) => verbs.map((v) => [v, kind])),
 );
-/** The kinds to record: a list of EVENT_KINDS names, or all of them. */
-export function eventKinds(list) {
-  if (list === undefined || list === null) return new Set(Object.keys(EVENT_KINDS));
+/** A list of kinds (an array, or text separated by commas), each checked. */
+function kindList(list) {
   const names = Array.isArray(list) ? list : String(list).split(',');
   const kinds = new Set(names.map((n) => String(n).trim()).filter(Boolean));
   for (const kind of kinds)
     if (!(kind in EVENT_KINDS))
-      throw new Error(
-        `Unknown kind of GitHub event "${kind}"; use ${Object.keys(EVENT_KINDS).join(', ')}.`,
-      );
+      throw new Error(`Unknown kind "${kind}"; use ${Object.keys(EVENT_KINDS).join(', ')}.`);
+  return kinds;
+}
+/** The kinds to record: a list of EVENT_KINDS names, or all of them. */
+export function eventKinds(list) {
+  return list === undefined || list === null ? new Set(Object.keys(EVENT_KINDS)) : kindList(list);
+}
+/**
+ * The kinds to record from `only` (just these) and `except` (all but these): `--only commits`,
+ * `--except forks,branches`, or `"only"`/`"except"` in routing rules. All, without either.
+ */
+export function selectKinds({ only, except } = {}) {
+  const kinds = only === undefined || only === null ? eventKinds() : kindList(only);
+  if (except !== undefined && except !== null)
+    for (const kind of kindList(except)) kinds.delete(kind);
   return kinds;
 }
 /** Whether moments of `verb` are kept, given the kinds to record. */
@@ -841,4 +856,123 @@ export class StintTracker {
     if (durations.length) this.save();
     return durations;
   }
+}
+
+/**
+ * A commit, as a moment on its repository: when it was authored, titled with the first line
+ * of its message. Tagged with the platform, the repository, `commit`, the branch it was made
+ * on (as is, such as `feat/new_feature`) and its author's account when the platform knows it.
+ * Never its hash, which is in its ID: tags gather many moments, and a hash names one.
+ * `commit` is `{sha, message, time, url, login}`; `items` are the items it mentions that it may
+ * be linked to.
+ */
+export function commitMoment(repository, commit, branch) {
+  const message = String(commit.message ?? '');
+  const [first, ...rest] = message.split('\n');
+  const body = rest.join('\n').trim();
+  return {
+    id: entityId(repository, 'commit', commit.sha),
+    time: seconds(commit.time),
+    metadata: {
+      title: (first.trim() || commit.sha.slice(0, 12)).slice(0, 300),
+      ...(body || commit.url
+        ? {
+            description:
+              body.slice(0, 4000) + (commit.url ? (body ? '\n\n' : '') + commit.url : ''),
+          }
+        : {}),
+      ...(commit.url ? { url: commit.url } : {}),
+      tags: [
+        ...new Set(
+          [
+            platformOf(repository),
+            repositoryTag(repository),
+            'commit',
+            ...(branch ? [branch] : []),
+            ...(commit.login ? [personTag(commit.login, repository)] : []),
+          ].map(lowerTag),
+        ),
+      ],
+    },
+  };
+}
+/** Links from a commit's moment to the items its message names, in its repository. */
+export function commitLinks(repository, commit) {
+  return mentionedItems(commit.message, repository).map((item) => ({
+    a: { moment: entityId(repository, 'commit', commit.sha) },
+    b: { duration: itemId(item.repository, item.number, !!item.mergeRequest) },
+    related: true,
+  }));
+}
+/** A branch's moment: created or deleted (from a webhook), or begun (its first own commit). */
+export function branchMoment(repository, branch, { verb, time, person }) {
+  const what = {
+    branch: 'Branch',
+    'branch created': 'Created branch',
+    'branch deleted': 'Deleted branch',
+  }[verb];
+  return {
+    id: entityId(repository, 'branch', slug(branch), slug(verb), seconds(time)),
+    time: seconds(time),
+    metadata: {
+      title: `${what} ${branch}`.slice(0, 300),
+      tags: [
+        ...new Set(
+          [
+            platformOf(repository),
+            repositoryTag(repository),
+            verb,
+            branch,
+            ...(person ? [personTag(person, repository)] : []),
+          ].map(lowerTag),
+        ),
+      ],
+    },
+  };
+}
+/** A fork of the repository, as a moment when it was made, tagged `forked` and its owner. */
+export function forkMoment(repository, fork) {
+  return {
+    id: entityId(repository, 'fork', slug(fork.full_name)),
+    time: seconds(fork.created_at),
+    metadata: {
+      title: `Forked to ${fork.full_name}`.slice(0, 300),
+      ...(fork.html_url ? { url: fork.html_url } : {}),
+      tags: [
+        ...new Set(
+          [
+            platformOf(repository),
+            repositoryTag(repository),
+            'forked',
+            ...(fork.owner?.login ? [personTag(fork.owner.login, repository)] : []),
+          ].map(lowerTag),
+        ),
+      ],
+    },
+  };
+}
+/**
+ * A push's commits, from a webhook (`push`): moments tagged with the branch pushed to, and
+ * links to the items they name. Commits GitHub marks as not distinct were already pushed to
+ * another branch, which keeps them; tags never come from email addresses.
+ */
+export function pushChanges(repository, payload, kinds = ALL_KINDS) {
+  const branch = /^refs\/heads\/(.+)$/.exec(payload.ref ?? '')?.[1];
+  if (!branch || !keeps(kinds, 'commit')) return null;
+  const commits = (payload.commits ?? [])
+    .filter((c) => c.distinct !== false && c.id && c.timestamp)
+    .map((c) => ({
+      sha: c.id,
+      message: c.message,
+      time: c.timestamp,
+      url: c.url,
+      login: c.author?.username || null,
+    }));
+  return {
+    repository,
+    durations: [],
+    removed: [],
+    moments: commits.map((c) => commitMoment(repository, c, branch)),
+    links: keeps(kinds, 'item') ? commits.flatMap((c) => commitLinks(repository, c)) : [],
+  };
 }

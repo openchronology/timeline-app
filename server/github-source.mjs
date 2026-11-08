@@ -9,8 +9,12 @@
 import { createHash, createHmac, timingSafeEqual } from 'node:crypto';
 import { readFileSync } from 'node:fs';
 import {
+  branchMoment,
   deliveryMoments,
   eventKinds,
+  forkMoment,
+  pushChanges,
+  selectKinds,
   keeps,
   mentionChanges,
   milestoneChanges,
@@ -236,8 +240,8 @@ export function validSignature(secret, body, header) {
  * Routing rules: which timeline each repository's events go to.
  * `{"routes": [{"repository": "owner/name" | "owner/*", "timeline": "<uuid>"}, …],
  *   "default": "<uuid>"}`. The first rule that matches wins; then `default`; else the event
- * is not kept. Names compare without regard to case, as GitHub's do. `"events": ["labels",
- * …]` records only those kinds of event as moments (all of them without it).
+ * is not kept. Names compare without regard to case, as GitHub's do. `"only": ["commits",
+ * …]` records only those kinds, and `"except": ["forks", …]` all but those.
  */
 export function githubRoutes(config) {
   const uuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
@@ -266,9 +270,9 @@ export function githubRoutes(config) {
   const fallback = config.default?.toLowerCase() ?? null;
   return {
     timelines: [...new Set([...routes.map((r) => r.timeline), ...(fallback ? [fallback] : [])])],
-    // The kinds of event recorded as moments (github-events.mjs EVENT_KINDS): all, unless
-    // `events` lists some.
-    kinds: eventKinds(config.events),
+    // The kinds recorded (github-events.mjs EVENT_KINDS): all, `only` some, or all `except`
+    // some.
+    kinds: selectKinds({ only: config.only, except: config.except }),
     route(repository) {
       const r = parseRepository(repository);
       if (!r) return null;
@@ -312,6 +316,37 @@ export function deliveryChanges(event, payload, kinds = eventKinds()) {
   if (event === 'sub_issues') return subIssueChanges(payload, kinds);
   if (!repositoryName(repository)) return [];
   const none = { durations: [], moments: [], removed: [], removedMoments: [], links: [] };
+  if (event === 'push') {
+    const change = pushChanges(repository, payload, kinds);
+    return change ? [change] : [];
+  }
+  if ((event === 'create' || event === 'delete') && payload.ref_type === 'branch') {
+    const verb = event === 'create' ? 'branch created' : 'branch deleted';
+    if (!keeps(kinds, verb) || !payload.ref) return [];
+    return [
+      {
+        ...none,
+        repository,
+        moments: [
+          branchMoment(repository, payload.ref, {
+            verb,
+            time: payload.repository?.pushed_at
+              ? new Date(
+                  typeof payload.repository.pushed_at === 'number'
+                    ? payload.repository.pushed_at * 1000
+                    : payload.repository.pushed_at,
+                ).toISOString()
+              : new Date().toISOString(),
+            person: payload.sender?.login,
+          }),
+        ],
+      },
+    ];
+  }
+  if (event === 'fork' && payload.forkee) {
+    if (!keeps(kinds, 'forked')) return [];
+    return [{ ...none, repository, moments: [forkMoment(repository, payload.forkee)] }];
+  }
   if (event === 'release' && payload.release) {
     if (!keeps(kinds, 'released')) return [];
     const moment = ['deleted', 'unpublished'].includes(payload.action)
@@ -342,7 +377,11 @@ export function deliveryChanges(event, payload, kinds = eventKinds()) {
     return [{ ...none, repository, ...milestoneChanges(repository, payload.milestone) }];
   }
   const mentions = (source, text, by) =>
-    keeps(kinds, 'mentioned') ? mentionChanges(source, text, source.time, by) : [];
+    keeps(kinds, 'mentioned')
+      ? mentionChanges(source, text, source.time, by).map((change) =>
+          keeps(kinds, 'item') ? change : { ...change, links: [] },
+        )
+      : [];
   if (event === 'issue_comment') {
     const item = payload.issue;
     if (!item?.number || !['created', 'edited'].includes(payload.action)) return [];
@@ -358,15 +397,9 @@ export function deliveryChanges(event, payload, kinds = eventKinds()) {
       : null;
   if (!item || !Number.isInteger(item.number)) return [];
   if (payload.action === 'deleted' && event !== 'pull_request_review')
-    return [
-      {
-        repository,
-        durations: [],
-        moments: [],
-        removed: [itemId(repository, item.number, !!item.merge_request)],
-        links: [],
-      },
-    ];
+    return keeps(kinds, 'item')
+      ? [{ ...none, repository, removed: [itemId(repository, item.number, !!item.merge_request)] }]
+      : [];
   const happened = deliveryMoments(event, payload, repository, item, kinds);
   const links = [
     ...happened.links,
@@ -376,12 +409,14 @@ export function deliveryChanges(event, payload, kinds = eventKinds()) {
           .map((n) => closesLink(repository, item.number, n))
       : []),
   ];
+  // Without items, their durations are not kept, nor links (which need them).
+  const items = keeps(kinds, 'item');
   const own = {
     repository,
-    durations: [itemDuration(repository, item)],
+    durations: items ? [itemDuration(repository, item)] : [],
     moments: happened.moments,
     removed: [],
-    links,
+    links: items ? links : [],
   };
   const mentioned =
     event !== 'pull_request_review' && ['opened', 'edited'].includes(payload.action)

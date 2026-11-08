@@ -120,6 +120,11 @@ export function forgejoDelivery(event, type, payload) {
   // Labels: Forgejo says the set changed, not which label, so the item's duration (and its
   // `label:` tags) follow, without a moment.
   const relabelled = action === 'label_updated' || action === 'label_cleared';
+  // Pushes, branches and forks have GitHub's fields: only their repository is renamed. A
+  // push's commits carry no `distinct`, so a commit pushed again to another branch (merging
+  // without a merge commit) takes that branch's tag.
+  if (['push', 'create', 'delete', 'fork'].includes(event))
+    return { event, payload: withRepository };
   if (event === 'issues' && payload.issue)
     return {
       event: 'issues',
