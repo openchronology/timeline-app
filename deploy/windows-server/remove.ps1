@@ -1,12 +1,13 @@
 # Copyright (c) 2026 Athan Clark. SPDX-License-Identifier: GPL-3.0-only
-# Removes the OpenChronology services (the server, the syslog receiver, email delivery and
-# PostgreSQL) before the uninstaller deletes the installation (#116, #125). The configuration
+# Removes the OpenChronology services (the server, the syslog and GitHub receivers, email
+# delivery and PostgreSQL) before the uninstaller deletes the installation (#116, #125). The configuration
 # and the database, in %ProgramData%\OpenChronology, remain.
 param([string]$InstallDir = $PSScriptRoot)
 $ErrorActionPreference = 'Continue'
 # Each WinSW service, and the copy of the wrapper that installed it.
 $services = [ordered]@{
   OpenChronologySyslog = 'openchronology-syslog-service.exe'
+  OpenChronologyGitHub = 'openchronology-github-service.exe'
   OpenChronologyMail   = 'openchronology-mail-service.exe'
   OpenChronology       = 'openchronology-service.exe'
 }

@@ -1,5 +1,5 @@
 # Docker Compose for a self-hosted server: PostgreSQL with pgmp, migrations and the web app,
-# with optional seed data, mail worker and syslog receiver (docs/docker.md).
+# with optional seed data, mail worker, syslog receiver and GitHub receiver (docs/docker.md).
 x-app-build: &app-build
   context: .
   dockerfile: deploy/Dockerfile.app
@@ -213,5 +213,35 @@ services:
     depends_on:
       app:
         condition: service_started
+  # Optional GitHub webhook receiver (docs/github.md): docker compose --profile github up -d
+  github:
+    profiles: ['github']
+    restart: unless-stopped
+    init: true
+    image: openchronology-app:local
+    build: *app-build
+    environment:
+      OCH_API_URL: ${GITHUB_RECEIVER_API_URL:-http://app:5173}
+      OCH_API_KEY: ${GITHUB_RECEIVER_API_KEY:-}
+      GITHUB_WEBHOOK_SECRET: ${GITHUB_WEBHOOK_SECRET:-}
+      FORGEJO_WEBHOOK_SECRET: ${FORGEJO_WEBHOOK_SECRET:-}
+      GITLAB_WEBHOOK_TOKEN: ${GITLAB_WEBHOOK_TOKEN:-}
+      GITHUB_ROUTES: /config/github-routes.json
+      GITHUB_HOST: 0.0.0.0
+      GITHUB_PORT: 5580
+      GITHUB_STATE: /var/lib/openchronology-github/github-state.json
+      GITHUB_TOKEN: ${GITHUB_TOKEN:-}
+      GITHUB_API_URL: ${GITHUB_API_URL:-}
+    volumes:
+      - ${GITHUB_ROUTES_FILE:-./github-routes.json}:/config/github-routes.json:ro
+      - github-state:/var/lib/openchronology-github
+    # Loopback only, like the app: GitHub reaches it through your HTTPS reverse proxy.
+    ports:
+      - '127.0.0.1:${GITHUB_HOST_PORT:-5580}:5580'
+    command: ['node', 'server/github-receiver.mjs']
+    depends_on:
+      app:
+        condition: service_started
 volumes:
   timelines:
+  github-state:

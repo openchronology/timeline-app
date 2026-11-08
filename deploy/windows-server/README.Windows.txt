@@ -16,8 +16,9 @@ with the pgmp extension, Node.js 24, the platform and the SQLite converter. It t
   - creates the openchronology database with pgmp and migrates it;
   - starts the OpenChronology service (Local Service account), which listens on
     127.0.0.1:5173. Both services start with Windows;
-  - installs the OpenChronologySyslog (syslog receiver) and OpenChronologyMail (account
-    email) services, which start only once you configure and start them (below).
+  - installs the OpenChronologySyslog (syslog receiver), OpenChronologyGitHub (GitHub
+    receiver) and OpenChronologyMail (account email) services, which start only once you
+    configure and start them (below).
 
 Unattended: openchronology-server-windows-amd64-setup.exe /S (exit code 2 when setup did not
 finish). Setup writes C:\ProgramData\OpenChronology\setup.log; it is safe to run again, as an
@@ -73,11 +74,24 @@ replaced or written anew there is readable by administrators only, until you gra
 and allow the port in Windows Defender Firewall, on a trusted network only: the receiver has
 no TLS or sender authentication.
 
+GitHub to timelines (github.md): the OpenChronologyGitHub service receives GitHub's webhooks
+on 127.0.0.1:5580, behind your HTTPS reverse proxy, and mirrors issues and pull requests into
+the timelines its routes choose. Write the routes into
+C:\ProgramData\OpenChronology\github-routes.json and set OCH_API_KEY and
+GITHUB_WEBHOOK_SECRET in C:\ProgramData\OpenChronology\github.env, then:
+
+  Set-Service OpenChronologyGitHub -StartupType Automatic; Start-Service OpenChronologyGitHub
+
+It runs as Local Service too, logs beside the others and keeps its state in
+C:\ProgramData\OpenChronology\github-state. Setup makes github.env and github-routes.json
+readable by Local Service, as it does syslog.env.
+
 The commands are in C:\Program Files\OpenChronology Server; run them as an administrator:
 
   openchronology-migrate                 migrates the database and restarts the services
   openchronology-reset-admin-password    the administrator's password, from the configuration
   och-import-logs                        imports log files (log-import.md)
+  och-import-github                      imports GitHub issues and pull requests (github.md)
 
 Back up AUTH_ENCRYPTION_KEY apart from the database: without it, enrolled authenticator
 secrets cannot be decrypted. Do not change it once accounts exist.
@@ -90,9 +104,9 @@ Upgrade
 
 Run the newer installer. It stops the services, replaces the program, keeps the configuration
 and the database, migrates the database to the new version and starts the services again
-(OpenChronologyMail and OpenChronologySyslog only if they start with Windows). Running
-openchronology-migrate by hand restarts the server, and OpenChronologyMail and
-OpenChronologySyslog, each if it starts with Windows.
+(OpenChronologyMail, OpenChronologySyslog and OpenChronologyGitHub only if they start with
+Windows). Running openchronology-migrate by hand restarts the server, and OpenChronologyMail,
+OpenChronologySyslog and OpenChronologyGitHub, each if it starts with Windows.
 Back up first:
 
   "C:\Program Files\OpenChronology Server\pgsql\bin\pg_dump.exe" -h 127.0.0.1 -p 5442 ^

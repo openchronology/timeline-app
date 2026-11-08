@@ -54,7 +54,8 @@ getent passwd openchronology-logs >/dev/null ||
 # An upgrade stops the server; it starts again once openchronology-migrate has run.
 if [ "$1" -ge 2 ] && [ -d /run/systemd/system ]; then
   systemctl stop openchronology.service openchronology-mail.service \
-    openchronology-syslog.service openchronology-journald.service >/dev/null 2>&1 || true
+    openchronology-syslog.service openchronology-github.service \
+    openchronology-journald.service >/dev/null 2>&1 || true
 fi
 exit 0
 
@@ -64,7 +65,8 @@ exit 0
 %preun
 if [ "$1" -eq 0 ] && [ -d /run/systemd/system ]; then
   systemctl disable --now openchronology.service openchronology-mail.service \
-    openchronology-syslog.service openchronology-journald.service >/dev/null 2>&1 || true
+    openchronology-syslog.service openchronology-github.service \
+    openchronology-journald.service >/dev/null 2>&1 || true
 fi
 exit 0
 
@@ -95,10 +97,12 @@ exit 0
 /usr/lib/systemd/system/openchronology.service
 /usr/lib/systemd/system/openchronology-mail.service
 /usr/lib/systemd/system/openchronology-syslog.service
+/usr/lib/systemd/system/openchronology-github.service
 /usr/lib/systemd/system/openchronology-journald.service
 /usr/sbin/openchronology-migrate
 /usr/sbin/openchronology-reset-admin-password
 /usr/sbin/openchronology-setup
 /usr/bin/och-import-logs
+/usr/bin/och-import-github
 /usr/share/openchronology
 %doc /usr/share/doc/openchronology-server

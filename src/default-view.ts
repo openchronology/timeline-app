@@ -2,7 +2,7 @@
 // A timeline's default view (#416): how it opens for readers, embeds and shared links. It is a
 // separation, by tags or by an entity's relationships, saved with the timeline's settings (`view`
 // in a document), so exports, saves, forks, merges and saved history keep it like the title.
-import { validateTags } from './tags.js';
+import { validateEntityTags } from './tags.js';
 import { refKey, validateRef } from './relationships.js';
 import type { EntityRef } from './relationships.js';
 
@@ -40,7 +40,7 @@ export function validateTimelineView(value: unknown): TimelineView {
   if (object(s) && 'tags' in s) {
     if (Object.keys(s).length !== 1)
       throw new Error('A default separation by tags has only its tags.');
-    const tags = validateTags(s.tags);
+    const tags = validateEntityTags(s.tags);
     if (!tags.length) throw new Error('A default separation needs at least one tag.');
     return { separation: { tags } };
   }

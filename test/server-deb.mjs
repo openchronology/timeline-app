@@ -91,6 +91,22 @@ try {
   assert.doesNotMatch(await sh('ldd /usr/lib/openchronology/bin/och-convert'), /not found/);
   // The log importer runs as a command with the bundled Node.js.
   assert.match(await sh('och-import-logs --help'), /^Usage: och-import-logs/);
+  // The GitHub importer too (docs/github.md).
+  assert.match(await sh('och-import-github --help'), /^Usage: och-import-github/);
+  // The GitHub receiver is installed, with its configuration template, and loads with the
+  // bundled Node.js; it refuses to start without the webhook's secret.
+  assert.match(
+    await sh(
+      'test -f /usr/lib/systemd/system/openchronology-github.service && test -f /usr/share/openchronology/github.env.example && echo installed',
+    ),
+    /installed/,
+  );
+  assert.match(
+    await sh(
+      `cd /usr/lib/openchronology && GITHUB_ROUTES_JSON='{"default":"00000000-0000-0000-0000-000000000000"}' node/bin/node server/github-receiver.mjs 2>&1; true`,
+    ),
+    /GITHUB_WEBHOOK_SECRET/,
+  );
   // The journald follower is installed, and loads with the bundled Node.js (#151).
   assert.match(
     await sh(

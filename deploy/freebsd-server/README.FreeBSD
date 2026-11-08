@@ -14,8 +14,8 @@ PostgreSQL @PG_MAJOR@, GMP and SQLite. Like FreeBSD's ports, the package starts 
 itself (pkg ends whatever its scripts leave running); openchronology-setup finishes the
 first installation:
 
-  - creates the `openchronology` system user, and `openchronology-logs` for the syslog
-    receiver;
+  - creates the `openchronology` system user, and `openchronology-logs` for the syslog and
+    GitHub receivers;
   - initializes PostgreSQL @PG_MAJOR@ if it is not yet (/var/db/postgres/data@PG_MAJOR@, with
     peer authentication on its local socket), and enables and starts it;
   - writes /usr/local/etc/openchronology/openchronology.env, with a new
@@ -70,6 +70,17 @@ syslog.md, "Its own account".
 `och-import-logs` imports historic log files (log-import.md), with OCH_API_URL and
 OCH_API_KEY from the environment or syslog.env: `och-import-logs --help`.
 
+The GitHub receiver (github.md) mirrors issues and pull requests into timelines from
+GitHub's webhooks, on 127.0.0.1:5580 behind your HTTPS reverse proxy. It is configured in
+/usr/local/etc/openchronology/github.env (the API key and the webhook's secret) with routes
+in /usr/local/etc/openchronology/github-routes.json; then
+`sysrc openchronology_github_enable=YES && service openchronology_github start`.
+It runs as openchronology-logs too: github.env is root:openchronology-logs, mode 0640, and
+so must be the routes file. It keeps its state in /var/db/openchronology-github.
+`och-import-github` imports a repository's existing issues and pull requests (github.md),
+with OCH_API_URL, OCH_API_KEY and GITHUB_TOKEN from the environment or github.env:
+`och-import-github --help`.
+
 Upgrade
 -------
 
@@ -81,8 +92,9 @@ and leaves the database and configuration as they are. It then lists:
                  /usr/local/share/openchronology/openchronology.env.example
   2. A backup:  su -l postgres -c 'pg_dump openchronology' > openchronology.sql
   3. openchronology-migrate, which migrates the database and starts the server, and the mail
-     worker (openchronology_mail) and the syslog receiver (openchronology_syslog), each if it
-     is enabled. Disabled ones stay stopped.
+     worker (openchronology_mail), the syslog receiver (openchronology_syslog) and the
+     GitHub receiver (openchronology_github), each if it is enabled. Disabled ones stay
+     stopped.
 
 openchronology-migrate is safe to run more than once. `--no-restart` migrates only and starts
 nothing. Releases up to 0.12.1 started only the server; after upgrading from one, start an
@@ -99,8 +111,9 @@ Remove
 `pkg delete openchronology-server` stops and removes the server. The configuration
 (including AUTH_ENCRYPTION_KEY), the database and the system users remain; delete them with:
 
-    sysrc -x openchronology_enable openchronology_mail_enable openchronology_syslog_enable
-    rm -rf /usr/local/etc/openchronology /var/db/openchronology
+    sysrc -x openchronology_enable openchronology_mail_enable openchronology_syslog_enable \
+      openchronology_github_enable
+    rm -rf /usr/local/etc/openchronology /var/db/openchronology /var/db/openchronology-github
     su -l postgres -c 'dropdb openchronology && dropuser openchronology'
     pw userdel openchronology
     pw userdel openchronology-logs
@@ -118,5 +131,5 @@ Layout
   /usr/local/etc/openchronology           configuration (created on first install)
   /usr/local/share/openchronology         configuration templates of the installed version
   /usr/local/etc/rc.d                     openchronology, openchronology_mail,
-                                          openchronology_syslog
+                                          openchronology_syslog, openchronology_github
   /usr/local/lib/postgresql, /usr/local/share/postgresql/extension   pgmp

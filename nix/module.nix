@@ -243,6 +243,24 @@ in
       };
     };
 
+    github = {
+      enable = mkEnableOption "the GitHub receiver, which records issues and pull requests as timelines";
+      environmentFile = logEnvironmentFile "github";
+      settings = mkOption {
+        type = types.attrsOf types.str;
+        default = { };
+        example = {
+          GITHUB_PORT = "5580";
+          GITHUB_ROUTES = "/etc/openchronology/github-routes.json";
+        };
+        description = ''
+          Its configuration (deploy/debian-server/github.env). OCH_API_URL defaults to this
+          server and GITHUB_STATE to a file in its state directory; give its OCH_API_KEY and
+          GITHUB_WEBHOOK_SECRET (and GITHUB_TOKEN) in its own `environmentFile`.
+        '';
+      };
+    };
+
     journald = {
       enable = mkEnableOption "the journald follower, which records the systemd journal as timelines";
       environmentFile = logEnvironmentFile "journald";
@@ -364,7 +382,7 @@ in
       };
     })
 
-    (mkIf (cfg.syslog.enable || cfg.journald.enable) {
+    (mkIf (cfg.syslog.enable || cfg.github.enable || cfg.journald.enable) {
       # The log importers' own user (#501).
       users.users.openchronology-logs = {
         isSystemUser = true;
@@ -383,6 +401,27 @@ in
         description = "OpenChronology syslog receiver";
         command = "openchronology-syslog";
         inherit (cfg.syslog) settings environmentFile;
+      };
+    })
+
+    (mkIf cfg.github.enable {
+      warnings = lib.optional (cfg.github.environmentFile == null) ''
+        services.openchronology.github.environmentFile is not set: the GitHub receiver does not
+        read services.openchronology.environmentFile (#501), so give its OCH_API_KEY and
+        GITHUB_WEBHOOK_SECRET there.
+      '';
+      systemd.services.openchronology-github = logService {
+        description = "OpenChronology GitHub receiver";
+        command = "openchronology-github";
+        settings = {
+          GITHUB_STATE = "/var/lib/openchronology-github/github-state.json";
+        }
+        // cfg.github.settings;
+        inherit (cfg.github) environmentFile;
+        extra = {
+          # Each item's board column, kept across restarts (GITHUB_STATE).
+          StateDirectory = "openchronology-github";
+        };
       };
     })
 

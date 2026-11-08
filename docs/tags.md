@@ -2,7 +2,7 @@
 
 <!-- description: Tags on events: short labels such as war or trade, how to add them, filter by them, and separate a timeline into tracks by tag. -->
 
-Events (moments and durations) can carry tags: short labels you choose, such as `war` or `trade`. Enter them as a comma-separated list in the **Tags** field of a moment's details or the duration dialog. Tags are stored as `metadata.tags` and normalized like timeline tags: trimmed, lowercased, deduplicated, at most 40 per entity, 1–64 characters each, without commas or control characters. Search indexes them with the rest of the timeline, and they travel through `.ochx`, `.och`, server saves, forks and merges like other metadata. `tags` is reserved, so plugin fields cannot use it. Older documents that used a `tags` key for something other than a list of tag strings open unchanged, and that value is ignored for tagging.
+Events (moments and durations) can carry tags: short labels you choose, such as `war` or `trade`. Enter them as a comma-separated list in the **Tags** field of a moment's details or the duration dialog. Tags are stored as `metadata.tags` and normalized like timeline tags: trimmed, lowercased, deduplicated, at most 40 per entity, without commas or control characters. An event's tag may be up to 128 characters, long enough for references such as `gitlab:git.example.com/group/subgroup/project!1234`. A timeline's own tags stay within 64. Search indexes them with the rest of the timeline, and they travel through `.ochx`, `.och`, server saves, forks and merges like other metadata. `tags` is reserved, so plugin fields cannot use it. Older documents that used a `tags` key for something other than a list of tag strings open unchanged, and that value is ignored for tagging.
 
 ## Separating by tags
 
@@ -40,7 +40,7 @@ Several separations are `groups`, two to seven of them, each a list of tags:
 { "view": { "separation": { "related": { "moment": "launch" }, "depth": "all" } } }
 ```
 
-`depth` is `direct` (Separate related) or `all` (Separate all connected). Tags are normalized like entity tags: one to forty, 1–64 characters each, trimmed and lowercased, without commas. The entity is named like a relationship's end and must be a valid ID, but it need not exist: a deleted entity is kept in the setting, and the timeline then opens whole, quietly. Anything else is refused when the document is saved or imported. Only the separation is saved. The bar's label comes from the entity's title when the timeline opens.
+`depth` is `direct` (Separate related) or `all` (Separate all connected). Tags are normalized like entity tags: one to forty, 1–128 characters each, trimmed and lowercased, without commas. The entity is named like a relationship's end and must be a valid ID, but it need not exist: a deleted entity is kept in the setting, and the timeline then opens whole, quietly. Anything else is refused when the document is saved or imported. Only the separation is saved. The bar's label comes from the entity's title when the timeline opens.
 
 How it fits with the rest:
 

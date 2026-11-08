@@ -143,7 +143,7 @@ export function unitCommand(unit, log, pidFile) {
 export async function checkSystemdServices({ sh, psql, name, installSystemd }) {
   await sh(`command -v systemd-analyze >/dev/null || { ${installSystemd}; } >/dev/null 2>&1`);
   await sh(
-    'cd /usr/lib/systemd/system && systemd-analyze verify openchronology.service openchronology-mail.service openchronology-syslog.service openchronology-journald.service',
+    'cd /usr/lib/systemd/system && systemd-analyze verify openchronology.service openchronology-mail.service openchronology-syslog.service openchronology-github.service openchronology-journald.service',
   );
   const unit = await sh('cat /usr/lib/systemd/system/openchronology-syslog.service');
   const pid = '/tmp/syslog.pid';

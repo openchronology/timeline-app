@@ -98,9 +98,11 @@ assert.equal(session.server, true, 'The server reaches its database.');
 assert.equal((await fetch('http://127.0.0.1:5173/api/plugins')).status, 200);
 assert.match(await (await fetch('http://127.0.0.1:5173/')).text(), /<html/i);
 assert.match(await ps(`& '${dir}\\och-import-logs.cmd' --help`), /Usage: och-import-logs/);
+assert.match(await ps(`& '${dir}\\och-import-github.cmd' --help`), /Usage: och-import-github/);
 
-// The syslog receiver and email delivery are services too (#125), installed to start by hand.
-for (const name of ['OpenChronologySyslog', 'OpenChronologyMail']) {
+// The syslog and GitHub receivers and email delivery are services too (#125), installed to
+// start by hand.
+for (const name of ['OpenChronologySyslog', 'OpenChronologyGitHub', 'OpenChronologyMail']) {
   assert.equal(await status(name), 'Stopped');
   assert.match(await ps(`(Get-Service ${name}).StartType`), /Manual/);
 }
@@ -154,6 +156,9 @@ assert.doesNotMatch(migrated, /mail worker restarted/);
 assert.match(migrated, /OpenChronology syslog receiver restarted\./);
 assert.equal(await status('OpenChronologySyslog'), 'Running');
 assert.equal(await status('OpenChronologyMail'), 'Stopped');
+// The GitHub receiver, not set to start with Windows, stays stopped too.
+assert.doesNotMatch(migrated, /GitHub receiver restarted/);
+assert.equal(await status('OpenChronologyGitHub'), 'Stopped');
 const { passwordMatches } = await import(pathToFileURL(`${dir}\\app\\server\\auth.mjs`).href);
 const adminMatches = async () =>
   passwordMatches(
@@ -178,12 +183,14 @@ assert.deepEqual(await healthy(), { status: 'ok', storage: 'postgresql' });
 // started by hand, does not.
 assert.equal(await status('OpenChronologySyslog'), 'Running');
 assert.equal(await status('OpenChronologyMail'), 'Stopped');
+assert.equal(await status('OpenChronologyGitHub'), 'Stopped');
 
 // Removing it removes the services and the program, and keeps the configuration and data.
 await ps(`Start-Process -Wait -FilePath '${dir}\\uninstall.exe' -ArgumentList '/S', '_?=${dir}'`);
 assert.equal(await status('OpenChronology'), '');
 assert.equal(await status('OpenChronologyPostgreSQL'), '');
 assert.equal(await status('OpenChronologySyslog'), '');
+assert.equal(await status('OpenChronologyGitHub'), '');
 assert.equal(await status('OpenChronologyMail'), '');
 assert.match(await ps(`Test-Path '${configFile}'`), /True/);
 assert.match(await ps(`Test-Path '${data}\\pgdata\\PG_VERSION'`), /True/);

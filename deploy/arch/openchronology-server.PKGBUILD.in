@@ -59,18 +59,21 @@ package() {
 
   # The Debian package's services, configuration templates and commands.
   local unit
-  for unit in openchronology openchronology-mail openchronology-syslog openchronology-journald; do
+  for unit in openchronology openchronology-mail openchronology-syslog openchronology-github \
+      openchronology-journald; do
     sed 's|README.Debian|README.Arch|' "$srcdir/$unit.service" > "$srcdir/$unit.arch.service"
     install -Dm644 "$srcdir/$unit.arch.service" "$pkgdir/usr/lib/systemd/system/$unit.service"
   done
   install -Dm644 "$srcdir/openchronology.env" "$pkgdir/usr/share/openchronology/openchronology.env.example"
   install -Dm644 "$srcdir/syslog.env" "$pkgdir/usr/share/openchronology/syslog.env.example"
+  install -Dm644 "$srcdir/github.env" "$pkgdir/usr/share/openchronology/github.env.example"
   install -Dm644 "$srcdir/journald.env" "$pkgdir/usr/share/openchronology/journald.env.example"
   install -Dm755 "$srcdir/openchronology-setup" "$pkgdir/usr/bin/openchronology-setup"
   install -Dm755 "$srcdir/openchronology-migrate" "$pkgdir/usr/bin/openchronology-migrate"
   install -Dm755 "$srcdir/openchronology-reset-admin-password" \
     "$pkgdir/usr/bin/openchronology-reset-admin-password"
   install -Dm755 "$srcdir/och-import-logs" "$pkgdir/usr/bin/och-import-logs"
+  install -Dm755 "$srcdir/och-import-github" "$pkgdir/usr/bin/och-import-github"
   install -Dm755 "$srcdir/openchronology-log-files" "$app/bin/openchronology-log-files"
   install -Dm644 "$srcdir/openchronology-server.sysusers" "$pkgdir/usr/lib/sysusers.d/openchronology-server.conf"
   install -Dm644 "$srcdir/openchronology-server.tmpfiles" "$pkgdir/usr/lib/tmpfiles.d/openchronology-server.conf"

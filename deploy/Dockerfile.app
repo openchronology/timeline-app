@@ -56,6 +56,10 @@ COPY server server
 RUN install -d -o node -g node -m 0755 platform/.next/cache
 # The log importer (docs/log-import.md) as a command, e.g. beside the Compose syslog service.
 RUN ln -s /app/server/import-logs.mjs /usr/local/bin/och-import-logs
+# The GitHub importer (docs/github.md), and the folder the Compose github service keeps its
+# state in: node's, so the named volume mounted there starts out writable by it.
+RUN ln -s /app/server/import-github.mjs /usr/local/bin/och-import-github \
+    && install -d -o node -g node -m 0700 /var/lib/openchronology-github
 COPY LICENSE NOTICE THIRD_PARTY.md ./
 COPY legal legal
 COPY LICENSE NOTICE THIRD_PARTY.md /usr/local/share/openchronology/

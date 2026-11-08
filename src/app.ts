@@ -73,6 +73,7 @@ import {
   pluginSize,
   PLUGIN_EXAMPLE,
   validateTags,
+  validateEntityTags,
   validateTimelineImage,
   validateTimelineView,
   sameSeparation,
@@ -6444,7 +6445,7 @@ function mapFilter(): ViewFilter | null {
   const scope =
     el('map-scope').querySelector<HTMLInputElement>('input[type=radio]:checked')?.value ?? 'all';
   if (scope === 'tagged' || scope === 'untagged') {
-    const tags = validateTags(parseTagInput(input('map-tags').value));
+    const tags = validateEntityTags(parseTagInput(input('map-tags').value));
     if (!tags.length) throw new Error('Name at least one tag.');
     return { tags, mode: scope === 'tagged' ? 'any' : 'none' };
   }

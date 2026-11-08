@@ -1,0 +1,6 @@
+#!/bin/sh
+# Copyright (c) 2026 Athan Clark. SPDX-License-Identifier: GPL-3.0-only
+# Receives GitHub webhooks into timelines (github.md) with github.env, until stopped: in a
+# terminal, or as your launchd agent with `openchronology-agent start github` (README.Homebrew).
+OCH_CONFIG=@HOMEBREW_PREFIX@/etc/openchronology/github.env NODE_ENV=production \
+  exec "@NODE@" --import="@LIBEXEC@/server/load-configuration.mjs" "@LIBEXEC@/server/github-receiver.mjs"
