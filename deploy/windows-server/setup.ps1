@@ -156,10 +156,23 @@ try {
   if (-not (Test-Path $routes)) {
     Write-Text $routes "{`n  `"routes`": [],`n  `"default`": null`n}`n"
   }
+  # The GitHub receiver's, likewise, and the folder where it keeps each item's board column
+  # (GITHUB_STATE), which its LocalService account writes.
+  $github = Join-Path $data 'github.env'
+  $githubRoutes = Join-Path $data 'github-routes.json'
+  $githubState = Join-Path $data 'github-state'
+  if (-not (Test-Path $github)) {
+    Copy-Item (Join-Path $InstallDir 'templates\github.env.example') $github
+  }
+  if (-not (Test-Path $githubRoutes)) {
+    Write-Text $githubRoutes "{`n  `"routes`": [],`n  `"default`": null`n}`n"
+  }
+  New-Item -ItemType Directory -Force -Path $githubState | Out-Null
+  Set-Access $githubState @('S-1-5-19=Modify')
   # Set on each run, so a file written anew since (readable by administrators only) is readable
   # by the services again, and no other entry stays.
   Set-Access $superuserFile @()
-  foreach ($file in $config, $syslog, $routes) { Set-Access $file @('S-1-5-19=Read') }
+  foreach ($file in $config, $syslog, $routes, $github, $githubRoutes) { Set-Access $file @('S-1-5-19=Read') }
   $superuser = (Get-Content -Raw $superuserFile).Trim()
   $url = (Select-String -Path $config -Pattern '^DATABASE_URL=postgresql://openchronology:([^@]+)@').Matches
   if (-not $url) { throw "DATABASE_URL in $config does not name the openchronology role's password" }
@@ -244,10 +257,12 @@ try {
     }
     throw "The server did not answer; see $logs"
   }
-  # The syslog receiver and email delivery (WinSW, #125): installed once, to start by hand
-  # until configured. An upgrade stopped them; the ones set to start with Windows start again.
+  # The syslog and GitHub receivers and email delivery (WinSW, #125): installed once, to start
+  # by hand until configured. An upgrade stopped them; the ones set to start with Windows start
+  # again.
   foreach ($worker in @(
       @{ Name = 'OpenChronologySyslog'; Wrapper = 'openchronology-syslog-service.exe' },
+      @{ Name = 'OpenChronologyGitHub'; Wrapper = 'openchronology-github-service.exe' },
       @{ Name = 'OpenChronologyMail'; Wrapper = 'openchronology-mail-service.exe' })) {
     if (-not (Get-Service $worker.Name -ErrorAction SilentlyContinue)) {
       & (Join-Path $InstallDir "service\$($worker.Wrapper)") install | Out-Host
@@ -269,7 +284,8 @@ Next steps, as an administrator:
   - Back up AUTH_ENCRYPTION_KEY from that file separately from the database.
   - For account email, set RESEND_API_KEY and AUTH_EMAIL_FROM there, then start the
     OpenChronologyMail service; for syslog, configure syslog.env and start
-    OpenChronologySyslog (README.Windows.txt).
+    OpenChronologySyslog; for GitHub, configure github.env and start
+    OpenChronologyGitHub (README.Windows.txt).
 
 See $InstallDir\README.Windows.txt.
 "@

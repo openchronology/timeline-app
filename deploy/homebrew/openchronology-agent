@@ -1,18 +1,19 @@
 #!/bin/sh
 # Copyright (c) 2026 Athan Clark. SPDX-License-Identifier: GPL-3.0-only
-# Runs the syslog receiver (openchronology-syslog) or account email delivery
-# (openchronology-mail) as your launchd agent (#125), as `brew services` runs the server:
-# started now and whenever you log in, and started again if it stops.
-# Usage: openchronology-agent start|stop|restart|status syslog|mail
+# Runs the syslog receiver (openchronology-syslog), the GitHub receiver (openchronology-github)
+# or account email delivery (openchronology-mail) as your launchd agent (#125), as
+# `brew services` runs the server: started now and whenever you log in, and started again if
+# it stops.
+# Usage: openchronology-agent start|stop|restart|status syslog|github|mail
 set -eu
 usage() {
-  echo 'Usage: openchronology-agent start|stop|restart|status syslog|mail' >&2
+  echo 'Usage: openchronology-agent start|stop|restart|status syslog|github|mail' >&2
   exit 2
 }
 [ $# -eq 2 ] || usage
 action=$1
 worker=$2
-case "$worker" in syslog | mail) ;; *) usage ;; esac
+case "$worker" in syslog | github | mail) ;; *) usage ;; esac
 label="org.openchronology.$worker"
 agents="$HOME/Library/LaunchAgents"
 plist="$agents/$label.plist"

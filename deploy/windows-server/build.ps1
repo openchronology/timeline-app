@@ -103,18 +103,20 @@ Copy-Item "$repo\native-store\target\release\och-convert.exe" "$stage\app\bin\"
 # The Windows services (WinSW: one copy of the wrapper per service, named as its settings
 # file), the commands, templates and documentation.
 New-Item -ItemType Directory -Force -Path "$stage\service" | Out-Null
-foreach ($name in 'openchronology-service', 'openchronology-syslog-service', 'openchronology-mail-service') {
+foreach ($name in 'openchronology-service', 'openchronology-syslog-service', 'openchronology-github-service', 'openchronology-mail-service') {
   Copy-Item $winsw "$stage\service\$name.exe"
   Copy-Item "$here\$name.xml" "$stage\service\"
 }
 Copy-Item "$here\setup.ps1", "$here\remove.ps1", "$here\*.cmd" "$stage\"
 New-Item -ItemType Directory -Force -Path "$stage\templates" | Out-Null
-foreach ($name in 'openchronology.env', 'syslog.env') {
+foreach ($name in 'openchronology.env', 'syslog.env', 'github.env') {
   # Windows paths for the Linux packages' templates.
   (Get-Content "$repo\deploy\debian-server\$name" -Raw) `
     -replace '/etc/openchronology', 'C:\ProgramData\OpenChronology' `
+    -replace '/var/lib/openchronology-github', 'C:\ProgramData\OpenChronology\github-state' `
     -replace 'sudo systemctl restart openchronology', 'Restart-Service OpenChronology' `
     -replace 'sudo systemctl enable --now openchronology-syslog', 'Set-Service OpenChronologySyslog -StartupType Automatic; Start-Service OpenChronologySyslog' `
+    -replace 'sudo systemctl enable --now openchronology-github', 'Set-Service OpenChronologyGitHub -StartupType Automatic; Start-Service OpenChronologyGitHub' `
     -replace 'sudo systemctl enable --now openchronology-mail', 'Set-Service OpenChronologyMail -StartupType Automatic; Start-Service OpenChronologyMail' `
     -replace 'sudo openchronology-', 'openchronology-' |
     Set-Content -Encoding utf8NoBOM "$stage\templates\$name.example"

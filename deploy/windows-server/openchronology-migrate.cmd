@@ -1,7 +1,8 @@
 @echo off
 rem Copyright (c) 2026 Athan Clark. SPDX-License-Identifier: GPL-3.0-only
 rem Brings the OpenChronology database up to this version's schema, then restarts the server,
-rem and the mail worker and the syslog receiver, each when it starts with Windows (#371, #374).
+rem and the mail worker and the syslog and GitHub receivers, each when it starts with Windows
+rem (#371, #374).
 rem --no-restart restarts nothing.
 rem Run as an administrator. Usage: openchronology-migrate [--no-restart]
 setlocal
@@ -15,4 +16,4 @@ if not exist "%OCH_CONFIG%" (
 if /i "%~1"=="--no-restart" exit /b 0
 powershell -NoProfile -Command "Restart-Service OpenChronology -Force" || exit /b 1
 echo OpenChronology restarted.
-powershell -NoProfile -Command "foreach ($w in @(@('OpenChronologyMail', 'mail worker'), @('OpenChronologySyslog', 'syslog receiver'))) { $s = Get-Service $w[0] -ErrorAction SilentlyContinue; if ($s -and $s.StartType -eq 'Automatic') { Restart-Service $w[0] -Force; Write-Host ('OpenChronology ' + $w[1] + ' restarted.') } }"
+powershell -NoProfile -Command "foreach ($w in @(@('OpenChronologyMail', 'mail worker'), @('OpenChronologySyslog', 'syslog receiver'), @('OpenChronologyGitHub', 'GitHub receiver'))) { $s = Get-Service $w[0] -ErrorAction SilentlyContinue; if ($s -and $s.StartType -eq 'Automatic') { Restart-Service $w[0] -Force; Write-Host ('OpenChronology ' + $w[1] + ' restarted.') } }"

@@ -58,13 +58,15 @@ freebsd_paths() {
     -e 's|sudo systemctl restart openchronology|service openchronology restart|g' \
     -e 's|systemctl enable --now openchronology-\([a-z]*\)|sysrc openchronology_\1_enable=YES \&\& service openchronology_\1 start|g' \
     -e 's|postgresql:///openchronology?host=/var/run/postgresql|postgresql://openchronology@/openchronology?host=/tmp|' \
+    -e 's|/var/lib/openchronology-github|/var/db/openchronology-github|g' \
     -e 's|README.Debian|README.FreeBSD|g' "$@"
 }
 mkdir -p "$ROOT/share/openchronology"
 freebsd_paths "$SHARED/openchronology.env" >"$ROOT/share/openchronology/openchronology.env.example"
 freebsd_paths "$SHARED/syslog.env" >"$ROOT/share/openchronology/syslog.env.example"
+freebsd_paths "$SHARED/github.env" >"$ROOT/share/openchronology/github.env.example"
 mkdir -p "$ROOT/etc/rc.d" "$ROOT/sbin" "$ROOT/bin"
-for service in openchronology openchronology_mail openchronology_syslog; do
+for service in openchronology openchronology_mail openchronology_syslog openchronology_github; do
   install -m 0755 "$HERE/$service.rc" "$ROOT/etc/rc.d/$service"
 done
 sed "s/@PG_MAJOR@/$PG_MAJOR/g" "$HERE/openchronology-setup" >"$ROOT/sbin/openchronology-setup"
@@ -75,6 +77,9 @@ install -m 0755 "$HERE/openchronology-reset-admin-password" \
 freebsd_paths "$SHARED/och-import-logs" |
   sed 's|"\$APP/node/bin/node"|/usr/local/bin/node|g' >"$ROOT/bin/och-import-logs"
 chmod 0755 "$ROOT/bin/och-import-logs"
+freebsd_paths "$SHARED/och-import-github" |
+  sed 's|"\$APP/node/bin/node"|/usr/local/bin/node|g' >"$ROOT/bin/och-import-github"
+chmod 0755 "$ROOT/bin/och-import-github"
 find "$STAGE" -type d -exec chmod 0755 {} +
 
 # The package: its manifest, scripts and file list.

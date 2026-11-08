@@ -70,7 +70,8 @@ COPY --from=native /build/rust-dependencies /out/native/rust-dependencies
 COPY deploy/homebrew/cargo-config.toml /out/native/.cargo/config.toml
 # The Homebrew formula's commands and configuration templates (deploy/homebrew).
 COPY deploy/homebrew /out/homebrew
-COPY deploy/debian-server/openchronology.env deploy/debian-server/syslog.env /out/homebrew/
+COPY deploy/debian-server/openchronology.env deploy/debian-server/syslog.env \
+    deploy/debian-server/github.env /out/homebrew/
 RUN rm -rf /out/lib/openchronology/node_modules/@img /out/homebrew/cargo-config.toml \
     /out/homebrew/*.rb.in /out/homebrew/tap-README.md /out/homebrew/README.md \
     && tar -C /out -czf /openchronology-server-platform.tar.gz lib doc native homebrew
