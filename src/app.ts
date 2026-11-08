@@ -96,6 +96,7 @@ import {
   UNIT_PRESETS,
   CUSTOM_EXAMPLE,
   anchorOf,
+  isOngoing,
   resolveDuration,
   validateDuration,
   durationPlugins,
@@ -1276,6 +1277,11 @@ for (const type of ['wheel', 'pointermove', 'touchmove', 'keydown', 'click'] as 
     },
     { capture: true, passive: true },
   );
+// An ongoing duration ends at "now" (#537): a view that shows one is redrawn as time passes,
+// every 15 seconds while the page is visible.
+setInterval(() => {
+  if (!document.hidden && frame.durations?.some((band) => isOngoing(band.end))) requestRender();
+}, 15000);
 let pendingFrameRefresh = false;
 function requestRender(refreshFrame = true) {
   pendingFrameRefresh ||= refreshFrame;
@@ -8920,6 +8926,7 @@ function renderDurationPluginFields() {
 function endpointTime(duration: Duration, which: 'start' | 'end'): Q | null {
   const endpoint = duration[which];
   if (typeof endpoint === 'string') return Q.parse(endpoint);
+  if (isOngoing(endpoint)) return model?.now() ?? null;
   const time = model?.momentTime(endpoint.moment);
   if (time) return Q.parse(time);
   const band = frame.durations?.find((b) => b.id === duration.id);
@@ -8940,16 +8947,19 @@ function endpointEditor(which: 'start' | 'end') {
   legend.textContent = which === 'start' ? 'Start' : 'End';
   const mode = document.createElement('select');
   mode.setAttribute('aria-label', `${legend.textContent} kind`);
+  // An end may be ongoing (#537) where the timeline has a "now": the Gregorian display.
+  const ongoing = which === 'end' && (isOngoing(endpoint) || !!model?.now());
   for (const [value, label] of [
     ['time', 'Fixed time'],
     ['moment', 'Follows a moment'],
+    ...(ongoing ? [['ongoing', 'Ongoing (until now)']] : []),
   ]) {
     const option = document.createElement('option');
     option.value = value;
     option.textContent = label;
     mode.append(option);
   }
-  mode.value = typeof endpoint === 'string' ? 'time' : 'moment';
+  mode.value = typeof endpoint === 'string' ? 'time' : isOngoing(endpoint) ? 'ongoing' : 'moment';
   mode.disabled = !durationEditable();
   box.append(legend, mode);
   const setEndpoint = (next: DurationEndpoint) => {
@@ -8985,6 +8995,14 @@ function endpointEditor(which: 'start' | 'end') {
       apply: (time) => setEndpoint(time.toString()),
     });
     box.append(field);
+  } else if (isOngoing(endpoint)) {
+    const now = model?.now();
+    const summary = document.createElement('p');
+    summary.className = 'duration-anchor';
+    summary.textContent = now
+      ? 'Ongoing · now ' + presented(now)
+      : 'Ongoing · this timeline has no current time';
+    box.append(summary);
   } else {
     const anchored = model?.byId.get(endpoint.moment);
     const time = endpointTime(current.duration, which);
@@ -9012,7 +9030,7 @@ function endpointEditor(which: 'start' | 'end') {
   }
   const follow = (cancelled?: () => void) =>
     pickMoment((moment) => setEndpoint({ moment: moment.id }), cancelled);
-  if (typeof endpoint !== 'string' && durationEditable()) {
+  if (typeof endpoint === 'object' && 'moment' in endpoint && durationEditable()) {
     const choose = document.createElement('button');
     choose.type = 'button';
     choose.textContent = 'Choose another moment…';
@@ -9023,9 +9041,9 @@ function endpointEditor(which: 'start' | 'end') {
     if (mode.value === 'time') {
       const time = endpointTime(openDuration!.duration, which) ?? viewMiddle();
       setEndpoint(time.toString());
-    } else
-      // Following needs a moment: choose one now, or stay fixed.
-      follow(() => (mode.value = 'time'));
+    } else if (mode.value === 'ongoing') setEndpoint({ ongoing: true });
+    // Following needs a moment: choose one now, or keep the endpoint as it was.
+    else follow(() => (mode.value = typeof endpoint === 'string' ? 'time' : 'ongoing'));
   };
   return box;
 }
@@ -11269,6 +11287,12 @@ function renderDurationBands() {
     button.style.width = Math.max(6, (right - left) / uiScale) + 'px';
     // Below the axis's tick labels, which they would otherwise hide (#228).
     button.style.top = top(band.sourceKey, row);
+    // An ongoing duration's end is now (#537): where that is in view, the band fades out
+    // there rather than reading as having ended.
+    button.classList.toggle(
+      'ongoing',
+      isOngoing(band.end) && viewport.x(parsedTime(band.last), width()) <= width(),
+    );
     // What a band says changes with its content, not as the view moves (#68).
     const content = `${contentGeneration()}\u0000${band.first}\u0000${band.last}\u0000${members.length}`;
     if (bandContent.get(button) === content) continue;
@@ -11292,7 +11316,7 @@ function renderDurationBands() {
       ' · ' +
       presented(parsedTime(band.first)) +
       ' → ' +
-      presented(parsedTime(band.last));
+      (isOngoing(band.end) ? 'now' : presented(parsedTime(band.last)));
     hoverPreview.update(button, plugins, band.metadata, 1n, 'Untitled duration');
   }
   for (const [key, button] of durationButtons)

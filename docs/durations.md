@@ -6,6 +6,7 @@ A duration is a timeline entity in its own right, with an ID, a start, an end, a
 
 - **A fixed time**, an exact rational coordinate stored with the duration.
 - **A moment anchor**, which follows a moment's time. Moving that moment moves the endpoint.
+- **Ongoing** (an end only): the current time, for something still in progress, such as an open issue or "2022–present". See [Ongoing durations](#ongoing-durations).
 
 Endpoints can be mixed: a duration can start at a moment and end at a fixed time. Reversed endpoints still render the interval between them, and zero-length durations are allowed.
 
@@ -34,6 +35,16 @@ Durations are a top-level `durations` array in version-1 documents. A time endpo
 ```
 
 Duration IDs use the same ASCII alphabet as moment IDs, are unique among durations, and export sorted by ID. Anchors must name existing root moments; stack entries cannot be anchors. The `durations` metadata key stays reserved, and durations cannot contain durations.
+
+### Ongoing durations
+
+An end of `{"ongoing": true}` is the current time: the band runs up to now and keeps growing while the timeline is open, redrawn every 15 seconds. Its end fades out where "now" is in view, and its time reads as "… – now". When it is finished, set the end to a fixed time or a moment in the duration dialog (**End** → **Fixed time**), or choose **Ongoing (until now)** there to start one.
+
+- Only timelines with the **Gregorian** time display have a "now": their coordinates are Unix seconds × scale + origin. Other timelines refuse ongoing durations.
+- A start cannot be ongoing. An ongoing duration whose start is still in the future is a point at its start until then.
+- "Now" is not uncertainty: an end that happened at an unknown time is a different question.
+- The interval trees cannot hold a time that moves, so they hold an ongoing duration as a point at its start. A window's ongoing durations are resolved at the current time, then ranked, counted and summarized with the rest (#537).
+- The server cannot save ongoing durations yet, so for now they work in files and in the browser. The server's queries come in a later stage of #537, and the SQLite store's after that.
 
 ### Earlier linked durations
 

@@ -2954,6 +2954,11 @@ dialog button {
   line-height: 14px;
 }
 /* A band standing for several nearly identical spans (#316) is outlined twice. */
+/* An ongoing duration (#537) runs until now: its end fades out instead of stopping. */
+.duration-band.ongoing {
+  -webkit-mask-image: linear-gradient(to right, #000 calc(100% - 18px), transparent);
+  mask-image: linear-gradient(to right, #000 calc(100% - 18px), transparent);
+}
 .duration-band[data-grouped]:not([data-grouped='1']) {
   box-shadow: 0 0 0 1px var(--timeline-duration, var(--stage-duration));
 }

@@ -1,7 +1,7 @@
 // Copyright (c) 2026 Athan Clark. SPDX-License-Identifier: GPL-3.0-only
 // The dashboard and pull requests in the editor: lists of timelines (yours, starred and public),
 // stars, forks and comparisons, and reviewing, discussing and merging pull requests.
-import { durationsMovedWith, printEntityTime, validateDocument } from './core.js';
+import { anchorOf, durationsMovedWith, printEntityTime, validateDocument } from './core.js';
 import { describeLabels } from './content-labels.js';
 import { markdownText } from './rich-text.js';
 import { changeText, exactTimeText, movedDurationsText } from './wording.js';
@@ -162,11 +162,7 @@ function summarize(base: TimelineDocument, after: TimelineDocument): ProposalCha
       change: 'moved',
       before: d,
       after: d,
-      movedWith: [
-        ...new Set(
-          [d.start, d.end].flatMap((end) => (typeof end === 'object' ? [end.moment] : [])),
-        ),
-      ]
+      movedWith: [...new Set([d.start, d.end].flatMap((end) => anchorOf(end) ?? []))]
         .filter((id) => moved.has(id))
         .map((id) => {
           const e = titles.get(id);

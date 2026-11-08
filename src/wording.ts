@@ -33,7 +33,7 @@ export function longBackgroundsText(count: number, limit: number): string {
 }
 
 /** A time as stored: exact, or a duration's end anchored to a moment. */
-type StoredTime = string | { moment: string };
+type StoredTime = string | { moment: string } | { ongoing: true };
 /** A moment or duration as a pull request's summary of changes gives it. */
 interface ChangedEntity {
   id?: string;
@@ -63,7 +63,7 @@ const changed = (before: string | null, after: string | null) =>
 /** An entity's exact time: a moment's, or a duration's start – end. */
 function exactTime(entity: ChangedEntity): string {
   const one = (time: StoredTime | undefined) =>
-    typeof time === 'object' ? `moment ${time.moment}` : String(time);
+    typeof time !== 'object' ? String(time) : 'moment' in time ? `moment ${time.moment}` : 'now';
   return entity.time !== undefined ? entity.time : `${one(entity.start)} – ${one(entity.end)}`;
 }
 /**
