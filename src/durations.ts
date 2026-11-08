@@ -6,8 +6,11 @@ import { contentLabels, CONTENT_LABELS_KEY } from './content-labels.js';
 import type { PointEvent, Metadata } from './core.js';
 import { normalizeEntityTags } from './tags.js';
 import { entryLimitText, withinEntryLimit } from './entry-limit.js';
-/** An endpoint is an exact time, or an anchor that follows a moment's time. */
-export type DurationEndpoint = string | { moment: string };
+/**
+ * An endpoint is an exact time, an anchor that follows a moment's time, or (an end only) the
+ * current time, while the duration is ongoing (#537).
+ */
+export type DurationEndpoint = string | { moment: string } | { ongoing: true };
 export interface Duration {
   id: string;
   start: DurationEndpoint;
@@ -24,7 +27,11 @@ export interface DurationBand extends Duration {
 const identifier = (v: unknown): v is string =>
   typeof v === 'string' && /^[A-Za-z0-9_.:-]{1,128}$/.test(v);
 export function anchorOf(endpoint: DurationEndpoint): string | null {
-  return typeof endpoint === 'string' ? null : endpoint.moment;
+  return typeof endpoint === 'object' && 'moment' in endpoint ? endpoint.moment : null;
+}
+/** Whether an endpoint is the current time: the end of a duration still in progress (#537). */
+export function isOngoing(endpoint: DurationEndpoint): endpoint is { ongoing: true } {
+  return typeof endpoint === 'object' && 'ongoing' in endpoint;
 }
 /**
  * The durations `after` holds unchanged from `before` (the same JSON) whose start or end is
@@ -47,8 +54,17 @@ export function durationsMovedWith(
     )
     .sort((a, b) => (a.id < b.id ? -1 : a.id > b.id ? 1 : 0));
 }
-function endpoint(value: unknown, parse: (text: string) => Q): DurationEndpoint {
+function endpoint(value: unknown, parse: (text: string) => Q, end = false): DurationEndpoint {
   if (typeof value === 'string') return parse(value).toString();
+  if (
+    end &&
+    value &&
+    typeof value === 'object' &&
+    !Array.isArray(value) &&
+    Object.keys(value).length === 1 &&
+    (value as { ongoing?: unknown }).ongoing === true
+  )
+    return { ongoing: true };
   if (
     value &&
     typeof value === 'object' &&
@@ -57,7 +73,11 @@ function endpoint(value: unknown, parse: (text: string) => Q): DurationEndpoint 
     identifier((value as { moment?: unknown }).moment)
   )
     return { moment: (value as { moment: string }).moment };
-  throw new Error('A duration endpoint is an exact time or {"moment": "<moment id>"}.');
+  throw new Error(
+    end
+      ? 'A duration end is an exact time, {"moment": "<moment id>"} or {"ongoing": true}.'
+      : 'A duration start is an exact time or {"moment": "<moment id>"}.',
+  );
 }
 function durationMetadata(value: unknown): Metadata {
   if (!value || typeof value !== 'object' || Array.isArray(value))
@@ -78,7 +98,7 @@ export function validateDuration(value: unknown, parse: (text: string) => Q): Du
   return {
     id: d.id,
     start: endpoint(d.start, parse),
-    end: endpoint(d.end, parse),
+    end: endpoint(d.end, parse, true),
     metadata: durationMetadata(d.metadata ?? {}),
   };
 }
@@ -139,15 +159,24 @@ export function convertLegacyDurations(events: PointEvent[]): {
   });
   return { events: converted, durations };
 }
-/** Resolves both endpoints; an anchor to an unknown moment cannot be placed. */
+/**
+ * Resolves both endpoints; an anchor to an unknown moment cannot be placed. An ongoing end is
+ * `now`, but never before the start: a duration starting later is a point at its start until
+ * then. Without `now` it is that point too, the placeholder the interval trees hold (#537).
+ */
 export function resolveDuration(
   duration: Duration,
   timeOf: (moment: string) => string | undefined,
+  now?: Q,
 ): DurationBand | null {
-  const time = (e: DurationEndpoint) => (typeof e === 'string' ? e : timeOf(e.moment));
-  const startTime = time(duration.start),
-    endTime = time(duration.end);
-  if (startTime === undefined || endTime === undefined) return null;
+  const time = (e: DurationEndpoint) =>
+    typeof e === 'string' ? e : 'moment' in e ? timeOf(e.moment) : undefined;
+  const startTime = time(duration.start);
+  if (startTime === undefined) return null;
+  let endTime = time(duration.end);
+  if (isOngoing(duration.end))
+    endTime = now && now.compare(Q.parse(startTime)) > 0 ? now.toString() : startTime;
+  if (endTime === undefined) return null;
   const ordered = Q.parse(startTime).compare(Q.parse(endTime)) <= 0;
   return {
     ...duration,
@@ -168,8 +197,9 @@ export function fixMissingAnchors(
 ): Duration[] {
   return durations.map((duration) => {
     const fix = (e: DurationEndpoint): DurationEndpoint => {
-      if (typeof e === 'string' || exists(e.moment)) return e;
-      const time = lastTime(e.moment);
+      const anchor = anchorOf(e);
+      if (anchor === null || exists(anchor)) return e;
+      const time = lastTime(anchor);
       if (time === undefined) throw new Error('Duration anchors must name existing moments.');
       return time;
     };
@@ -388,6 +418,78 @@ export function durationWindow(
         ...(count > DURATION_COUNT_CAP ? { durationsTotalMore: true } : {}),
       }
     : { durations, durationsTruncated: false };
+}
+/**
+ * A window of the interval tree joined with the ongoing durations, resolved at "now" (#537).
+ * The trees hold an ongoing duration only as a placeholder, a point at its start, since "now"
+ * cannot be stored; `window` must leave those out, and `ongoing` holds them resolved. The
+ * result is what durationWindow would give if the tree held them: those touching
+ * [lower, upper] and at least `threshold` long count, and the longest `limit` are kept.
+ */
+export function withOngoing(
+  window: ReturnType<typeof durationWindow>,
+  ongoing: readonly DurationBand[],
+  lower: Q,
+  upper: Q,
+  limit = 256,
+  threshold: Q | null = null,
+): ReturnType<typeof durationWindow> {
+  const extent = (band: DurationBand) => Q.parse(band.last).sub(Q.parse(band.first));
+  const matches = ongoing.filter(
+    (band) =>
+      Q.parse(band.first).compare(upper) <= 0 &&
+      Q.parse(band.last).compare(lower) >= 0 &&
+      (threshold === null || extent(band).compare(threshold) >= 0),
+  );
+  if (!matches.length) return window;
+  const fromTree = 'durationsTotal' in window ? window.durationsTotal : window.durations.length,
+    count = fromTree + matches.length,
+    more = 'durationsTotalMore' in window || count > DURATION_COUNT_CAP;
+  let durations = [
+    ...window.durations,
+    ...matches.map((band) => ({ ...band, metadata: durationOverview(band.metadata) })),
+  ];
+  if (durations.length > limit)
+    // The longest first, then by start and ID, as durationWindow keeps them.
+    durations = durations
+      .sort(
+        (a, b) =>
+          extent(b).compare(extent(a)) ||
+          Q.parse(a.first).compare(Q.parse(b.first)) ||
+          (a.id < b.id ? -1 : a.id > b.id ? 1 : 0),
+      )
+      .slice(0, limit);
+  durations.sort((a, b) => Q.parse(a.first).compare(Q.parse(b.first)) || (a.id < b.id ? -1 : 1));
+  return count > limit
+    ? {
+        durations,
+        durationsTruncated: true,
+        durationsTotal: Math.min(count, DURATION_COUNT_CAP),
+        ...(more ? { durationsTotalMore: true } : {}),
+      }
+    : { durations, durationsTruncated: false };
+}
+/**
+ * The ongoing durations (resolved, see withOngoing) that collapse below `threshold` and touch
+ * [lower, upper], added to a window's summaries in start order (#537).
+ */
+export function summariesWithOngoing(
+  summaries: DurationSummary[],
+  ongoing: readonly DurationBand[],
+  lower: Q,
+  upper: Q,
+  threshold: Q,
+): DurationSummary[] {
+  const added = ongoing
+    .filter(
+      (band) =>
+        Q.parse(band.first).compare(upper) <= 0 &&
+        Q.parse(band.last).compare(lower) >= 0 &&
+        collapses(band, threshold),
+    )
+    .map((band) => ({ first: band.first, last: band.last, count: 1, band }));
+  if (!added.length) return summaries;
+  return [...summaries, ...added].sort((a, b) => Q.parse(a.first).compare(Q.parse(b.first)));
 }
 /** "1,234" or, at the cap with more beyond it, "10,000+". */
 export function durationCountText(total: number, more = false) {

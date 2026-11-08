@@ -650,7 +650,7 @@ export function localEvents(
  * and qualifies the moment's ID with the source key, as mapFrame does for the moment itself.
  */
 function mapEndpoint(track: Track, endpoint: DurationEndpoint): DurationEndpoint {
-  return typeof endpoint === 'string'
-    ? Q.parse(endpoint).mul(track.scale).add(track.offset).toString()
-    : { moment: track.source.key + ':' + endpoint.moment };
+  if (typeof endpoint === 'string')
+    return Q.parse(endpoint).mul(track.scale).add(track.offset).toString();
+  return 'moment' in endpoint ? { moment: track.source.key + ':' + endpoint.moment } : endpoint;
 }

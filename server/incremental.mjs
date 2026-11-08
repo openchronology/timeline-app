@@ -14,6 +14,7 @@ import {
   validateDocument,
   validateDuration,
   resolveDuration,
+  isOngoing,
   relationshipKey,
   refKey,
   searchRows,
@@ -184,6 +185,8 @@ export async function applyIncrementally(c, t, patch) {
         fail(error.message);
       }
       if (duration.id !== change.id) fail('Changed duration ID mismatch.');
+      // Its trees cannot place an end that moves with the clock yet (#537).
+      if (isOngoing(duration.end)) fail('This server cannot save ongoing durations yet (#537).');
       durationChanges.set(change.id, duration);
     }
   }

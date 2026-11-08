@@ -9,6 +9,7 @@ import {
   pluginMetadata,
   validateDocument,
   durationTree,
+  isOngoing,
   OVERVIEW_URL_LIMIT,
   fixMissingAnchors,
   coalesceGroups,
@@ -2683,6 +2684,9 @@ async function writeNodes(client, table, id, tree) {
  * duration may be anchored to a moment's time) before the tree is built.
  */
 async function writeDurationNodes(client, table, id, document) {
+  // Its trees cannot place an end that moves with the clock yet (#537).
+  if ((document.durations ?? []).some((d) => isOngoing(d.end)))
+    throw new HttpError(400, 'This server cannot save ongoing durations yet (#537).');
   const times = new Map(document.events.map((e) => [e.id, e.time]));
   return writeIntervalNodes(
     client,

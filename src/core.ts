@@ -10,6 +10,11 @@ import {
   durationTree,
   durationWindow,
   durationSummaries,
+  anchorOf,
+  isOngoing,
+  resolveDuration,
+  withOngoing,
+  summariesWithOngoing,
 } from './durations.js';
 import type { Duration, DurationBand, DurationEndpoint, IntervalNode } from './durations.js';
 import { durationGroups, coalesceGroups } from './summaries.js';
@@ -63,6 +68,9 @@ export {
   durationCountText,
   durationsMovedWith,
   DURATION_COUNT_CAP,
+  isOngoing,
+  withOngoing,
+  summariesWithOngoing,
 } from './durations.js';
 export {
   DEFAULT_ENTRY_LIMIT,
@@ -109,10 +117,11 @@ export * from './drafts.js';
 export { stackWindow, scaleTimeline } from './stack-layout.js';
 import { parseTimestamp } from './calendar.js';
 import { parseDecimal } from './numeric.js';
-import { validatePresentation } from './presentation.js';
+import { nowCoordinate, validatePresentation } from './presentation.js';
 import type { TimePresentation } from './presentation.js';
 export {
   createPresenter,
+  nowCoordinate,
   printTimeSpan,
   printEntityTime,
   validatePresentation,
@@ -374,6 +383,14 @@ export function validateDocument(value: unknown, partial = false): TimelineDocum
     partial ? null : ids,
     parseTime,
   ).sort((a, b) => (a.id < b.id ? -1 : a.id > b.id ? 1 : 0));
+  // "Now" exists only where coordinates are calendar time (#537); a partial save carries no
+  // settings, and its timeline's were checked when they were saved.
+  if (
+    !partial &&
+    durations.some((d) => isOngoing(d.end)) &&
+    (doc.presentation as { mode?: unknown } | undefined)?.mode !== 'gregorian'
+  )
+    throw new Error('Only timelines with the Gregorian time display can have ongoing durations.');
   const durationIds = new Set(durations.map((d) => d.id));
   const relationships = validateRelationships(
     doc.relationships,
@@ -407,7 +424,11 @@ function asArray(value: unknown): unknown[] {
 export class TimelineIndex {
   readonly points = new RationalMap<readonly PointEvent[]>((bucket) => BigInt(bucket.length));
   private intervals: IntervalNode | null = null;
+  /** Ongoing durations (#537): the tree leaves them out, and frames resolve them at "now". */
+  private ongoing: Duration[] = [];
   private intervalDirty = true;
+  /** The current time in milliseconds since the Unix epoch, replaceable in tests. */
+  clock: () => number = () => Date.now();
   private edges: IntervalNode | null = null;
   private graph: Map<string, Set<string>> | null = null;
   /** Links by canonical key. Links to deleted entities stay until saved, so undo restores them. */
@@ -525,9 +546,7 @@ export class TimelineIndex {
   /** Durations whose start or end follows this moment. */
   anchoredTo(moment: string): Duration[] {
     return [...this.durations.values()].filter(
-      (d) =>
-        (typeof d.start !== 'string' && d.start.moment === moment) ||
-        (typeof d.end !== 'string' && d.end.moment === moment),
+      (d) => anchorOf(d.start) === moment || anchorOf(d.end) === moment,
     );
   }
   protected durationList(): Duration[] {
@@ -543,7 +562,7 @@ export class TimelineIndex {
    * they are, rather than rebuilding them at every edit (#68).
    */
   private anchored(id: string): boolean {
-    const names = (end: DurationEndpoint) => typeof end !== 'string' && end.moment === id;
+    const names = (end: DurationEndpoint) => anchorOf(end) === id;
     for (const duration of this.durations.values())
       if (names(duration.start) || names(duration.end)) return true;
     for (const link of this.relationships.values())
@@ -701,7 +720,12 @@ export class TimelineIndex {
   }
   frame(viewport: Viewport, width: number, pixels = 24): Frame {
     if (this.intervalDirty) {
-      this.intervals = durationTree(this.durations.values(), (id) => this.momentTime(id));
+      const all = [...this.durations.values()];
+      this.ongoing = all.filter((d) => isOngoing(d.end));
+      this.intervals = durationTree(
+        all.filter((d) => !isOngoing(d.end)),
+        (id) => this.momentTime(id),
+      );
       const times = entityTimes(this.byId.values(), this.durations.values(), (id) =>
         this.momentTime(id),
       );
@@ -725,8 +749,19 @@ export class TimelineIndex {
       };
     });
     const arcs = durationWindow(this.edges, viewport.left, viewport.right, 256, collapsed);
+    const now = this.now(),
+      ongoing = now
+        ? this.ongoing.flatMap((d) => resolveDuration(d, (id) => this.momentTime(id), now) ?? [])
+        : [];
     return {
-      ...durationWindow(this.intervals, viewport.left, viewport.right, 256, collapsed),
+      ...withOngoing(
+        durationWindow(this.intervals, viewport.left, viewport.right, 256, collapsed),
+        ongoing,
+        viewport.left,
+        viewport.right,
+        256,
+        collapsed,
+      ),
       edges: arcs.durations.map(arcFromBand),
       edgesTruncated: arcs.durationsTruncated,
       visitedNodes: result.stats.visitedNodes,
@@ -735,13 +770,26 @@ export class TimelineIndex {
             [
               ...moments,
               ...durationGroups(
-                durationSummaries(this.intervals, viewport.left, viewport.right, collapsed),
+                summariesWithOngoing(
+                  durationSummaries(this.intervals, viewport.left, viewport.right, collapsed),
+                  ongoing,
+                  viewport.left,
+                  viewport.right,
+                  collapsed,
+                ),
               ),
             ],
             collapsed,
           )
         : moments,
     };
+  }
+  /**
+   * The current time as a stored coordinate, where the timeline has one: under the Gregorian
+   * display, whose coordinates are Unix seconds × scale + origin. Elsewhere null (#537).
+   */
+  now(): Q | null {
+    return nowCoordinate(this.presentation, this.clock());
   }
   eventsBetween(first: string, last: string, limit = 100): PointEvent[] {
     const result: PointEvent[] = [];

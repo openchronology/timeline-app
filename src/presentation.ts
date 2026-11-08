@@ -146,6 +146,20 @@ export function validatePresentation(value: unknown): TimePresentation {
  * span (rational coordinates as decimals); a custom script prints each end as it does for
  * inputs, and if it fails, the ends read as SI seconds, which stored times are.
  */
+/**
+ * The current time, `milliseconds` since the Unix epoch, as a stored coordinate: only the
+ * Gregorian display gives coordinates a calendar meaning (Unix seconds × scale + origin), so
+ * other timelines have no "now" and get null (#537).
+ */
+export function nowCoordinate(
+  settings: TimePresentation | undefined,
+  milliseconds: number,
+): Q | null {
+  if (settings?.mode !== 'gregorian') return null;
+  return Q.from(BigInt(Math.floor(milliseconds)), 1000n)
+    .mul(Q.parse(settings.scale))
+    .add(Q.parse(settings.origin));
+}
 export function printTimeSpan(settings: TimePresentation | undefined, first: Q, last: Q): string {
   const options = settings ? validatePresentation(settings) : DEFAULT_PRESENTATION;
   const both = (print: (time: Q) => string) => {
@@ -446,10 +460,11 @@ function relativeContext(
  * time the display cannot write reads as its exact coordinate. With no presenter (invalid
  * settings), every time is exact.
  */
+/** A duration's endpoint, as durations.ts defines it: a time, a moment's, or now (#537). */
+type EntityEndpoint = string | { moment: string } | { ongoing: true };
 export function printEntityTime(
   presenter: TimePresenter | null,
-  entity:
-    { time: string } | { start: string | { moment: string }; end: string | { moment: string } },
+  entity: { time: string } | { start: EntityEndpoint; end: EntityEndpoint },
   momentTime?: (id: string) => string | null | undefined,
 ): string {
   const exact = (time: string) => {
@@ -459,8 +474,9 @@ export function printEntityTime(
       return time;
     }
   };
-  const one = (time: string | { moment: string }) => {
+  const one = (time: EntityEndpoint) => {
     if (typeof time === 'string') return exact(time);
+    if ('ongoing' in time) return 'now';
     const resolved = momentTime ? momentTime(time.moment) : null;
     if (resolved === null) return `the time of moment ${time.moment}`;
     return resolved === undefined
