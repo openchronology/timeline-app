@@ -8,11 +8,11 @@
  *   GITHUB_ROUTES=./github-routes.json node server/github-receiver.mjs
  */
 import { createServer } from 'node:http';
-import { realpathSync } from 'node:fs';
+import { readFileSync, realpathSync, writeFileSync } from 'node:fs';
 import { pathToFileURL } from 'node:url';
 import { TimelineWriter, temporary } from './timeline-writer.mjs';
 import { deliveryChanges, loadRoutes, validSignature } from './github-source.mjs';
-import { keeps, projectStatusChange } from './github-events.mjs';
+import { StintTracker, keeps, projectStatusChange } from './github-events.mjs';
 import { loadConfiguration } from './env-file.mjs';
 import { relationshipKey } from '../dist/core.mjs';
 
@@ -28,11 +28,18 @@ class Pending {
   durations = new Map();
   moments = new Map();
   removed = new Set();
+  removedMoments = new Set();
   links = new Map();
   get size() {
-    return this.durations.size + this.moments.size + this.removed.size + this.links.size;
+    return (
+      this.durations.size +
+      this.moments.size +
+      this.removed.size +
+      this.removedMoments.size +
+      this.links.size
+    );
   }
-  add({ durations = [], moments = [], removed = [], links = [] }) {
+  add({ durations = [], moments = [], removed = [], removedMoments = [], links = [] }) {
     for (const d of durations) {
       this.removed.delete(d.id);
       this.durations.set(d.id, d);
@@ -41,8 +48,25 @@ class Pending {
       this.durations.delete(id);
       this.removed.add(id);
     }
-    for (const m of moments) this.moments.set(m.id, m);
+    for (const m of moments) {
+      this.removedMoments.delete(m.id);
+      this.moments.set(m.id, m);
+    }
+    for (const id of removedMoments) {
+      this.moments.delete(id);
+      this.removedMoments.add(id);
+    }
     for (const link of links) this.links.set(relationshipKey(link), link);
+  }
+  /** Its contents, as `add` takes them. */
+  get changes() {
+    return {
+      durations: [...this.durations.values()],
+      moments: [...this.moments.values()],
+      removed: [...this.removed],
+      removedMoments: [...this.removedMoments],
+      links: [...this.links.values()],
+    };
   }
 }
 
@@ -60,6 +84,7 @@ export class GithubIngest {
    * @param {string} [options.token] a GitHub token, to name the issues of project status
    *   changes (deliveries give node IDs only); without one those are not recorded
    * @param {string} [options.githubApi] GitHub's API origin (GitHub Enterprise)
+   * @param {StintTracker} [options.stints] each item's open column stints (see github-events.mjs)
    */
   constructor({
     api,
@@ -71,6 +96,7 @@ export class GithubIngest {
     log = console,
     token,
     githubApi = 'https://api.github.com',
+    stints = new StintTracker(),
   }) {
     if (!secret) throw new Error('GITHUB_WEBHOOK_SECRET must be the webhook’s secret.');
     this.writer = new TimelineWriter({ api, key, fetcher });
@@ -80,6 +106,7 @@ export class GithubIngest {
     this.token = token;
     this.githubApi = githubApi;
     this.resolving = new Set();
+    this.stints = stints;
     this.flushMs = flushMs;
     this.log = log;
     this.pending = new Map();
@@ -127,7 +154,13 @@ export class GithubIngest {
       }
       const resolving = projectStatusChange(payload, this.token, this.fetcher, this.githubApi)
         .then((change) => {
-          if (!change || !this.queue(change)) this.stats.ignored++;
+          if (!change) return void this.stats.ignored++;
+          // The time in the column it left ends, and the one in the column it entered starts.
+          const { move, ...moment } = change;
+          const durations = keeps(this.routes.kinds, 'in column')
+            ? this.stints.move(change.repository, move.item, move)
+            : [];
+          if (!this.queue({ ...moment, durations })) this.stats.ignored++;
         })
         .catch((error) => this.log.error('github: a project status change:', error.message))
         .finally(() => this.resolving.delete(resolving));
@@ -137,6 +170,23 @@ export class GithubIngest {
     let queued = false;
     for (const change of deliveryChanges(event, payload, this.routes.kinds))
       queued = this.queue(change) || queued;
+    // A closed item's time in its board's columns ends when it closed.
+    const item = payload.issue ?? payload.pull_request;
+    if (
+      payload.action === 'closed' &&
+      item?.number &&
+      payload.repository?.full_name &&
+      keeps(this.routes.kinds, 'in column')
+    ) {
+      const ended = this.stints.close(
+        payload.repository.full_name,
+        item,
+        (item.merged ? item.merged_at : item.closed_at) ?? item.updated_at,
+      );
+      if (ended.length)
+        queued =
+          this.queue({ repository: payload.repository.full_name, durations: ended }) || queued;
+    }
     if (!queued) {
       this.stats.ignored++;
       return 204;
@@ -175,13 +225,9 @@ export class GithubIngest {
     if (!queue?.size) return;
     this.pending.delete(timeline);
     const run = (async () => {
-      const entities = {
-        moments: [...queue.moments.values()],
-        durations: [...queue.durations.values()],
-        removed: [...queue.removed],
-      };
+      const { links: _, ...entities } = queue.changes;
       try {
-        if (entities.moments.length || entities.durations.length || entities.removed.length)
+        if (Object.values(entities).some((list) => list.length))
           await this.writer.send(timeline, entities);
         this.stats.saved += entities.moments.length + entities.durations.length;
       } catch (error) {
@@ -219,18 +265,8 @@ export class GithubIngest {
     // Newer changes queued meanwhile win over these.
     const newer = this.pending.get(timeline) ?? new Pending();
     const merged = new Pending();
-    merged.add({
-      durations: [...queue.durations.values()],
-      moments: [...queue.moments.values()],
-      removed: [...queue.removed],
-      links: [...queue.links.values()],
-    });
-    merged.add({
-      durations: [...newer.durations.values()],
-      moments: [...newer.moments.values()],
-      removed: [...newer.removed],
-      links: [...newer.links.values()],
-    });
+    merged.add(queue.changes);
+    merged.add(newer.changes);
     this.pending.set(timeline, merged);
     const wait = Math.min(60000, Math.max(1000, Number(error.retryAfter) * 1000 || 5000));
     this.schedule(timeline, wait);
@@ -308,6 +344,17 @@ export async function main(env = process.env) {
     flushMs: env.GITHUB_FLUSH_MS ? Number(env.GITHUB_FLUSH_MS) : undefined,
     token: env.GITHUB_TOKEN || undefined,
     githubApi: env.GITHUB_API_URL || undefined,
+    // Open column stints survive a restart when GITHUB_STATE names a file for them.
+    stints: new StintTracker(env.GITHUB_STATE || undefined, {
+      read: (file) => {
+        try {
+          return JSON.parse(readFileSync(file, 'utf8'));
+        } catch {
+          return {};
+        }
+      },
+      write: (file, value) => writeFileSync(file, JSON.stringify(value)),
+    }),
   });
   await ingest.check();
   const listening = await listenGithub(ingest, {

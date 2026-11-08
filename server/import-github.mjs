@@ -24,7 +24,16 @@ import {
   loadRoutes,
   repositoryName,
 } from './github-source.mjs';
-import { EVENT_KINDS, eventKinds, timelineEvent } from './github-events.mjs';
+import {
+  EVENT_KINDS,
+  eventKinds,
+  keeps,
+  milestoneChanges,
+  moveOf,
+  releaseMoment,
+  stintsFromMoves,
+  timelineEvent,
+} from './github-events.mjs';
 import { relationshipKey } from '../dist/core.mjs';
 import { loadConfiguration } from './env-file.mjs';
 
@@ -118,12 +127,16 @@ export async function readRepository(reader, repository, { since, kinds = eventK
     numbers.set(item.number, item);
   }
   const moments = [],
+    removedMoments = [],
     links = [];
   if (kinds.size)
-    for (const item of numbers.values())
+    for (const item of numbers.values()) {
+      const moves = [];
       for await (const event of reader.list(
         `/repos/${repository}/issues/${item.number}/timeline`,
       )) {
+        const move = moveOf(event);
+        if (move) moves.push(move);
         const time = event.created_at ?? event.submitted_at;
         if (since && time && Date.parse(time) < Date.parse(since)) continue;
         const changes = timelineEvent(repository, item, event, kinds);
@@ -131,6 +144,27 @@ export async function readRepository(reader, repository, { since, kinds = eventK
         moments.push(...changes.moments);
         links.push(...changes.links);
       }
+      // Its time in each board column, from all its moves (not only those since `since`).
+      if (moves.length && keeps(kinds, 'in column'))
+        durations.push(...stintsFromMoves(repository, item, moves));
+    }
+  // The repository's releases and milestones.
+  if (keeps(kinds, 'released'))
+    for await (const release of reader.list(`/repos/${repository}/releases`)) {
+      const moment = releaseMoment(repository, release);
+      if (moment && (!since || Date.parse(release.published_at) >= Date.parse(since)))
+        moments.push(moment);
+    }
+  if (keeps(kinds, 'milestone'))
+    for await (const milestone of reader.list(`/repos/${repository}/milestones`, {
+      state: 'all',
+    })) {
+      if (since && Date.parse(milestone.updated_at) < Date.parse(since)) continue;
+      const changes = milestoneChanges(repository, milestone);
+      durations.push(...changes.durations);
+      moments.push(...changes.moments);
+      removedMoments.push(...changes.removedMoments);
+    }
   for (const item of numbers.values())
     if (isPullRequest(item))
       for (const issue of closedIssues(`${item.title ?? ''}\n${item.body ?? ''}`))
@@ -141,7 +175,14 @@ export async function readRepository(reader, repository, { since, kinds = eventK
   const unique = new Map(
     links.filter((l) => read(l.a) && read(l.b)).map((l) => [relationshipKey(l), l]),
   );
-  return { durations, moments, links: [...unique.values()] };
+  return {
+    durations,
+    moments,
+    removedMoments,
+    links: [...unique.values()],
+    items: numbers.size,
+    open: [...numbers.values()].filter((item) => item.state !== 'closed').length,
+  };
 }
 
 const USAGE = `Usage: och-import-github --repo owner/name [--repo …] (--timeline <uuid> | --config <routes.json>)
@@ -231,8 +272,7 @@ export async function main(argv = process.argv.slice(2), env = process.env, out 
       failed = true;
       continue;
     }
-    const open = changes.durations.filter((d) => typeof d.end !== 'string').length;
-    const summary = `${changes.durations.length} issues and pull requests (${open} open), ${changes.moments.length} events, ${changes.links.length} links`;
+    const summary = `${changes.items} issues and pull requests (${changes.open} open), ${changes.durations.length - changes.items} other durations (milestones, time in columns), ${changes.moments.length} events, ${changes.links.length} links`;
     if (!writer) {
       out.log(`${repository} → ${timeline}: would import ${summary}.`);
       for (const d of changes.durations.slice(0, 3)) out.log('  ' + JSON.stringify(d));
@@ -249,7 +289,11 @@ export async function main(argv = process.argv.slice(2), env = process.env, out 
           );
         checked.add(timeline);
       }
-      await writer.send(timeline, { durations: changes.durations, moments: changes.moments });
+      await writer.send(timeline, {
+        durations: changes.durations,
+        moments: changes.moments,
+        removedMoments: changes.removedMoments,
+      });
       if (changes.links.length) await writer.send(timeline, { links: changes.links });
       out.log(`${repository} → ${timeline}: imported ${summary}.`);
     } catch (error) {

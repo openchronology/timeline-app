@@ -28,7 +28,7 @@ import {
 export const EVENT_KINDS = {
   assignments: ['assigned', 'unassigned'],
   labels: ['labeled', 'unlabeled'],
-  milestones: ['milestoned', 'demilestoned'],
+  milestones: ['milestoned', 'demilestoned', 'milestone', 'due'],
   state: ['closed', 'reopened', 'merged'],
   renames: ['renamed'],
   reviews: [
@@ -47,7 +47,8 @@ export const EVENT_KINDS = {
     'marked as duplicate',
     'unmarked as duplicate',
   ],
-  status: ['moved'],
+  status: ['moved', 'in column'],
+  releases: ['released'],
   other: ['locked', 'unlocked', 'pinned', 'unpinned', 'transferred'],
 };
 const KIND_OF = new Map(
@@ -198,6 +199,28 @@ export function mentionChanges(source, text, time, by) {
     }));
 }
 
+/**
+ * A move on a project board from an item's timeline, `{project, column, time}`, or null: classic
+ * projects name the column; Projects' status events may not, and then it is not known.
+ */
+export function moveOf(event) {
+  if (
+    !['moved_columns_in_project', 'added_to_project', 'project_v2_item_status_changed'].includes(
+      event.event,
+    )
+  )
+    return null;
+  const column =
+    event.project_card?.column_name ??
+    event.project_v2_item_status?.name ??
+    event.status?.name ??
+    event.to?.name ??
+    null;
+  const time = event.created_at;
+  return column && time
+    ? { project: event.project?.name ?? event.project_v2?.title ?? undefined, column, time }
+    : null;
+}
 /** The verb (see EVENT_KINDS) each GitHub timeline event is recorded as. */
 const VERB_OF = {
   assigned: 'assigned',
@@ -384,13 +407,7 @@ export function timelineEvent(repository, item, event, kinds = ALL_KINDS) {
     case 'moved_columns_in_project':
     case 'added_to_project':
     case 'project_v2_item_status_changed': {
-      // A board's column: classic projects name it; Projects' status events may not.
-      const column =
-        event.project_card?.column_name ??
-        event.project_v2_item_status?.name ??
-        event.status?.name ??
-        event.to?.name ??
-        null;
+      const column = moveOf(event)?.column;
       if (!column) return null;
       return one('moved', {
         subject: column,
@@ -568,5 +585,226 @@ export async function projectStatusChange(
       what: `Moved to ${column}${project ? ' in ' + project : ''}`,
     },
   );
-  return { repository, durations: [], removed: [], moments: [moment], links: [] };
+  return {
+    repository,
+    durations: [],
+    removed: [],
+    moments: [moment],
+    links: [],
+    move: {
+      item: { number: issue.number, title: issue.title, html_url: issue.url },
+      project,
+      column,
+      time: item.updated_at ?? new Date().toISOString(),
+    },
+  };
+}
+
+/**
+ * A release, as a moment on its repository: when it was published (drafts are not), titled
+ * with its tag and name, tagged `released`, `release:<tag>` and its author. Keyed by GitHub's
+ * release ID, so an edit rewrites it and a deletion removes it.
+ */
+export function releaseMoment(repository, release) {
+  if (!release?.published_at || release.draft) return null;
+  const name = release.name && release.name !== release.tag_name ? ` ${release.name}` : '';
+  return {
+    id: entityId(repository, 'release', String(release.id)),
+    time: seconds(release.published_at),
+    metadata: {
+      title: `Released ${release.tag_name}${name}`.slice(0, 300),
+      ...(release.html_url ? { url: release.html_url } : {}),
+      tags: [
+        ...new Set(
+          [
+            'github',
+            repositoryTag(repository),
+            'released',
+            'release:' + release.tag_name,
+            ...(release.prerelease ? ['prerelease'] : []),
+            ...(release.author?.login ? [personTag(release.author.login)] : []),
+          ].map(lowerTag),
+        ),
+      ],
+    },
+  };
+}
+export const releaseId = (repository, release) =>
+  entityId(repository, 'release', String(release.id));
+
+/**
+ * A milestone, as a duration on its repository: from when it was created until it was closed,
+ * ongoing while open; and, when it has a due date, a moment then. Tagged `milestone`,
+ * `milestone:<title>` (as its items are) and its state.
+ */
+export function milestoneChanges(repository, milestone) {
+  const tags = [
+    'github',
+    repositoryTag(repository),
+    'milestone',
+    'milestone:' + milestone.title,
+    'state:' + (milestone.state === 'closed' ? 'closed' : 'open'),
+  ].map(lowerTag);
+  const description = typeof milestone.description === 'string' ? milestone.description : '';
+  const duration = {
+    id: milestoneId(repository, milestone),
+    start: seconds(milestone.created_at),
+    end:
+      milestone.state === 'closed' && milestone.closed_at
+        ? seconds(milestone.closed_at)
+        : { ongoing: true },
+    metadata: {
+      title: `Milestone ${milestone.title}`.slice(0, 300),
+      ...(description || milestone.html_url
+        ? {
+            description:
+              description.slice(0, 4000) +
+              (milestone.html_url ? (description ? '\n\n' : '') + milestone.html_url : ''),
+          }
+        : {}),
+      ...(milestone.html_url ? { url: milestone.html_url } : {}),
+      tags: [...new Set(tags)],
+    },
+  };
+  const due = milestone.due_on
+    ? {
+        id: entityId(repository, 'milestone', String(milestone.number), 'due'),
+        time: seconds(milestone.due_on),
+        metadata: {
+          title: `Due: milestone ${milestone.title}`.slice(0, 300),
+          ...(milestone.html_url ? { url: milestone.html_url } : {}),
+          tags: [...new Set([...tags.slice(0, 4), 'due'].map(lowerTag))],
+        },
+      }
+    : null;
+  return {
+    durations: [duration],
+    moments: due ? [due] : [],
+    removedMoments: due ? [] : [dueId(repository, milestone)],
+  };
+}
+export const milestoneId = (repository, milestone) =>
+  entityId(repository, 'milestone', String(milestone.number));
+const dueId = (repository, milestone) =>
+  entityId(repository, 'milestone', String(milestone.number), 'due');
+
+/**
+ * The time an item spent in one column of a project board, as a duration: from when it was
+ * moved there, until it was moved on (`end`), or ongoing. Titled `#412 in Review (Roadmap)`,
+ * tagged with the item's tags, `in column`, `status:<column>` and `project:<name>`: separated
+ * by `status:` tags, the board's columns become rows, each showing how long work sat there.
+ */
+export function columnStint(repository, item, { project, column, start, end }) {
+  return {
+    id: entityId(
+      repository,
+      String(item.number),
+      'in',
+      ...(project ? [slug(project)] : []),
+      slug(column),
+      seconds(start),
+    ),
+    start: seconds(start),
+    end: end ? seconds(end) : { ongoing: true },
+    metadata: {
+      title: `#${item.number} in ${column}${project ? ` (${project})` : ''}`.slice(0, 300),
+      ...(item.html_url ? { url: item.html_url } : {}),
+      tags: [
+        ...new Set(
+          [
+            'github',
+            repositoryTag(repository),
+            itemTag(repository, item.number),
+            'in column',
+            'status:' + column,
+            ...(project ? ['project:' + project] : []),
+          ].map(lowerTag),
+        ),
+      ],
+    },
+  };
+}
+/**
+ * An item's column stints from its moves, in time order (`{project, column, time}`): each
+ * lasts until the next move on the same board, and the last until the item closed, or is
+ * ongoing while it is open.
+ */
+export function stintsFromMoves(repository, item, moves) {
+  const boards = new Map();
+  for (const move of [...moves].sort((a, b) => Date.parse(a.time) - Date.parse(b.time))) {
+    const key = move.project ?? '';
+    if (!boards.has(key)) boards.set(key, []);
+    boards.get(key).push(move);
+  }
+  const closed = item.state === 'closed' ? (item.closed_at ?? null) : null;
+  const stints = [];
+  for (const list of boards.values())
+    list.forEach((move, i) =>
+      stints.push(
+        columnStint(repository, item, {
+          project: move.project,
+          column: move.column,
+          start: move.time,
+          end: list[i + 1]?.time ?? closed,
+        }),
+      ),
+    );
+  return stints;
+}
+
+/**
+ * The receiver's memory of each item's open column stint per board, so a move can end the one
+ * before it: `{column, start}` by `<repository>#<number>|<project>`. Kept in `file` (JSON)
+ * when given, so a restart remembers; without it, a stint open when the receiver restarted
+ * stays ongoing until the importer or a later move corrects it.
+ */
+export class StintTracker {
+  constructor(file, { read, write } = {}) {
+    this.file = file;
+    this.write = write;
+    this.open = new Map(file && read ? Object.entries(read(file) ?? {}) : []);
+  }
+  save() {
+    if (this.file && this.write) this.write(this.file, Object.fromEntries(this.open));
+  }
+  /** A move: the stint it ends (with its end) and the one it opens. */
+  move(repository, item, { project, column, time }) {
+    const key = `${repository.toLowerCase()}#${item.number}|${project ?? ''}`;
+    const before = this.open.get(key);
+    const durations = [];
+    if (before && before.column !== column)
+      durations.push(
+        columnStint(repository, item, {
+          project,
+          column: before.column,
+          start: before.start,
+          end: time,
+        }),
+      );
+    if (!before || before.column !== column) {
+      durations.push(columnStint(repository, item, { project, column, start: time }));
+      this.open.set(key, { column, start: time });
+      this.save();
+    }
+    return durations;
+  }
+  /** The item closed: its open stints end then. */
+  close(repository, item, time) {
+    const prefix = `${repository.toLowerCase()}#${item.number}|`;
+    const durations = [];
+    for (const [key, stint] of this.open)
+      if (key.startsWith(prefix)) {
+        durations.push(
+          columnStint(repository, item, {
+            project: key.slice(prefix.length) || undefined,
+            column: stint.column,
+            start: stint.start,
+            end: time,
+          }),
+        );
+        this.open.delete(key);
+      }
+    if (durations.length) this.save();
+    return durations;
+  }
 }
