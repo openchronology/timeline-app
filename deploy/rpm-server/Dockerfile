@@ -136,8 +136,10 @@ RUN set -eu; \
     sed "s/@PG_MAJOR@/$PG_MAJOR/g" /root/rpm/README.RPM > "$doc/README.RPM"; \
     install -D -m 0644 /root/shared/openchronology.env "$ROOT/usr/share/openchronology/openchronology.env.example"; \
     install -D -m 0644 /root/shared/syslog.env "$ROOT/usr/share/openchronology/syslog.env.example"; \
+    install -D -m 0644 /root/shared/github.env "$ROOT/usr/share/openchronology/github.env.example"; \
     install -D -m 0644 /root/shared/journald.env "$ROOT/usr/share/openchronology/journald.env.example"; \
-    for unit in openchronology openchronology-mail openchronology-syslog openchronology-journald; do \
+    for unit in openchronology openchronology-mail openchronology-syslog openchronology-github \
+      openchronology-journald; do \
       sed 's|README.Debian|README.RPM|' "/root/shared/$unit.service" > "/root/$unit.service"; \
       install -D -m 0644 "/root/$unit.service" "$ROOT/usr/lib/systemd/system/$unit.service"; \
     done; \
@@ -145,6 +147,7 @@ RUN set -eu; \
     install -D -m 0755 /root/shared/openchronology-reset-admin-password "$ROOT/usr/sbin/openchronology-reset-admin-password"; \
     install -D -m 0755 /root/rpm/openchronology-setup "$ROOT/usr/sbin/openchronology-setup"; \
     install -D -m 0755 /root/shared/och-import-logs "$ROOT/usr/bin/och-import-logs"; \
+    install -D -m 0755 /root/shared/och-import-github "$ROOT/usr/bin/och-import-github"; \
     install -D -m 0755 /root/shared/openchronology-log-files "$APP/bin/openchronology-log-files"; \
     find "$ROOT" -type d -exec chmod 0755 {} +; \
     sed -e "s/@VERSION@/$RPM_VERSION/" -e "s/@RELEASE@/$RPM_RELEASE/" \

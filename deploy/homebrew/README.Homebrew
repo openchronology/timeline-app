@@ -67,16 +67,25 @@ and write the routes to $(brew --prefix)/etc/openchronology/syslog-routes.json, 
 `openchronology-agent start syslog`. `och-import-logs` imports historic log files
 (log-import.md): `och-import-logs --help`.
 
-Email delivery and the syslog receiver run as your launchd agents, as `brew services` runs the
+The GitHub receiver (github.md), `openchronology-github`, receives GitHub's webhooks on
+127.0.0.1:5580, behind your HTTPS reverse proxy, and mirrors issues and pull requests into the
+timelines its routes choose. Set OCH_API_KEY and GITHUB_WEBHOOK_SECRET in
+$(brew --prefix)/etc/openchronology/github.env and write the routes to
+$(brew --prefix)/etc/openchronology/github-routes.json, then
+`openchronology-agent start github`. `och-import-github` imports what a repository has
+already (github.md): `och-import-github --help`.
+
+Email delivery and the syslog and GitHub receivers run as your launchd agents, as `brew services` runs the
 server: started now and whenever you log in, and started again if they stop.
 
-    openchronology-agent start syslog      (or mail)
+    openchronology-agent start syslog      (or github, or mail)
     openchronology-agent status syslog     running or not, its process and last exit code
     openchronology-agent restart syslog    after editing its configuration
     openchronology-agent stop syslog       stops it, and it no longer starts at login
 
-They log to $(brew --prefix)/var/log/openchronology-syslog.log and openchronology-mail.log.
-Their definitions are ~/Library/LaunchAgents/org.openchronology.syslog.plist and .mail.plist.
+They log to $(brew --prefix)/var/log/openchronology-syslog.log, openchronology-github.log
+and openchronology-mail.log. Their definitions are
+~/Library/LaunchAgents/org.openchronology.syslog.plist, .github.plist and .mail.plist.
 
 Upgrade
 -------
@@ -88,8 +97,8 @@ Upgrade
                  $(brew --prefix)/share/openchronology/openchronology.env.example
   2. Back up:  $(brew --prefix postgresql@17)/bin/pg_dump -h /tmp openchronology > openchronology.sql
   3. openchronology-migrate, which migrates the database and restarts the server, and the
-     launchd agents of the mail worker and the syslog receiver that you started
-     (openchronology-agent start mail|syslog), so that they run the new version too.
+     launchd agents of the mail worker and the syslog and GitHub receivers that you started
+     (openchronology-agent start mail|syslog|github), so that they run the new version too.
 
 Remove
 ------
@@ -99,7 +108,8 @@ unless you ask Homebrew to keep it (its databases, in $(brew --prefix)/var/postg
 remain either way). To keep PostgreSQL and the database running:
 
     brew install postgresql@17
-    openchronology-agent stop syslog; openchronology-agent stop mail
+    openchronology-agent stop syslog; openchronology-agent stop github
+    openchronology-agent stop mail
     brew services stop openchronology-server
     brew uninstall openchronology-server
 

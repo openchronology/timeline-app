@@ -71,12 +71,14 @@ buildNpmPackage {
       --add-flags $app/openchronology-server.mjs --chdir $app \
       --set-default OCH_CONFIG /dev/null
     for command in migrate:migrate reset-admin-password:reset-admin-password \
-        mail:mail-worker syslog:syslog-receiver journald:journald-receiver; do
+        mail:mail-worker syslog:syslog-receiver github:github-receiver journald:journald-receiver; do
       makeWrapper ${lib.getExe nodejs_24} $out/bin/openchronology-''${command%%:*} \
         --add-flags $app/server/''${command#*:}.mjs --chdir $app --set NODE_ENV production
     done
     makeWrapper ${lib.getExe nodejs_24} $out/bin/och-import-logs \
       --add-flags $app/server/import-logs.mjs
+    makeWrapper ${lib.getExe nodejs_24} $out/bin/och-import-github \
+      --add-flags $app/server/import-github.mjs
     runHook postInstall
   '';
 

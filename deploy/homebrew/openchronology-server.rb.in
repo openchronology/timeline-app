@@ -61,12 +61,15 @@ class OpenchronologyServer < Formula
 
     # Configuration templates, with this Mac's paths.
     (share/"openchronology").install "homebrew/openchronology.env" => "openchronology.env.example",
-                                     "homebrew/syslog.env"         => "syslog.env.example"
+                                     "homebrew/syslog.env"         => "syslog.env.example",
+                                     "homebrew/github.env"         => "github.env.example"
     inreplace share.glob("openchronology/*.example") do |s|
       s.gsub! "/etc/openchronology", "#{etc}/openchronology", audit_result: false
+      # The GitHub receiver's state, beside the server's data.
+      s.gsub! "/var/lib/openchronology-github", "#{var}/openchronology", audit_result: false
       s.gsub! "sudo systemctl restart openchronology", "brew services restart openchronology-server",
               audit_result: false
-      # The mail and syslog workers run as your launchd agents (openchronology-agent).
+      # The mail, syslog and GitHub workers run as your launchd agents (openchronology-agent).
       s.gsub! "sudo systemctl enable --now openchronology-", "openchronology-agent start ",
               audit_result: false
       s.gsub! "sudo openchronology-", "openchronology-", audit_result: false
@@ -74,7 +77,8 @@ class OpenchronologyServer < Formula
 
     # The commands, pointing at this installation.
     commands = %w[openchronology-setup openchronology-migrate openchronology-reset-admin-password
-                  och-import-logs openchronology-mail openchronology-syslog openchronology-agent]
+                  och-import-logs och-import-github openchronology-mail openchronology-syslog
+                  openchronology-github openchronology-agent]
     commands.each { |command| bin.install "homebrew/#{command}" }
     # Not every command names every path.
     inreplace commands.map { |command| bin/command } do |s|
@@ -118,6 +122,7 @@ class OpenchronologyServer < Formula
 
   test do
     assert_match "Usage: och-import-logs", shell_output("#{bin}/och-import-logs --help")
+    assert_match "Usage: och-import-github", shell_output("#{bin}/och-import-github --help")
     assert_path_exists libexec/"bin/och-convert"
     # pgmp loads in a scratch PostgreSQL 17 cluster.
     ENV["LC_ALL"] = "C"

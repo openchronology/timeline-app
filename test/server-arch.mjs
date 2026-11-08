@@ -101,6 +101,21 @@ try {
   assert.match(await sh('curl -s http://127.0.0.1:5173/'), /<html/i);
   assert.doesNotMatch(await sh('ldd /usr/lib/openchronology/bin/och-convert'), /not found/);
   assert.match(await sh('och-import-logs --help'), /^Usage: och-import-logs/);
+  assert.match(await sh('och-import-github --help'), /^Usage: och-import-github/);
+  // The GitHub receiver is installed, with its configuration template, and loads with the
+  // bundled Node.js; it refuses to start without the webhook's secret.
+  assert.match(
+    await sh(
+      'test -f /usr/lib/systemd/system/openchronology-github.service && test -f /usr/share/openchronology/github.env.example && echo installed',
+    ),
+    /installed/,
+  );
+  assert.match(
+    await sh(
+      `cd /usr/lib/openchronology && GITHUB_ROUTES_JSON='{"default":"00000000-0000-0000-0000-000000000000"}' node/bin/node server/github-receiver.mjs 2>&1; true`,
+    ),
+    /GITHUB_WEBHOOK_SECRET/,
+  );
   assert.match(
     await sh('cd /usr/lib/openchronology && node/bin/node server/journald-receiver.mjs 2>&1; true'),
     /Set JOURNALD_TIMELINE/,
@@ -143,7 +158,10 @@ try {
 
   // Removing it keeps the configuration and the database, and says how to delete them.
   const remove = await sh('pacman -R --noconfirm openchronology-server 2>&1');
-  assert.match(remove, /the PostgreSQL database and the openchronology and openchronology-logs\s+system users remain/i);
+  assert.match(
+    remove,
+    /the PostgreSQL database and the openchronology and openchronology-logs\s+system users remain/i,
+  );
   assert.match(await sh('test -e /etc/openchronology && echo present || echo gone'), /present/);
   assert.equal(await psql("SELECT count(*) FROM oc_users WHERE username='kept'"), '1');
   console.log(

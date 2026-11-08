@@ -31,8 +31,8 @@ nix-env -f https://github.com/openchronology/timeline-app/archive/<tag>.tar.gz -
 ``` The server's commands are the Debian package's:
 
 - `openchronology-server`, `openchronology-migrate` and `openchronology-reset-admin-password`;
-- the workers: `openchronology-mail`, `openchronology-syslog` and `openchronology-journald`;
-- `och-import-logs`.
+- the workers: `openchronology-mail`, `openchronology-syslog`, `openchronology-github` and `openchronology-journald`;
+- `och-import-logs` and `och-import-github`.
 
 They read their settings from the environment, or from a file named by `OCH_CONFIG`.
 
@@ -91,19 +91,20 @@ What the module sets up:
 
 ### Options
 
-| Option                                             | Default                | What it does                                                                                |
-| -------------------------------------------------- | ---------------------- | ------------------------------------------------------------------------------------------- |
-| `enable`                                           | `false`                | Runs OpenChronology                                                                         |
-| `origin`                                           | (required)             | The public origin, exactly as people reach it (`APP_ORIGIN`)                                |
-| `host`, `port`                                     | `127.0.0.1`, 5173      | Where the server listens                                                                    |
-| `settings`                                         | `{ }`                  | Any other setting of `openchronology.env`, such as `PLATFORM_NAME` or `TIMELINE_LINK_LIMIT` |
-| `environmentFile`                                  | `null`                 | A file of `KEY=value` secrets, read by every service, overriding `settings`                 |
-| `database.createLocally`                           | `true`                 | Runs PostgreSQL here. Otherwise set `DATABASE_URL`, to a database that has `pgmp`           |
-| `mail.enable`                                      | `false`                | The account email worker (Resend)                                                           |
-| `syslog.enable`, `.settings`, `.environmentFile`   | `false`, `{ }`, `null` | The [syslog receiver](syslog.md), and a file of its own secrets (`OCH_API_KEY`)             |
-| `journald.enable`, `.settings`, `.environmentFile` | `false`, `{ }`, `null` | The [journald follower](journald.md), and a file of its own secrets (`OCH_API_KEY`)         |
-| `nginx.enable`, `.hostName`                        | `false`, origin's      | An nginx virtual host in front of the server                                                |
-| `package`                                          | the flake's server     | The server package to run                                                                   |
+| Option                                             | Default                | What it does                                                                                             |
+| -------------------------------------------------- | ---------------------- | -------------------------------------------------------------------------------------------------------- |
+| `enable`                                           | `false`                | Runs OpenChronology                                                                                      |
+| `origin`                                           | (required)             | The public origin, exactly as people reach it (`APP_ORIGIN`)                                             |
+| `host`, `port`                                     | `127.0.0.1`, 5173      | Where the server listens                                                                                 |
+| `settings`                                         | `{ }`                  | Any other setting of `openchronology.env`, such as `PLATFORM_NAME` or `TIMELINE_LINK_LIMIT`              |
+| `environmentFile`                                  | `null`                 | A file of `KEY=value` secrets, read by every service, overriding `settings`                              |
+| `database.createLocally`                           | `true`                 | Runs PostgreSQL here. Otherwise set `DATABASE_URL`, to a database that has `pgmp`                        |
+| `mail.enable`                                      | `false`                | The account email worker (Resend)                                                                        |
+| `syslog.enable`, `.settings`, `.environmentFile`   | `false`, `{ }`, `null` | The [syslog receiver](syslog.md), and a file of its own secrets (`OCH_API_KEY`)                          |
+| `github.enable`, `.settings`, `.environmentFile`   | `false`, `{ }`, `null` | The [GitHub receiver](github.md), and a file of its own secrets (`OCH_API_KEY`, `GITHUB_WEBHOOK_SECRET`) |
+| `journald.enable`, `.settings`, `.environmentFile` | `false`, `{ }`, `null` | The [journald follower](journald.md), and a file of its own secrets (`OCH_API_KEY`)                      |
+| `nginx.enable`, `.hostName`                        | `false`, origin's      | An nginx virtual host in front of the server                                                             |
+| `package`                                          | the flake's server     | The server package to run                                                                                |
 
 **Keep secrets out of `settings`:** it is written to the Nix store, which every user of the machine can read. Secrets include `RESEND_API_KEY`, `ADMIN_INITIAL_PASSWORD`, sign-in providers' client secrets, and the log importers' `OCH_API_KEY`. Put them in `environmentFile` (the log importers' key in their own, below), for example with [sops-nix](https://github.com/Mic92/sops-nix) or [agenix](https://github.com/ryantm/agenix).
 
@@ -131,6 +132,18 @@ services.openchronology.syslog = {
 Both run as their own system user, `openchronology-logs`, not as `openchronology` (#501). They read only their own `settings` and `environmentFile`, not the server's settings, `environmentFile` or generated key, and have no role in the database. Make the files their settings name (`SYSLOG_ROUTES`, `JOURNALD_ROUTES`, `JOURNALD_SSH_KEY`, `JOURNALD_KNOWN_HOSTS`) readable by that user, for example with sops-nix's or agenix's `owner` or `group`. Before #501 they read the server's `environmentFile`: move their `OCH_API_KEY` to `syslog.environmentFile` and `journald.environmentFile`. The module warns while either is unset.
 
 The journald follower runs with the `systemd-journal` group, so it can read the journal, and keeps its cursor in `/var/lib/openchronology-journald`.
+
+The [GitHub receiver](github.md) runs the same way, as `openchronology-logs` with its own `settings` and `environmentFile`. Give it `OCH_API_KEY` and `GITHUB_WEBHOOK_SECRET` (and `GITHUB_TOKEN`, for project boards) in that file:
+
+```nix
+services.openchronology.github = {
+  enable = true;
+  environmentFile = "/run/secrets/openchronology-github.env";
+  settings.GITHUB_ROUTES = "/etc/openchronology/github-routes.json";
+};
+```
+
+It listens on `127.0.0.1:5580`; put it behind the nginx virtual host, or another reverse proxy that provides HTTPS, for GitHub to reach it. It keeps each item's board column in `/var/lib/openchronology-github` (`GITHUB_STATE`).
 
 ### Backups and upgrades
 

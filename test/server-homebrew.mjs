@@ -65,6 +65,14 @@ assert.equal(session.server, true, 'The server reaches its database.');
 assert.equal((await fetch('http://127.0.0.1:5173/api/plugins')).status, 200);
 assert.match(await (await fetch('http://127.0.0.1:5173/')).text(), /<html/i);
 assert.match(await sh('och-import-logs --help'), /^Usage: och-import-logs/);
+assert.match(await sh('och-import-github --help'), /^Usage: och-import-github/);
+// The GitHub receiver's command and configuration are installed; it is not started.
+assert.match(
+  await sh(
+    `test -x "${prefix}/bin/openchronology-github" && test -f "${prefix}/etc/openchronology/github.env" && echo installed`,
+  ),
+  /installed/,
+);
 
 // The syslog receiver as a launchd agent (openchronology-agent, #125) delivers a message into
 // a timeline, keeps running once macOS registers it as a background item, and stops for good
@@ -133,9 +141,11 @@ await sh(
 const migrated = await sh('openchronology-migrate 2>&1');
 assert.match(migrated, /OpenChronology schema installed\./);
 assert.match(migrated, /OpenChronology restarted\./);
-// The mail worker and the syslog receiver are not enabled, so they stay stopped (#371, #374).
+// The mail worker and the syslog and GitHub receivers are not enabled, so they stay stopped
+// (#371, #374).
 assert.doesNotMatch(migrated, /mail worker restarted/);
 assert.doesNotMatch(migrated, /syslog receiver restarted/);
+assert.doesNotMatch(migrated, /GitHub receiver restarted/);
 const { passwordMatches } = await import(
   `${prefix}/opt/openchronology-server/libexec/server/auth.mjs`
 );

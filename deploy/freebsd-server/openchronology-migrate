@@ -1,8 +1,8 @@
 #!/bin/sh
 # Copyright (c) 2026 Athan Clark. SPDX-License-Identifier: GPL-3.0-only
 # Brings the OpenChronology database up to this package's schema, then (re)starts the server,
-# the mail worker and the syslog receiver, each when it is enabled (an upgrade stopped them all,
-# #371, #374). Safe to run more than once.
+# the mail worker and the syslog and GitHub receivers, each when it is enabled (an upgrade
+# stopped them all, #371, #374). Safe to run more than once.
 # Usage, as root: openchronology-migrate [--no-restart]   (restarts nothing)
 set -eu
 APP=/usr/local/lib/openchronology
@@ -24,7 +24,7 @@ if [ "${1:-}" != "--no-restart" ] && service openchronology enabled; then
   echo "OpenChronology restarted."
 fi
 [ "${1:-}" = "--no-restart" ] && exit 0
-for worker in "mail:mail worker" "syslog:syslog receiver"; do
+for worker in "mail:mail worker" "syslog:syslog receiver" "github:GitHub receiver"; do
   name="openchronology_${worker%%:*}"
   if service "$name" enabled; then
     service "$name" restart >/dev/null 2>&1 || service "$name" start >/dev/null

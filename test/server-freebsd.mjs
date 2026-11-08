@@ -76,6 +76,18 @@ assert.match(await (await fetch('http://127.0.0.1:5173/')).text(), /<html/i);
 // The SQLite converter finds its libraries.
 assert.doesNotMatch(await sh('ldd /usr/local/lib/openchronology/bin/och-convert'), /not found/);
 assert.match(await sh('och-import-logs --help'), /^Usage: och-import-logs/);
+assert.match(await sh('och-import-github --help'), /^Usage: och-import-github/);
+// The GitHub receiver's rc.d service and configuration are installed, stopped until enabled.
+assert.match(
+  await sh(
+    'test -x /usr/local/etc/rc.d/openchronology_github && test -f /usr/local/etc/openchronology/github.env && echo installed',
+  ),
+  /installed/,
+);
+assert.match(
+  await sh('service openchronology_github onestatus 2>&1; true'),
+  /openchronology_github is not running/,
+);
 
 // The syslog receiver as its rc.d service, run as the openchronology user, delivers a
 // message into a timeline (#125).
@@ -134,14 +146,19 @@ assert.equal(await psql("SELECT count(*) FROM oc_users WHERE username='kept'"), 
 const migrated = await sh('openchronology-migrate 2>&1');
 assert.match(migrated, /OpenChronology schema installed\./);
 assert.match(migrated, /OpenChronology restarted\./);
-// The mail worker and the syslog receiver are not enabled, so they stay stopped (#371, #374).
+// The mail worker and the syslog and GitHub receivers are not enabled, so they stay stopped
+// (#371, #374).
 assert.doesNotMatch(migrated, /mail worker restarted/);
 assert.doesNotMatch(migrated, /syslog receiver restarted/);
+assert.doesNotMatch(migrated, /GitHub receiver restarted/);
 assert.deepEqual(await healthy(), { status: 'ok', storage: 'postgresql' });
 
 // Removing it stops the service and keeps the configuration and the database.
 const remove = await sh('env ASSUME_ALWAYS_YES=yes pkg delete -y openchronology-server 2>&1');
-assert.match(remove, /the PostgreSQL database and the openchronology and openchronology-logs\s+system users remain/i);
+assert.match(
+  remove,
+  /the PostgreSQL database and the openchronology and openchronology-logs\s+system users remain/i,
+);
 assert.match(await sh(`test -e ${configFile} && echo present || echo gone`), /present/);
 assert.equal(await psql("SELECT count(*) FROM oc_users WHERE username='kept'"), '1');
 await assert.rejects(fetch('http://127.0.0.1:5173/healthz'));

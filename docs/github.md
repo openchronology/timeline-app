@@ -188,6 +188,28 @@ GitHub's first delivery is a ping, which the receiver answers.
 - **Stopping:** on SIGTERM or SIGINT it saves what is queued, for up to ten seconds, before exiting.
 - **Missed deliveries:** to catch up on any, run the importer with `--since`.
 
+## Running it as a service
+
+Every [server package](install.md#server-packages) installs the receiver as a service of its system, stopped until you configure it. Set `OCH_API_KEY` and `GITHUB_WEBHOOK_SECRET` in its `github.env`, write the routes to `github-routes.json` beside it, then start it:
+
+| Installed with                      | Configuration                                    | Start it, and at every boot or login                                                          | Its log                                              |
+| ----------------------------------- | ------------------------------------------------ | --------------------------------------------------------------------------------------------- | ---------------------------------------------------- |
+| Debian, Ubuntu, Rocky, RHEL, Fedora | `/etc/openchronology/github.env`                 | `sudo systemctl enable --now openchronology-github` (systemd)                                 | `journalctl -u openchronology-github`                |
+| Arch Linux                          | `/etc/openchronology/github.env`                 | `sudo systemctl enable --now openchronology-github` (systemd)                                 | `journalctl -u openchronology-github`                |
+| FreeBSD                             | `/usr/local/etc/openchronology/github.env`       | `sysrc openchronology_github_enable=YES && service openchronology_github start` (rc.d)        | `/var/log/messages`                                  |
+| macOS (Homebrew)                    | `$(brew --prefix)/etc/openchronology/github.env` | `openchronology-agent start github` (a launchd agent, as `brew services` runs the server)     | `$(brew --prefix)/var/log/openchronology-github.log` |
+| Windows                             | `C:\ProgramData\OpenChronology\github.env`       | `Set-Service OpenChronologyGitHub -StartupType Automatic; Start-Service OpenChronologyGitHub` | `C:\ProgramData\OpenChronology\logs`                 |
+| NixOS                               | `services.openchronology.github`                 | `services.openchronology.github.enable = true;` ([NixOS](nix.md#log-importers))               | `journalctl -u openchronology-github`                |
+| Docker Compose                      | `GITHUB_RECEIVER_API_KEY`, `GITHUB_ROUTES_FILE`  | `docker compose --profile github up -d github`                                                | `docker compose logs github`                         |
+
+Each listens on `127.0.0.1:5580`, for your HTTPS reverse proxy to forward GitHub's deliveries to. Each runs it as an unprivileged account (`openchronology-logs`, Local Service on Windows, or you on macOS), restarts it if it fails, and stops it cleanly: on `SIGTERM` (Ctrl+C on Windows) the receiver saves what is queued first. Restart the service after editing its configuration. An upgrade stops it, and `openchronology-migrate` starts it again if it is enabled.
+
+- **Its own account:** as the [syslog receiver](syslog.md#its-own-account) does, it runs as `openchronology-logs`, which cannot read the server's configuration and has no role in its database. `github.env` is owned by `root:openchronology-logs`, mode 0640; give the routes file the same owner and mode: `sudo chown root:openchronology-logs github-routes.json && sudo chmod 0640 github-routes.json`.
+- **Its state:** `GITHUB_STATE` names a file in a folder only the receiver writes: `/var/lib/openchronology-github` (systemd's `StateDirectory`), `/var/db/openchronology-github` on FreeBSD, `$(brew --prefix)/var/openchronology` on macOS, `C:\ProgramData\OpenChronology\github-state` on Windows, and the `github-state` volume in Compose.
+- **The importer:** each package also installs `och-import-github`. Without `OCH_API_KEY` in the environment, it reads `OCH_API_URL`, `OCH_API_KEY`, `GITHUB_TOKEN` and `GITHUB_ROUTES` from the package's `github.env`, so `sudo och-import-github --repo acme/app --since 2026-11-01` catches up with what the receiver missed.
+
+To run it as a service elsewhere, such as from a checkout, start from the package's definition for your system: [the systemd unit](../deploy/debian-server/openchronology-github.service), [the rc.d script](../deploy/freebsd-server/openchronology_github.rc), [the launchd agent](../deploy/homebrew/openchronology-agent) or [the WinSW service](../deploy/windows-server/openchronology-github-service.xml). Point it at `node server/github-receiver.mjs` in your copy, with `OCH_CONFIG` naming a configuration file like [`github.env`](../deploy/debian-server/github.env) (or the variables above set directly).
+
 ## Privacy
 
 Events name people, so the timelines mirror personal data from GitHub. Only what the tables above list is copied:

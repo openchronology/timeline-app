@@ -38,6 +38,7 @@ new_config "$CONFIG" \
   "s|^AUTH_ENCRYPTION_KEY=\$|AUTH_ENCRYPTION_KEY=$key|; s|^DATABASE_URL=.*|DATABASE_URL=postgresql://openchronology@/openchronology?host=/tmp|" \
   "$EXAMPLES/openchronology.env.example"
 new_config "$CONFIG_DIR/syslog.env" "" "$EXAMPLES/syslog.env.example"
+new_config "$CONFIG_DIR/github.env" "" "$EXAMPLES/github.env.example"
 
 # SQL as you, Homebrew's PostgreSQL superuser, over its socket in /tmp.
 pg() { "$PG/psql" -X -q -At -v ON_ERROR_STOP=1 -h /tmp -d "$1" -c "$2"; }

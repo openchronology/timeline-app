@@ -1,0 +1,40 @@
+#!/bin/sh
+# Copyright (c) 2026 Athan Clark. SPDX-License-Identifier: GPL-3.0-only
+#
+# PROVIDE: openchronology_github
+# REQUIRE: LOGIN openchronology
+# KEYWORD: shutdown
+#
+# The OpenChronology GitHub receiver. Enable it in /etc/rc.conf with sysrc openchronology_github_enable=YES.
+# Its configuration is /usr/local/etc/openchronology/github.env (or openchronology_github_config).
+
+. /etc/rc.subr
+
+name=openchronology_github
+rcvar=openchronology_github_enable
+load_rc_config $name
+
+: ${openchronology_github_enable:="NO"}
+: ${openchronology_github_config:="/usr/local/etc/openchronology/github.env"}
+
+# daemon(8) runs it as its own user, openchronology-logs (#501), which cannot read the server's
+# configuration or log in to its database; restarts it if it fails and sends its output to
+# syslog, holding nothing open of the terminal or script that started it (-f).
+# Its configuration is read as systemd reads it (OCH_CONFIG, #118).
+pidfile="/var/run/openchronology/openchronology_github.pid"
+procname="daemon"
+command="/usr/sbin/daemon"
+command_args="-f -r -S -T openchronology_github -P ${pidfile} -u openchronology-logs /usr/bin/env NODE_ENV=production OCH_CONFIG=${openchronology_github_config} /usr/local/bin/node --import=/usr/local/lib/openchronology/server/load-configuration.mjs /usr/local/lib/openchronology/server/github-receiver.mjs"
+openchronology_github_chdir="/usr/local/lib/openchronology"
+start_precmd="openchronology_github_prestart"
+
+openchronology_github_prestart()
+{
+	# Root's: in a folder of the service's user, it could replace daemon(8)'s pidfile and have
+	# stop signal another process.
+	install -d -o root -g wheel -m 0755 /var/run/openchronology
+	# The receiver's own, for GITHUB_STATE: each item's board column, kept across restarts.
+	install -d -o openchronology-logs -g openchronology-logs -m 0700 /var/db/openchronology-github
+}
+
+run_rc_command "$1"
