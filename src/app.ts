@@ -97,6 +97,7 @@ import {
   CUSTOM_EXAMPLE,
   anchorOf,
   isOngoing,
+  nowCoordinate,
   resolveDuration,
   validateDuration,
   durationPlugins,
@@ -1282,6 +1283,23 @@ for (const type of ['wheel', 'pointermove', 'touchmove', 'keydown', 'click'] as 
 setInterval(() => {
   if (!document.hidden && frame.durations?.some((band) => isOngoing(band.end))) requestRender();
 }, 15000);
+/**
+ * A server's window says where its ongoing bands ended when it answered; a cached one is
+ * reused for 30 seconds. Drawn, they end at the browser's clock instead, so they keep growing
+ * between fetches (#537).
+ */
+function ongoingToNow(f: Frame, settings: TimePresentation | undefined): Frame {
+  const now = nowCoordinate(settings, Date.now());
+  if (!now || !f.durations?.some((band) => isOngoing(band.end))) return f;
+  return {
+    ...f,
+    durations: f.durations.map((band) => {
+      if (!isOngoing(band.end)) return band;
+      const last = now.compare(Q.parse(band.first)) > 0 ? now.toString() : band.first;
+      return { ...band, last, endTime: last };
+    }),
+  };
+}
 let pendingFrameRefresh = false;
 function requestRender(refreshFrame = true) {
   pendingFrameRefresh ||= refreshFrame;
@@ -1915,9 +1933,11 @@ function render(refreshFrame = true) {
     // Pending requests keep the last confirmed grouping until the server supplies
     // its replacement; otherwise zooming would hide singleton markers prematurely.
     const displayThreshold = cached ? threshold : Q.zero;
-    frame =
+    frame = ongoingToNow(
       sparseWorkspace()?.overlay(base, viewport, displayThreshold) ??
-      regroup(base, displayThreshold);
+        regroup(base, displayThreshold),
+      model?.presentation ?? remote?.presentation,
+    );
     sparseWorkspace()?.evict(selected?.id, openDuration?.duration.id, historyEntities());
     drawFrame();
     if (!refreshFrame || cached) {
