@@ -9599,7 +9599,7 @@ function tagPicker(group: string[], changed: () => void): HTMLElement {
   let shown: { tag: string; count: number | null }[] = [];
   const typed = () => {
     try {
-      return validateTags([search.value])[0] ?? null;
+      return validateEntityTags([search.value])[0] ?? null;
     } catch {
       return null;
     }
@@ -9736,7 +9736,7 @@ el<HTMLFormElement>('separate-form').onsubmit = (event) => {
   event.preventDefault();
   try {
     const groups = separateDraft
-      .map((group) => validateTags(group))
+      .map((group) => validateEntityTags(group))
       .filter((group) => group.length);
     if (!groups.length) {
       // Nothing chosen: the relationships' separation stays, or the timeline rejoins.

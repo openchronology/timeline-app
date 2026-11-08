@@ -52,7 +52,7 @@ export function validateTimelineView(value: unknown): TimelineView {
         `A default view has two to ${SEPARATION_LIMIT} groups of tags; one is {"tags": [...]}.`,
       );
     const groups = s.groups.map((group) => {
-      const tags = validateTags(group);
+      const tags = validateEntityTags(group);
       if (!tags.length) throw new Error('Each group of a default separation needs a tag.');
       return tags;
     });
