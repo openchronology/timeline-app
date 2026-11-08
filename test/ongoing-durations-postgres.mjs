@@ -161,7 +161,15 @@ try {
   frame = await store.query(timeline.id, user, window);
   assert.ok(Math.abs(lastOf(frame.durations.find((b) => b.id === 'issue')) - now()) <= 5);
 
-  // Timelines without a calendar refuse them.
+  // Timelines without a calendar refuse them, in sparse saves as in whole ones.
+  await assert.rejects(
+    store.save(timeline.id, user, timeline.revision, undefined, {
+      settings: { ...settings, presentation: undefined },
+      changes: [],
+      durationChanges: [{ id: 'issue', duration: doc.durations[0] }],
+    }),
+    /Gregorian time display/,
+  );
   await assert.rejects(
     store.create(user, { ...doc, presentation: undefined }),
     /Gregorian time display/,

@@ -14,6 +14,7 @@ import {
   validateDocument,
   validateDuration,
   resolveDuration,
+  isOngoing,
   relationshipKey,
   refKey,
   searchRows,
@@ -184,6 +185,10 @@ export async function applyIncrementally(c, t, patch) {
         fail(error.message);
       }
       if (duration.id !== change.id) fail('Changed duration ID mismatch.');
+      // "Now" exists only on Gregorian timelines (#537), as validateDocument requires of
+      // whole documents: a sparse save checks against the settings it sends.
+      if (isOngoing(duration.end) && settings.presentation?.mode !== 'gregorian')
+        fail('Only timelines with the Gregorian time display can have ongoing durations.');
       durationChanges.set(change.id, duration);
     }
   }
