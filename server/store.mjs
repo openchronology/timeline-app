@@ -9,8 +9,7 @@ import {
   pluginMetadata,
   validateDocument,
   durationTree,
-  withOngoing,
-  summariesWithOngoing,
+  frameWithOngoing,
   nowCoordinate,
   OVERVIEW_URL_LIMIT,
   fixMissingAnchors,
@@ -2411,67 +2410,42 @@ export class PostgresStore {
               }
             : {}),
         }));
-        const lower = Q.parse(query.lower),
-          upper = Q.parse(query.upper),
-          active = await ongoing();
-        let summaries = collapsed.rows.map((r) => ({
-          first: r.first_time,
-          last: r.last_time,
-          count: Number(r.duration_count),
-          ...(r.band ? { band: r.band } : {}),
-        }));
-        if (active.length) {
-          // Each placeholder is a zero-length duration, so the walk summarized it in the
-          // cluster holding its start: take it out of that count, then add it as resolved.
-          for (const band of active) {
-            const start = Q.parse(band.first);
-            if (start.compare(lower) < 0 || start.compare(upper) > 0) continue;
-            const cluster = summaries.find(
-              (s) => Q.parse(s.first).compare(start) <= 0 && Q.parse(s.last).compare(start) >= 0,
-            );
-            if (!cluster) continue;
-            cluster.count -= 1;
-            if (cluster.band?.id === band.id) delete cluster.band;
-          }
-          summaries = summariesWithOngoing(
-            summaries.filter((s) => s.count > 0),
-            active,
-            lower,
-            upper,
-            Q.parse(threshold),
-          );
-        }
-        const durationClusters = durationGroups(summaries);
-        // The bands: the walk never meets a placeholder, since the threshold is above zero
-        // for any window and a placeholder has no length.
-        const bands = withOngoing(
-          {
-            durations: intervals.rows.map((r) => r.band),
-            durationsTruncated: total > 256,
-            ...(total > 256
-              ? {
-                  durationsTotal: Math.min(total, DURATION_COUNT_CAP),
-                  ...(total > DURATION_COUNT_CAP ? { durationsTotalMore: true } : {}),
-                }
-              : {}),
-          },
-          active,
-          lower,
-          upper,
-          256,
-          Q.parse(threshold).compare(Q.zero) > 0 ? Q.parse(threshold) : null,
+        const durationClusters = durationGroups(
+          collapsed.rows.map((r) => ({
+            first: r.first_time,
+            last: r.last_time,
+            count: r.duration_count,
+            ...(r.band ? { band: r.band } : {}),
+          })),
         );
-        return {
-          ...bands,
-          edges,
-          edgesTruncated: arcs.rows.length > 256,
-          revision: t.revision,
-          threshold,
-          groups: durationClusters.length
-            ? coalesceGroups([...momentGroups, ...durationClusters], Q.parse(threshold))
-            : momentGroups,
-          visitedNodes: rows.at(-1)?.visited_nodes ?? 0,
+        const bands = {
+          durations: intervals.rows.map((r) => r.band),
+          durationsTruncated: total > 256,
+          ...(total > 256
+            ? {
+                durationsTotal: Math.min(total, DURATION_COUNT_CAP),
+                ...(total > DURATION_COUNT_CAP ? { durationsTotalMore: true } : {}),
+              }
+            : {}),
         };
+        // Ongoing durations (#537): their placeholders out, resolved at the server's clock in.
+        return frameWithOngoing(
+          {
+            ...bands,
+            edges,
+            edgesTruncated: arcs.rows.length > 256,
+            revision: t.revision,
+            threshold,
+            groups: durationClusters.length
+              ? coalesceGroups([...momentGroups, ...durationClusters], Q.parse(threshold))
+              : momentGroups,
+            visitedNodes: rows.at(-1)?.visited_nodes ?? 0,
+          },
+          await ongoing(),
+          Q.parse(query.lower),
+          Q.parse(query.upper),
+          Q.parse(threshold),
+        );
       }
       if (query.kind === 'related') {
         // Direct links from both ends, joined to search rows for titles and times. A link is

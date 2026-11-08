@@ -18,9 +18,12 @@
 //!   with one row per distinct moment time, weighted by how many moments share it. Its
 //!   augmented tree answers viewport overviews (groups of nearby moments) without reading
 //!   every moment.
-//! - `durations`: standalone durations; each endpoint is a fixed time or a moment it follows.
+//! - `durations`: standalone durations; each endpoint is a fixed time or a moment it follows,
+//!   and an end with neither is ongoing: it ends "now" (#537).
 //! - `duration_intervals` + `duration_nodes`: durations with endpoints resolved to times, and
 //!   a persistent AVL interval tree over them (intervals.rs), for viewport bands and summaries.
+//!   An ongoing duration is resolved to a point at its start, and queries given a `now` end
+//!   it there instead.
 //! - `relationships`: undirected links between moments and durations, stored once each.
 //! - `edge_intervals` + `edge_nodes`: the links as arcs between their endpoints' times, in the
 //!   same kind of interval tree.
@@ -117,17 +120,23 @@ fn identifier(id: &str) -> bool {
             .bytes()
             .all(|c| c.is_ascii_alphanumeric() || b"_.:-".contains(&c))
 }
-/// Splits an endpoint into (time, moment); exactly one is present.
+/// Splits an endpoint into (time, moment): one of them, or neither for an ongoing end, whose
+/// time is "now" (`{"ongoing": true}`, #537).
 fn endpoint(value: &Value) -> Result<(Option<&str>, Option<&str>), String> {
     match value {
         Value::String(time) if !time.is_empty() && time.len() <= 65536 => Ok((Some(time), None)),
+        Value::Object(o) if o.len() == 1 && o.get("ongoing") == Some(&Value::Bool(true)) => {
+            Ok((None, None))
+        }
         Value::Object(o) if o.len() == 1 => match o.get("moment").and_then(Value::as_str) {
             Some(id) if identifier(id) => Ok((None, Some(id))),
             _ => Err("Invalid duration anchor".into()),
         },
-        _ => Err("A duration endpoint is an exact time or a moment anchor".into()),
+        _ => Err("A duration endpoint is an exact time, a moment anchor or ongoing".into()),
     }
 }
+/// The stored form of an ongoing end, as `duration_intervals.end_json` and bands carry it.
+pub(crate) const ONGOING_JSON: &str = "{\"ongoing\":true}";
 /// Version-1 files stored durations as links in their start moment's metadata. They become
 /// standalone durations anchored to both original moments.
 pub fn convert_legacy_durations(doc: &mut Document) -> Result<(), String> {
@@ -238,7 +247,24 @@ fn validate(doc: &Document) -> Result<(), String> {
     for e in &doc.events {
         event_problem(e, |id| ids.insert(id))?;
     }
+    ongoing_needs_calendar(doc, &doc.durations)?;
     validate_entities(&doc.durations, &doc.relationships, |id| ids.contains(id))
+}
+/// Only timelines with the Gregorian display have a "now", so only they may hold ongoing
+/// durations (#537), as src/core.ts validateDocument also requires.
+fn ongoing_needs_calendar(doc: &Document, durations: &[Duration]) -> Result<(), String> {
+    let gregorian = doc
+        .presentation
+        .as_ref()
+        .and_then(|p| p.get("mode"))
+        .and_then(Value::as_str)
+        == Some("gregorian");
+    if !gregorian && durations.iter().any(|d| d.end.get("ongoing").is_some()) {
+        return Err(
+            "Only timelines with the Gregorian time display can have ongoing durations".into(),
+        );
+    }
+    Ok(())
 }
 /// The most moments a timeline holds.
 const MAX_EVENTS: usize = 200000;
@@ -316,6 +342,9 @@ fn validate_entities(
     for d in durations_list {
         if !identifier(&d.id) || !durations.insert(&d.id) {
             return Err("Duration IDs must be unique ASCII identifiers".into());
+        }
+        if endpoint(&d.start)? == (None, None) {
+            return Err("A duration's start cannot be ongoing".into());
         }
         for value in [&d.start, &d.end] {
             if let (_, Some(anchor)) = endpoint(value)? {
@@ -527,6 +556,7 @@ fn write<'a>(
             all.sort_by(|a, b| a.id.cmp(&b.id));
             Cow::Owned(all)
         };
+        ongoing_needs_calendar(doc, &durations)?;
         validate_entities(&durations, &doc.relationships, |id| ids.contains(id))?;
         create_duration_table(&db)?;
         for duration in durations.iter() {
@@ -713,6 +743,28 @@ fn read_document(path: &Path, include_events: bool) -> Result<Document, String> 
     db.execute("COMMIT", &[])?;
     Ok(doc)
 }
+/// The `durations` table: exactly one of time/moment for a start, and at most one for an end,
+/// where neither is an ongoing end (#537); fixed times are canonical exact rationals.
+const DURATIONS_TABLE: &str = "CREATE TABLE durations(id TEXT PRIMARY KEY,start_time TEXT COLLATE RATIONAL_V1 CHECK(start_time IS NULL OR q_is_canonical(start_time)=1),start_moment TEXT,end_time TEXT COLLATE RATIONAL_V1 CHECK(end_time IS NULL OR q_is_canonical(end_time)=1),end_moment TEXT,metadata TEXT NOT NULL,CHECK((start_time IS NULL)<>(start_moment IS NULL)),CHECK(end_time IS NULL OR end_moment IS NULL)) STRICT";
+/// Files written before ongoing durations (#537) required an end's time or moment. Their
+/// `durations` table is copied into one that allows neither, the first time one is saved.
+pub(crate) fn allow_ongoing(db: &Connection) -> Result<(), String> {
+    if db.scalar(
+        "SELECT count(*) FROM sqlite_schema WHERE name='durations' AND type='table' AND instr(sql,'(end_time IS NULL)<>(end_moment IS NULL)')>0",
+        &[],
+    )? == "0"
+    {
+        return Ok(());
+    }
+    db.execute(
+        &DURATIONS_TABLE.replace("TABLE durations", "TABLE durations_ongoing"),
+        &[],
+    )?;
+    db.execute("INSERT INTO durations_ongoing SELECT id,start_time,start_moment,end_time,end_moment,metadata FROM durations", &[])?;
+    db.execute("DROP TABLE durations", &[])?;
+    db.execute("ALTER TABLE durations_ongoing RENAME TO durations", &[])?;
+    create_duration_table(db)
+}
 /// Creates the `durations` table and its anchor indexes if missing.
 ///
 /// Each row is one standalone duration as the document stores it: `start_time`/`end_time`
@@ -721,8 +773,10 @@ fn read_document(path: &Path, include_events: bool) -> Result<Document, String> 
 /// `insert_duration` and sparse saves (workspace.rs); read by `read_durations` and when
 /// resolving `duration_intervals`.
 fn create_duration_table(db: &Connection) -> Result<(), String> {
-    // Exactly one of time/moment per endpoint; fixed times are canonical exact rationals.
-    db.execute("CREATE TABLE IF NOT EXISTS durations(id TEXT PRIMARY KEY,start_time TEXT COLLATE RATIONAL_V1 CHECK(start_time IS NULL OR q_is_canonical(start_time)=1),start_moment TEXT,end_time TEXT COLLATE RATIONAL_V1 CHECK(end_time IS NULL OR q_is_canonical(end_time)=1),end_moment TEXT,metadata TEXT NOT NULL,CHECK((start_time IS NULL)<>(start_moment IS NULL)),CHECK((end_time IS NULL)<>(end_moment IS NULL))) STRICT", &[])?;
+    db.execute(
+        &DURATIONS_TABLE.replace("TABLE durations", "TABLE IF NOT EXISTS durations"),
+        &[],
+    )?;
     // Durations anchored to a moment move with it. These indexes serve the lookups of the
     // durations following a moment that changed time or was deleted (workspace.rs).
     db.execute(
@@ -740,6 +794,12 @@ fn create_duration_table(db: &Connection) -> Result<(), String> {
 pub(crate) fn insert_duration(db: &Connection, d: &Duration) -> Result<(), String> {
     let (start_time, start_moment) = endpoint(&d.start)?;
     let (end_time, end_moment) = endpoint(&d.end)?;
+    if start_time.is_none() && start_moment.is_none() {
+        return Err("A duration's start cannot be ongoing".into());
+    }
+    if end_time.is_none() && end_moment.is_none() {
+        allow_ongoing(db)?;
+    }
     let metadata = serde_json::to_string(&d.metadata).map_err(|e| e.to_string())?;
     // Empty strings stand in for NULL; the wrapper binds text parameters only.
     db.execute(
@@ -767,6 +827,7 @@ fn read_durations(db: &Connection, id: Option<&str>) -> Result<Vec<Duration>, St
             let side = |time: &Option<String>, moment: &Option<String>| match (time, moment) {
                 (Some(t), None) => Ok(Value::String(t.clone())),
                 (None, Some(m)) => Ok(serde_json::json!({"moment": m})),
+                (None, None) => Ok(serde_json::json!({"ongoing": true})),
                 _ => Err("Invalid stored duration endpoint".to_string()),
             };
             Ok(Duration {
@@ -1331,7 +1392,7 @@ fn rebuild_duration_index(db: &Connection) -> Result<(), String> {
     // r: each duration with its endpoint JSON (json_quote makes a fixed time a JSON string)
     // and its resolved times s and e (an anchored endpoint takes its moment's time). The
     // window function numbers the rows by (earlier endpoint, id) to give each its ord.
-    db.execute("WITH r AS (SELECT d.id,CASE WHEN d.start_moment IS NULL THEN json_quote(d.start_time) ELSE json_object('moment',d.start_moment) END AS sj,CASE WHEN d.end_moment IS NULL THEN json_quote(d.end_time) ELSE json_object('moment',d.end_moment) END AS ej,COALESCE(d.start_time,(SELECT e.time FROM events e WHERE e.id=d.start_moment)) AS s,COALESCE(d.end_time,(SELECT e.time FROM events e WHERE e.id=d.end_moment)) AS e,d.metadata FROM durations d) INSERT INTO duration_intervals(ord,id,start_json,end_json,start_time,end_time,first,last,metadata) SELECT row_number() OVER (ORDER BY q_min(s,e) COLLATE RATIONAL_V1,id),id,sj,ej,s,e,q_min(s,e),q_max(s,e),metadata FROM r", &[])?;
+    db.execute("WITH r AS (SELECT d.id,CASE WHEN d.start_moment IS NULL THEN json_quote(d.start_time) ELSE json_object('moment',d.start_moment) END AS sj,CASE WHEN d.end_moment IS NOT NULL THEN json_object('moment',d.end_moment) WHEN d.end_time IS NOT NULL THEN json_quote(d.end_time) ELSE json('{\"ongoing\":true}') END AS ej,COALESCE(d.start_time,(SELECT e.time FROM events e WHERE e.id=d.start_moment)) AS s,COALESCE(d.end_time,(SELECT e.time FROM events e WHERE e.id=d.end_moment),CASE WHEN d.end_moment IS NULL THEN COALESCE(d.start_time,(SELECT e.time FROM events e WHERE e.id=d.start_moment)) END) AS e,d.metadata FROM durations d) INSERT INTO duration_intervals(ord,id,start_json,end_json,start_time,end_time,first,last,metadata) SELECT row_number() OVER (ORDER BY q_min(s,e) COLLATE RATIONAL_V1,id),id,sj,ej,s,e,q_min(s,e),q_max(s,e),metadata FROM r", &[])?;
     // Each duration's exact length, compared with the zoom threshold to decide whether it is
     // drawn as a band or summarized.
     db.execute(
@@ -1357,6 +1418,12 @@ fn rebuild_duration_index(db: &Connection) -> Result<(), String> {
 pub(crate) fn create_start_index(db: &Connection) -> Result<(), String> {
     db.execute(
         "CREATE INDEX IF NOT EXISTS duration_intervals_first ON duration_intervals(first COLLATE RATIONAL_V1)",
+        &[],
+    )?;
+    // The ongoing durations (#537), which the tree holds as points at their starts and every
+    // window query reads to resolve at the current time.
+    db.execute(
+        "CREATE INDEX IF NOT EXISTS duration_intervals_ongoing ON duration_intervals(first COLLATE RATIONAL_V1,id) WHERE end_json='{\"ongoing\":true}'",
         &[],
     )
 }
@@ -1644,7 +1711,10 @@ pub(crate) fn duration_list(
     sort: &str,
     offset: usize,
     limit: usize,
+    now: Option<&str>,
 ) -> Result<Value, String> {
+    let intervals = resolved_intervals("?7");
+    let now = now.unwrap_or("");
     let order = match sort {
         "start" => "d.first COLLATE RATIONAL_V1,d.id",
         "title" => "lower(coalesce(json_extract(d.metadata,'$.title'),'')),d.first COLLATE RATIONAL_V1,d.id",
@@ -1658,18 +1728,18 @@ pub(crate) fn duration_list(
     let take = (limit + 1).to_string();
     let skip = offset.to_string();
     let rows = db.query_limited(
-        &format!("SELECT {BAND_COLUMNS} FROM duration_intervals d WHERE {filter} ORDER BY {order} LIMIT CAST(?5 AS INTEGER) OFFSET CAST(?6 AS INTEGER)"),
-        &[lower, upper, threshold, text, &take, &skip],
+        &format!("SELECT {BAND_COLUMNS} FROM {intervals} d WHERE {filter} ORDER BY {order} LIMIT CAST(?5 AS INTEGER) OFFSET CAST(?6 AS INTEGER)"),
+        &[lower, upper, threshold, text, &take, &skip, now],
         limit + 1,
         8 * 1024 * 1024,
     )?;
     let total: usize = db
         .scalar(
             &format!(
-                "SELECT count(*) FROM (SELECT 1 FROM duration_intervals d WHERE {filter} LIMIT {})",
+                "SELECT count(*) FROM (SELECT 1 FROM {intervals} d WHERE {filter} LIMIT {})",
                 DURATION_COUNT_CAP + 1
             ),
-            &[lower, upper, threshold, text],
+            &[lower, upper, threshold, text, "", "", now],
         )?
         .parse()
         .map_err(|e: std::num::ParseIntError| e.to_string())?;
@@ -1695,17 +1765,26 @@ pub(crate) fn duration_page(
     upper: &str,
     after: Option<(&str, &str)>,
     limit: usize,
+    now: Option<&str>,
 ) -> Result<Value, String> {
+    let intervals = resolved_intervals("?6");
     let take = (limit + 1).to_string();
     let (after_first, after_id) = after.unwrap_or(("", ""));
     // Keyset pagination: durations starting at or after lower (?1) and ending at or before
     // upper (?2), strictly after the cursor (?3, ?4) in (first, id) order; an empty cursor
     // starts at the beginning. The range on `first` can use duration_intervals_first. One row
     // past the limit tells whether there is a next page.
-    let sql = format!("SELECT {BAND_COLUMNS} FROM duration_intervals d WHERE d.first>=q(?1) COLLATE RATIONAL_V1 AND d.last<=q(?2) COLLATE RATIONAL_V1 AND (?3='' OR q_cmp(d.first,q(?3))>0 OR (q_cmp(d.first,q(?3))=0 AND d.id>?4)) ORDER BY d.first COLLATE RATIONAL_V1,d.id LIMIT CAST(?5 AS INTEGER)");
+    let sql = format!("SELECT {BAND_COLUMNS} FROM {intervals} d WHERE d.first>=q(?1) COLLATE RATIONAL_V1 AND d.last<=q(?2) COLLATE RATIONAL_V1 AND (?3='' OR q_cmp(d.first,q(?3))>0 OR (q_cmp(d.first,q(?3))=0 AND d.id>?4)) ORDER BY d.first COLLATE RATIONAL_V1,d.id LIMIT CAST(?5 AS INTEGER)");
     let rows = db.query_limited(
         &sql,
-        &[lower, upper, after_first, after_id, &take],
+        &[
+            lower,
+            upper,
+            after_first,
+            after_id,
+            &take,
+            now.unwrap_or(""),
+        ],
         limit + 1,
         8 * 1024 * 1024,
     )?;
@@ -1722,6 +1801,29 @@ pub(crate) fn duration_page(
         None
     };
     Ok(serde_json::json!({"durations":durations,"next":next}))
+}
+/// `duration_intervals` with its ongoing durations (#537), which it holds as points at their
+/// starts, ending at the time in parameter `now` instead (never before their starts), when
+/// that parameter is not empty: what a list or page of durations reads, so its filters, order
+/// and offsets see them as they are drawn. SQLite flattens it into the query, which keeps the
+/// table's indexes.
+fn resolved_intervals(now: &str) -> String {
+    let ongoing = format!("d.end_json='{ONGOING_JSON}' AND {now}<>''");
+    format!("(SELECT d.ord,d.id,d.start_json,d.end_json,d.start_time,d.first,d.metadata,CASE WHEN {ongoing} THEN q_max(d.first,q({now})) ELSE d.end_time END AS end_time,CASE WHEN {ongoing} THEN q_max(d.first,q({now})) ELSE d.last END AS last,CASE WHEN {ongoing} THEN q_sub(q_max(d.first,q({now})),d.first) ELSE d.extent END AS extent FROM duration_intervals d)")
+}
+/// The ongoing durations (#537) as bands ending at `now` (never before their starts), in
+/// start order, at most DURATION_COUNT_CAP: read through `duration_intervals_ongoing`.
+pub(crate) fn ongoing_bands(db: &Connection, now: &str) -> Result<Vec<Value>, String> {
+    let intervals = resolved_intervals("?1");
+    db.query_limited(
+        &format!("SELECT {BAND_COLUMNS} FROM {intervals} d WHERE d.end_json='{ONGOING_JSON}' ORDER BY d.first COLLATE RATIONAL_V1,d.id LIMIT {DURATION_COUNT_CAP}"),
+        &[now],
+        DURATION_COUNT_CAP,
+        8 * 1024 * 1024,
+    )?
+    .iter()
+    .map(|row| band_json(row))
+    .collect()
 }
 /// Exact rational helpers evaluated by the sqlite-rational extension.
 ///

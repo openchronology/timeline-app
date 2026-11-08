@@ -49,7 +49,7 @@ export {
   crossArrowheadPath,
 } from './relationships.js';
 export type { EdgeBand, EntityRef, Relationship } from './relationships.js';
-export { durationGroups, coalesceGroups, entityCount } from './summaries.js';
+export { durationGroups, coalesceGroups, entityCount, frameWithOngoing } from './summaries.js';
 export {
   anchorOf,
   durationOverview,
