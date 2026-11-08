@@ -157,12 +157,24 @@ export const schemas = {
   Duration: {
     type: 'object',
     description:
-      'A span of time. Either end may be a fixed time or follow a moment; anchors must name moments of the timeline.',
+      'A span of time. Either end may be a fixed time or follow a moment, and the end may be ongoing; anchors must name moments of the timeline.',
     required: ['id', 'start', 'end'],
     properties: {
       id: { ...ENTITY_ID, description: 'Unique among the timeline’s durations.' },
       start: ref('DurationEndpoint'),
-      end: ref('DurationEndpoint'),
+      end: {
+        description:
+          'An exact time, `{"moment": "<id>"}` to follow that moment’s time, or `{"ongoing": true}` for the current time while it is in progress (timelines with the Gregorian display only). Its band then ends at the server’s clock, and never before its start.',
+        oneOf: [
+          ref('DurationEndpoint'),
+          {
+            type: 'object',
+            required: ['ongoing'],
+            additionalProperties: false,
+            properties: { ongoing: { type: 'boolean', enum: [true] } },
+          },
+        ],
+      },
       metadata: {
         ...ref('EntityMetadata'),
         description: 'As a moment’s; `{}` when left out. It may not contain `durations`.',

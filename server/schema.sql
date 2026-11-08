@@ -1195,6 +1195,9 @@ BEGIN
 END $$;
 -- A duration by its ID (band->>'id'): saves, merges, history and duration queries look one up.
 CREATE INDEX IF NOT EXISTS oc_duration_nodes_duration_id ON oc_duration_nodes(timeline_id,(band->>'id'));
+-- Ongoing durations (#537): the tree holds each as a point at its start, and every window
+-- query reads the timeline's few ongoing ones to resolve them at the current time.
+CREATE INDEX IF NOT EXISTS oc_duration_nodes_ongoing ON oc_duration_nodes(timeline_id) WHERE band->'end'->>'ongoing'='true';
 
 -- Per-timeline text search over moments and durations, rebuilt with the rational index on save.
 -- The 'simple' configuration is language-neutral; queries match word prefixes.
@@ -1295,6 +1298,8 @@ CREATE TABLE IF NOT EXISTS oc_view_duration_nodes (
   PRIMARY KEY(timeline_id,id)
 );
 -- Mirrors oc_duration_nodes' height and start key (above).
+-- A view's ongoing durations (#537), as oc_duration_nodes_ongoing.
+CREATE INDEX IF NOT EXISTS oc_view_duration_nodes_ongoing ON oc_view_duration_nodes(timeline_id) WHERE band->'end'->>'ongoing'='true';
 ALTER TABLE oc_view_duration_nodes ADD COLUMN IF NOT EXISTS height integer;
 DROP INDEX IF EXISTS oc_view_duration_nodes_first_approx;
 ALTER TABLE oc_view_duration_nodes DROP COLUMN IF EXISTS first_approx;

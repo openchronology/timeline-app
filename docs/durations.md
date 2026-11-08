@@ -44,7 +44,8 @@ An end of `{"ongoing": true}` is the current time: the band runs up to now and k
 - A start cannot be ongoing. An ongoing duration whose start is still in the future is a point at its start until then.
 - "Now" is not uncertainty: an end that happened at an unknown time is a different question.
 - The interval trees cannot hold a time that moves, so they hold an ongoing duration as a point at its start. A window's ongoing durations are resolved at the current time, then ranked, counted and summarized with the rest (#537).
-- The server cannot save ongoing durations yet, so for now they work in files and in the browser. The server's queries come in a later stage of #537, and the SQLite store's after that.
+- The server stores each as that point too, beside its definition, and resolves a timeline's ongoing durations at its own clock in every window, summary, list and lookup (read through a partial index, at most 10,000 per timeline). If a timeline's display stops being Gregorian, its ongoing durations stay points at their starts.
+- The desktop's SQLite store and `och-convert` cannot hold them yet: that is the last stage of #537.
 
 ### Earlier linked durations
 
