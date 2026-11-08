@@ -5,7 +5,7 @@
 import { localSource, localSourcesAllowed, localPicture } from './local-files.js';
 import { compilePluginScript } from './custom-time.js';
 import { contentLabels, CONTENT_LABELS_KEY } from './content-labels.js';
-import { validateTags } from './tags.js';
+import { validateEntityTags } from './tags.js';
 /** Versioned host components and optional source interpreted by our bounded language. */
 export interface PluginField {
   kind:
@@ -841,7 +841,7 @@ export function validatePluginManifest(value: unknown): PluginManifest {
         throw new Error(`A background chart has one to ${CHART_SERIES_LIMIT} series.`);
       series = chart.series.map((value) => {
         const one = object(value, ['label', 'tags', 'color', 'setting']);
-        const tags = validateTags(one.tags);
+        const tags = validateEntityTags(one.tags);
         const color = colorValue(one.color);
         if (!tags.length || !color || !colorSetting(one.setting))
           throw new Error(

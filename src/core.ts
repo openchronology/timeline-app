@@ -146,10 +146,13 @@ export type { DifferenceUnit, TimeDifference } from './difference.js';
 export { planRuler, tickLabel, validateRulerPolicy } from './ruler.js';
 export type { RulerPolicy, RulerTick, RulerPlan } from './ruler.js';
 export { parseTimestamp, printTimestamp } from './calendar.js';
-import { validateTags, entityTags, normalizeEntityTags } from './tags.js';
+import { validateTags, validateEntityTags, entityTags, normalizeEntityTags } from './tags.js';
 import { entryLimitText, withinEntryLimit } from './entry-limit.js';
 export {
   validateTags,
+  validateEntityTags,
+  ENTITY_TAG_LENGTH,
+  TIMELINE_TAG_LENGTH,
   entityTags,
   normalizeEntityTags,
   filterDocument,
@@ -650,7 +653,7 @@ export class TimelineIndex {
     right: Q,
     threshold: Q,
   ): Pick<FrameGroup, 'first' | 'last' | 'count'>[][] {
-    const wanted = series.map((tags) => new Set(validateTags(tags)));
+    const wanted = series.map((tags) => new Set(validateEntityTags(tags)));
     const key = JSON.stringify(wanted.map((tags) => [...tags].sort()));
     if (this.charted?.key !== key) {
       this.charted = {

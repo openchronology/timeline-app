@@ -68,7 +68,7 @@ import {
   validateDocument,
   validateDuration,
   validateRef,
-  validateTags,
+  validateEntityTags,
   validateTimelineImage,
 } from '../dist/core.mjs';
 const uuid = /^[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}$/i;
@@ -237,7 +237,7 @@ function viewFilter(value) {
   }
   let tags;
   try {
-    tags = validateTags(value.tags);
+    tags = validateEntityTags(value.tags);
   } catch {
     tags = [];
   }

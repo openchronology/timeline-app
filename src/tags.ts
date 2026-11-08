@@ -17,24 +17,38 @@ import type { Rational } from 'rational-ordered-map';
 import type { Metadata, PointEvent, TimelineDocument } from './core.js';
 import type { Duration } from './durations.js';
 
-export function validateTags(value: unknown): string[] {
+/** The longest a timeline's own tag may be (catalog tags, shown on cards and pages). */
+export const TIMELINE_TAG_LENGTH = 64;
+/**
+ * The longest an event's tag may be: long enough for references such as
+ * `gitlab:git.example.com/group/subgroup/project!1234` (#538).
+ */
+export const ENTITY_TAG_LENGTH = 128;
+/**
+ * Normalizes a list of tags: trimmed, lowercased, deduplicated, at most 40, each 1 to `length`
+ * characters without commas or control characters. A timeline's own tags by default; events'
+ * tags, and the tags that select events, with ENTITY_TAG_LENGTH (validateEntityTags).
+ */
+export function validateTags(value: unknown, length = TIMELINE_TAG_LENGTH): string[] {
   if (!Array.isArray(value) || value.length > 40) throw new Error('Use at most 40 tags.');
   const tags = value.map((tag) => {
     if (typeof tag !== 'string') throw new Error('Tags must be text.');
     const normalized = tag.normalize('NFC').trim().toLowerCase();
-    if (!normalized || normalized.length > 64 || /[\x00-\x1f\x7f,]/.test(normalized))
-      throw new Error('Tags must be 1–64 characters without commas or control characters.');
+    if (!normalized || normalized.length > length || /[\x00-\x1f\x7f,]/.test(normalized))
+      throw new Error(`Tags must be 1–${length} characters without commas or control characters.`);
     return normalized;
   });
   return [...new Set(tags)];
 }
+/** Events' tags, and tags that select events (separations, charts), at most 128 characters. */
+export const validateEntityTags = (value: unknown) => validateTags(value, ENTITY_TAG_LENGTH);
 /**
  * Normalizes an entity's `metadata.tags` when it is a valid tag list. Anything else is left
  * untouched as ordinary custom metadata, so older documents using that key still open.
  */
 export function normalizeEntityTags(value: unknown): unknown {
   try {
-    return validateTags(value);
+    return validateEntityTags(value);
   } catch {
     return value;
   }
@@ -57,7 +71,7 @@ export type ViewFilter =
 export function viewFilterKey(filter: ViewFilter): string {
   if ('related' in filter)
     return `${filter.mode}:related:${filter.depth}:${refKey(validateRef(filter.related))}`;
-  return filter.mode + ':' + [...validateTags(filter.tags)].sort().join(',');
+  return filter.mode + ':' + [...validateEntityTags(filter.tags)].sort().join(',');
 }
 /**
  * One side of a separation. Durations are resolved to fixed endpoints first, because the
@@ -111,7 +125,7 @@ export function filterMembership(
     set.add(start);
     inside = (key) => set.has(key);
   } else {
-    const wanted = new Set(validateTags(filter.tags));
+    const wanted = new Set(validateEntityTags(filter.tags));
     inside = (_key, metadata) => entityTags(metadata).some((tag) => wanted.has(tag));
   }
   return (key, metadata) => inside(key, metadata) === (filter.mode === 'any');
