@@ -14,6 +14,7 @@ import { TimelineWriter, temporary } from './timeline-writer.mjs';
 import { deliveryChanges, loadRoutes, validSignature } from './github-source.mjs';
 import { StintTracker, keeps, projectStatusChange } from './github-events.mjs';
 import { forgejoDelivery, validForgejoSignature } from './forgejo-source.mjs';
+import { gitlabDeliveryChanges, validGitlabToken } from './gitlab-source.mjs';
 
 /** A delivery's JSON body, or null when it is not JSON. */
 function parse(body) {
@@ -109,9 +110,9 @@ export class GithubIngest {
     githubApi = 'https://api.github.com',
     stints = new StintTracker(),
   }) {
-    if (!secret && !secrets.forgejo)
+    if (!secret && !secrets.forgejo && !secrets.gitlab)
       throw new Error(
-        'Set the webhook’s secret: GITHUB_WEBHOOK_SECRET for GitHub, FORGEJO_WEBHOOK_SECRET for Forgejo or Gitea.',
+        'Set the webhook’s secret: GITHUB_WEBHOOK_SECRET for GitHub, FORGEJO_WEBHOOK_SECRET for Forgejo or Gitea, GITLAB_WEBHOOK_TOKEN for GitLab.',
       );
     this.writer = new TimelineWriter({ api, key, fetcher });
     this.secret = secret;
@@ -162,8 +163,9 @@ export class GithubIngest {
   }
   /**
    * A delivery from any platform, told apart by its headers (lower-case names, as Node gives
-   * them): GitHub's (`x-github-event`) or Forgejo's and Gitea's (`x-forgejo-event`,
-   * `x-gitea-event`), each checked against its own secret. 400 for anything else.
+   * them): GitHub's (`x-github-event`), Forgejo's and Gitea's (`x-forgejo-event`,
+   * `x-gitea-event`) or GitLab's (`x-gitlab-event`), each checked against its own secret.
+   * 400 for anything else.
    */
   receiveFrom(headers, body) {
     if (headers['x-github-event'])
@@ -188,6 +190,25 @@ export class GithubIngest {
         return 204;
       }
       return this.handle(delivery.event, delivery.payload);
+    }
+    const gitlab = headers['x-gitlab-event'];
+    if (gitlab) {
+      if (
+        !this.secrets.gitlab ||
+        !validGitlabToken(this.secrets.gitlab, headers['x-gitlab-token'])
+      ) {
+        this.stats.rejected++;
+        return 401;
+      }
+      const payload = parse(body);
+      if (!payload) return 400;
+      this.stats.deliveries++;
+      // GitLab's deliveries carry their changes: mapped straight to timeline changes.
+      let queued = false;
+      for (const change of gitlabDeliveryChanges(String(gitlab), payload, this.routes.kinds))
+        queued = this.queue(change) || queued;
+      if (!queued) this.stats.ignored++;
+      return queued ? 202 : 204;
     }
     return 400;
   }
@@ -383,7 +404,10 @@ export async function main(env = process.env) {
     api: env.OCH_API_URL,
     key: env.OCH_API_KEY,
     secret: env.GITHUB_WEBHOOK_SECRET || undefined,
-    secrets: { forgejo: env.FORGEJO_WEBHOOK_SECRET || undefined },
+    secrets: {
+      forgejo: env.FORGEJO_WEBHOOK_SECRET || undefined,
+      gitlab: env.GITLAB_WEBHOOK_TOKEN || undefined,
+    },
     routes: loadRoutes(env),
     flushMs: env.GITHUB_FLUSH_MS ? Number(env.GITHUB_FLUSH_MS) : undefined,
     token: env.GITHUB_TOKEN || undefined,

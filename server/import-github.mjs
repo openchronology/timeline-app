@@ -25,6 +25,7 @@ import {
   repositoryName,
 } from './github-source.mjs';
 import { forgejoTimelineEvent } from './forgejo-source.mjs';
+import { readGitlab } from './gitlab-source.mjs';
 import {
   EVENT_KINDS,
   branchMoment,
@@ -77,32 +78,41 @@ export class GithubReader {
     this.requests = 0;
   }
   async get(url) {
-    for (;;) {
+    for (let attempt = 1; ; attempt++) {
       this.requests++;
-      const response = await this.fetcher(url, {
-        redirect: 'error',
-        signal: AbortSignal.timeout(60000),
-        headers: {
-          Accept: 'application/vnd.github+json',
-          'X-GitHub-Api-Version': '2022-11-28',
-          'User-Agent': USER_AGENT,
-          ...(this.token ? { Authorization: `${this.scheme} ${this.token}` } : {}),
-        },
-      });
+      let response;
+      try {
+        response = await this.fetcher(url, {
+          redirect: 'error',
+          signal: AbortSignal.timeout(60000),
+          headers: {
+            Accept: 'application/vnd.github+json',
+            'X-GitHub-Api-Version': '2022-11-28',
+            'User-Agent': USER_AGENT,
+            ...(this.token ? { Authorization: `${this.scheme} ${this.token}` } : {}),
+          },
+        });
+      } catch (error) {
+        // A request that timed out, or a connection that failed: tried again, three times.
+        if (attempt >= 3) throw error;
+        this.log.error(`${new URL(url).host}: ${error.message}; trying again.`);
+        await sleep(2000 * attempt);
+        continue;
+      }
       const remaining = response.headers.get('x-ratelimit-remaining');
       if ((response.status === 403 || response.status === 429) && remaining === '0') {
         const reset = Number(response.headers.get('x-ratelimit-reset')) * 1000;
         const wait = Math.max(1000, reset - Date.now());
         if (!(wait <= MAX_RATE_WAIT))
           throw new Error('GitHub’s rate limit is used up; set GITHUB_TOKEN, or try again later.');
-        this.log.error(`github: rate limited; waiting ${Math.ceil(wait / 1000)} s.`);
+        this.log.error(`${new URL(url).host}: rate limited; waiting ${Math.ceil(wait / 1000)} s.`);
         await sleep(wait);
         continue;
       }
       if (response.status !== 200) {
         const value = await response.json().catch(() => ({}));
         throw Object.assign(
-          new Error(`GitHub answered ${response.status}: ${value.message ?? url}`),
+          new Error(`${new URL(url).host} answered ${response.status}: ${value.message ?? url}`),
           { status: response.status },
         );
       }
@@ -295,7 +305,8 @@ Kinds: ${Object.keys(EVENT_KINDS).join(', ')}. All by default; --only commits im
 those, --except forks,branches everything else.
 
 Environment: OCH_API_URL and OCH_API_KEY (not needed for --dry-run); GITHUB_TOKEN, or
-FORGEJO_TOKEN for Forgejo and Gitea (recommended; needed for private repositories);
+FORGEJO_TOKEN for Forgejo and Gitea, GITLAB_TOKEN for GitLab (recommended; needed for
+private repositories);
 GITHUB_API_URL (GitHub Enterprise; default https://api.github.com).`;
 
 /** The command: exit 0 imported, 1 something failed, 2 a usage error. */
@@ -358,19 +369,21 @@ export async function main(argv = process.argv.slice(2), env = process.env, out 
   // The platform's API, token and paging.
   const { platform, host, public: isPublic } = parseRepository(repository);
   const reader =
-    platform === 'forgejo'
-      ? new GithubReader({
-          api: `https://${host}/api/v1`,
-          token: env.FORGEJO_TOKEN,
-          scheme: 'token',
-          pageSize: ['limit', '50'],
-          log: out,
-        })
-      : new GithubReader({
-          api: isPublic ? env.GITHUB_API_URL || undefined : `https://${host}/api/v3`,
-          token: env.GITHUB_TOKEN,
-          log: out,
-        });
+    platform === 'gitlab'
+      ? new GithubReader({ api: `https://${host}/api/v4`, token: env.GITLAB_TOKEN, log: out })
+      : platform === 'forgejo'
+        ? new GithubReader({
+            api: `https://${host}/api/v1`,
+            token: env.FORGEJO_TOKEN,
+            scheme: 'token',
+            pageSize: ['limit', '50'],
+            log: out,
+          })
+        : new GithubReader({
+            api: isPublic ? env.GITHUB_API_URL || undefined : `https://${host}/api/v3`,
+            token: env.GITHUB_TOKEN,
+            log: out,
+          });
   let writer = null;
   if (!options['dry-run'])
     try {
@@ -390,7 +403,10 @@ export async function main(argv = process.argv.slice(2), env = process.env, out 
           `timeline ${timeline} needs the Gregorian time display, for open items to end "now"`,
         );
     }
-    changes = await readRepository(reader, repository, { since, kinds });
+    changes =
+      platform === 'gitlab'
+        ? await readGitlab(reader, repository, { since, kinds })
+        : await readRepository(reader, repository, { since, kinds });
   } catch (error) {
     out.error(`${repository}: ${error.message}`);
     return 1;
@@ -402,6 +418,7 @@ export async function main(argv = process.argv.slice(2), env = process.env, out 
     `${changes.durations.length - changes.items} other durations`,
     `${changes.links.length} links`,
   ].join(', ');
+  for (const warning of changes.warnings ?? []) out.error(`${repository}: ${warning}`);
   out.log(`Requests: ${reader.requests}.`);
   if (!writer) {
     out.log(`${repository} → ${timeline}: would import ${summary}.`);

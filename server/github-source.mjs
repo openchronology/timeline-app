@@ -103,7 +103,7 @@ export const itemId = (repository, number, mergeRequest = false) =>
 /** A GitHub timestamp (ISO 8601, whole seconds) as a stored Gregorian coordinate: Unix seconds. */
 export function seconds(timestamp) {
   const ms = Date.parse(timestamp);
-  if (!Number.isFinite(ms)) throw new Error(`Not a GitHub time: ${timestamp}`);
+  if (!Number.isFinite(ms)) throw new Error(`Not a time: ${timestamp}`);
   return String(Math.floor(ms / 1000));
 }
 
