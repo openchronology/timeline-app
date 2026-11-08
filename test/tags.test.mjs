@@ -12,6 +12,8 @@ import {
   separationArcs,
   tagCounts,
   viewFilterKey,
+  validateEntityTags,
+  validateTags,
 } from '../dist/core.mjs';
 const doc = () => ({
   format: 'openchronology',
@@ -123,5 +125,27 @@ test("a separation keeps the whole timeline's arcs, each end marked by its side 
   assert.deepEqual(
     marks({ related: { moment: 'a' }, depth: 'all', mode: 'any' }, '0/1', '2000/1'),
     ['d:x~m:a true true', 'm:a~m:c true true', 'm:b~m:c true true', 'm:b~m:far true true'],
+  );
+});
+
+test('events may carry tags of up to 128 characters; timelines keep 64 (#538)', () => {
+  const long = 'gitlab:git.example.com/group/subgroup/project!1234'.padEnd(128, 'x');
+  assert.deepEqual(validateEntityTags([long]), [long]);
+  assert.throws(() => validateEntityTags([long + 'x']), /1–128 characters/);
+  assert.throws(() => validateTags([long]), /1–64 characters/);
+  // An event keeps it; a separation and a chart series select by it.
+  const doc = validateDocument({
+    format: 'openchronology',
+    version: 1,
+    title: 'Long tags',
+    description: '',
+    events: [{ id: 'a', time: '1/1', metadata: { tags: [long] } }],
+  });
+  assert.deepEqual(doc.events[0].metadata.tags, [long]);
+  assert.equal(viewFilterKey({ tags: [long], mode: 'any' }), 'any:' + long);
+  assert.throws(
+    () => validateDocument({ ...doc, tags: [long] }),
+    /1–64 characters/,
+    'a timeline’s own tags stay short',
   );
 });

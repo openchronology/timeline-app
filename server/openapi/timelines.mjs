@@ -120,7 +120,7 @@ export const schemas = {
       description: { type: 'string', description: 'Notes, in Markdown.' },
       tags: {
         type: 'array',
-        items: { type: 'string', minLength: 1, maxLength: 64 },
+        items: { type: 'string', minLength: 1, maxLength: 128 },
         maxItems: 40,
         description:
           'Tags, lowercased and trimmed when valid (1–64 characters, no commas or control characters, at most 40). Anything else is kept as ordinary metadata.',
@@ -287,7 +287,7 @@ export const schemas = {
                 type: 'array',
                 minItems: 1,
                 maxItems: 40,
-                items: { type: 'string', minLength: 1, maxLength: 64 },
+                items: { type: 'string', minLength: 1, maxLength: 128 },
                 description: 'Normalized like entity tags: trimmed, lowercased, without commas.',
               },
             },
@@ -352,7 +352,7 @@ export const schemas = {
         properties: {
           tags: {
             type: 'array',
-            items: { type: 'string', minLength: 1, maxLength: 64 },
+            items: { type: 'string', minLength: 1, maxLength: 128 },
             minItems: 1,
             maxItems: 40,
           },
