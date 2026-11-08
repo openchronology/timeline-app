@@ -1,8 +1,8 @@
 # GitHub to timelines
 
-<!-- description: Mirror GitHub, Forgejo and Gitea issues, pull requests and commits into timelines, ongoing while open, by webhook or import. -->
+<!-- description: Mirror GitHub, GitLab, Forgejo and Gitea issues, pull requests and commits into timelines, ongoing while open, by webhook or import. -->
 
-OpenChronology can aggregate the work your tools already record, from GitHub, and from Forgejo and Gitea ([below](#forgejo-and-gitea)) (#538). Each issue and pull request becomes a **duration**:
+OpenChronology can aggregate the work your tools already record, from GitHub, from Forgejo and Gitea ([below](#forgejo-and-gitea)), and from GitLab ([below](#gitlab)) (#538). Each issue and pull request becomes a **duration**:
 
 - it starts when the item was opened;
 - it is [ongoing](durations.md#ongoing-durations) while the item is open;
@@ -205,6 +205,7 @@ GitHub's first delivery is a ping, which the receiver answers.
 | `OCH_API_URL`, `OCH_API_KEY` | (required)               | The server's origin and a read/write API key.                                                    |
 | `GITHUB_WEBHOOK_SECRET`      | (one of these)           | The GitHub webhook's secret. Deliveries without a valid `X-Hub-Signature-256` are refused (401). |
 | `FORGEJO_WEBHOOK_SECRET`     | (one of these)           | The Forgejo or Gitea webhook's secret, checked against `X-Forgejo-Signature`.                    |
+| `GITLAB_WEBHOOK_TOKEN`       | (one of these)           | The GitLab webhook's secret token, compared with `X-Gitlab-Token`.                               |
 | `GITHUB_ROUTES`              | `github-routes.json`     | Path of the routing rules; `GITHUB_ROUTES_JSON` may hold them inline instead.                    |
 | `GITHUB_HOST`, `GITHUB_PORT` | `127.0.0.1`, `5580`      | Address and port to listen on.                                                                   |
 | `GITHUB_FLUSH_MS`            | `1000`                   | How long changes gather before they are saved.                                                   |
@@ -242,6 +243,36 @@ github.com keeps its short form, `github/acme/app#412`, and GitHub Enterprise na
 
 - **Labels:** Forgejo's deliveries say only that an item's labels changed, not which. The item's `label:` tags follow, but a label moment is recorded only by the importer, which reads it from the item's timeline.
 - **Not on Forgejo:** project boards, sub-issues and review requests by team.
+
+## GitLab
+
+GitLab projects are named with their host, as `gitlab:<host>/<group>/<subgroups…>/<project>`. On gitlab.com their tags leave the host out, as GitHub's do on github.com:
+
+|             | Project                                | Issue                 | Merge request        | Person                        |
+| ----------- | -------------------------------------- | --------------------- | -------------------- | ----------------------------- |
+| gitlab.com  | `gitlab/group/app`                     | `gitlab/group/app#12` | `gitlab/group/app!7` | `gitlab/mona`                 |
+| Self-hosted | `gitlab:git.example.com/group/sub/app` | `…#12`                | `…!7`                | `gitlab:git.example.com/mona` |
+
+Merge requests are numbered apart from issues, so they are written `!7`, and tagged `merge request`.
+
+- **Importer:** `--repo gitlab:gitlab.com/group/app` (or your host). Set `GITLAB_TOKEN` to a token with `read_api`. Without one, GitLab still lists a public project's issues, merge requests, commits and releases. It keeps back their events, notes and milestones, which the importer then leaves out with a warning.
+- **What happened to an item** comes from three sources:
+  - its label, milestone and state events;
+  - its system notes: assignments, review requests, approvals, drafts, renames, mentions, locks and duplicates;
+  - comments, which only add the mentions they make.
+
+  That is up to four listings per item, each read only if a kind you chose needs it.
+
+- **Commits:** GitLab names a commit's author but not their account, so commits carry no person tag.
+- **Branches with no new commits** since `--since` are not read: GitLab dates each branch's last commit.
+- **Receiver:** in the project's (or group's) **Settings → Webhooks**:
+  - **URL:** the receiver's address.
+  - **Secret token:** the value of `GITLAB_WEBHOOK_TOKEN`.
+  - **Triggers:** issues events, merge request events, comments, push events and releases events.
+
+  The receiver reads each change's before and after from the delivery: the labels added and removed, assignees, reviewers, title and draft state, and closing, reopening, merging and approval.
+
+- **Not on GitLab:** project boards, forks and sub-issues are not read live; forks are imported.
 
 ## Running it as a service
 
