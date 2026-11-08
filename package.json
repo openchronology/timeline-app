@@ -4,6 +4,7 @@
   "private": true,
   "type": "module",
   "bin": {
+    "och-import-github": "server/import-github.mjs",
     "och-import-logs": "server/import-logs.mjs"
   },
   "engines": {
@@ -38,6 +39,8 @@
     "syslog": "node server/syslog-receiver.mjs",
     "journald": "node server/journald-receiver.mjs",
     "import:logs": "node server/import-logs.mjs",
+    "github": "node server/github-receiver.mjs",
+    "import:github": "node server/import-github.mjs",
     "bench:report": "node bench/report.mjs"
   },
   "dependencies": {

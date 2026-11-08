@@ -135,12 +135,14 @@ export class TimelineWriter {
   /**
    * Saves one batch, in saves of at most limit(timeline) entries each, moments before
    * durations (which may name them): a save the server stops as too slow is sent again
-   * halved. Resolves with the last save's answer when all are saved; otherwise throws an
+   * halved. `removed` (duration IDs to delete) and `links` (relationship changes, which may
+   * name the entities saved before them) go with the last save. Resolves with the last save's
+   * answer when all are saved; otherwise throws an
    * error carrying `status` (none when the server could not be reached), the response
    * `value` and `retryAfter`. Saves already made stay (sending them again overwrites them
    * with the same).
    */
-  async send(timeline, { moments = [], durations = [] }) {
+  async send(timeline, { moments = [], durations = [], removed = [], links = [] }) {
     const items = [
       ...moments.map((event) => ({ event })),
       ...durations.map((duration) => ({ duration })),
@@ -149,12 +151,14 @@ export class TimelineWriter {
       value;
     do {
       const size = Math.min(this.limit(timeline), items.length - offset);
-      const part = items.slice(offset, offset + size);
+      const part = items.slice(offset, offset + size),
+        last = offset + size >= items.length;
       const started = this.now();
       try {
         value = await this.save(timeline, {
           moments: part.filter((p) => p.event).map((p) => p.event),
           durations: part.filter((p) => p.duration).map((p) => p.duration),
+          ...(last ? { removed, links } : {}),
         });
       } catch (error) {
         if (!TOO_SLOW.has(error.status) || size <= BATCH_MIN) throw error;
@@ -170,7 +174,7 @@ export class TimelineWriter {
     return value;
   }
   /** One save (see send). */
-  async save(timeline, { moments, durations }) {
+  async save(timeline, { moments, durations, removed = [], links = [] }) {
     for (let attempt = 0; ; attempt++) {
       let state = this.states.get(timeline);
       if (!state) {
@@ -185,9 +189,15 @@ export class TimelineWriter {
           revision: state.revision,
           settings: state.settings,
           changes: moments.map((event) => ({ id: event.id, event })),
-          ...(durations.length
-            ? { durationChanges: durations.map((duration) => ({ id: duration.id, duration })) }
+          ...(durations.length || removed.length
+            ? {
+                durationChanges: [
+                  ...durations.map((duration) => ({ id: duration.id, duration })),
+                  ...removed.map((id) => ({ id, duration: null })),
+                ],
+              }
             : {}),
+          ...(links.length ? { relationshipChanges: links } : {}),
         }),
       });
       // Saved: the answer carries the new revision, so the next save needs no reload.
