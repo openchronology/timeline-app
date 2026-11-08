@@ -14,11 +14,16 @@ import {
   USER_AGENT,
   entityId,
   itemId,
+  itemKey,
   itemTag,
+  parseRepository,
   personTag,
+  platformOf,
   repositoryName,
+  repositoryReference,
   repositoryTag,
   seconds,
+  tag as lowerTag,
 } from './github-source.mjs';
 
 /**
@@ -26,6 +31,10 @@ import {
  * and the verbs each records. All are on unless a list names some.
  */
 export const EVENT_KINDS = {
+  items: ['item'],
+  commits: ['commit'],
+  branches: ['branch', 'branch created', 'branch deleted'],
+  forks: ['forked'],
   assignments: ['assigned', 'unassigned'],
   labels: ['labeled', 'unlabeled'],
   milestones: ['milestoned', 'demilestoned', 'milestone', 'due'],
@@ -54,16 +63,27 @@ export const EVENT_KINDS = {
 const KIND_OF = new Map(
   Object.entries(EVENT_KINDS).flatMap(([kind, verbs]) => verbs.map((v) => [v, kind])),
 );
-/** The kinds to record: a list of EVENT_KINDS names, or all of them. */
-export function eventKinds(list) {
-  if (list === undefined || list === null) return new Set(Object.keys(EVENT_KINDS));
+/** A list of kinds (an array, or text separated by commas), each checked. */
+function kindList(list) {
   const names = Array.isArray(list) ? list : String(list).split(',');
   const kinds = new Set(names.map((n) => String(n).trim()).filter(Boolean));
   for (const kind of kinds)
     if (!(kind in EVENT_KINDS))
-      throw new Error(
-        `Unknown kind of GitHub event "${kind}"; use ${Object.keys(EVENT_KINDS).join(', ')}.`,
-      );
+      throw new Error(`Unknown kind "${kind}"; use ${Object.keys(EVENT_KINDS).join(', ')}.`);
+  return kinds;
+}
+/** The kinds to record: a list of EVENT_KINDS names, or all of them. */
+export function eventKinds(list) {
+  return list === undefined || list === null ? new Set(Object.keys(EVENT_KINDS)) : kindList(list);
+}
+/**
+ * The kinds to record from `only` (just these) and `except` (all but these): `--only commits`,
+ * `--except forks,branches`, or `"only"`/`"except"` in routing rules. All, without either.
+ */
+export function selectKinds({ only, except } = {}) {
+  const kinds = only === undefined || only === null ? eventKinds() : kindList(only);
+  if (except !== undefined && except !== null)
+    for (const kind of kindList(except)) kinds.delete(kind);
   return kinds;
 }
 /** Whether moments of `verb` are kept, given the kinds to record. */
@@ -78,14 +98,6 @@ function slug(text) {
     ? safe
     : safe + '-' + createHash('sha256').update(plain).digest('hex').slice(0, 8);
 }
-const lowerTag = (text) =>
-  String(text)
-    .normalize('NFC')
-    .replace(/[\x00-\x1f\x7f,]/g, ' ')
-    .trim()
-    .toLowerCase()
-    .slice(0, 64)
-    .trim();
 
 /**
  * One moment on an item: `verb` (an EVENT_KINDS verb) of `subject` (a label, a milestone, a
@@ -97,24 +109,26 @@ export function eventMoment(repository, item, { verb, subject, time, person, tag
   return {
     id: entityId(
       repository,
-      String(item.number),
+      ...itemKey(item),
       slug(verb),
       ...(subject ? [slug(subject)] : []),
       seconds(time),
     ),
     time: seconds(time),
     metadata: {
-      title: `${what}: #${item.number} ${item.title ?? ''}`.trim().slice(0, 300),
+      title: `${what}: ${item.merge_request ? '!' : '#'}${item.number} ${item.title ?? ''}`
+        .trim()
+        .slice(0, 300),
       ...(item.html_url ? { url: item.html_url } : {}),
       tags: [
         ...new Set(
           [
-            'github',
+            platformOf(repository),
             repositoryTag(repository),
-            itemTag(repository, item.number),
+            itemTag(repository, item.number, !!item.merge_request),
             verb,
             ...tags,
-            ...(person ? [personTag(person)] : []),
+            ...(person ? [personTag(person, repository)] : []),
           ].map(lowerTag),
         ),
       ].slice(0, 40),
@@ -124,33 +138,64 @@ export function eventMoment(repository, item, { verb, subject, time, person, tag
 const labelName = (label) => (typeof label === 'string' ? label : label?.name) ?? '';
 const login = (user) => user?.login ?? null;
 
+/** How an item is written in text: `acme/app#412`, or `group/app!12` for a merge request. */
+const reference = (item) => `${item.repository}${item.mergeRequest ? '!' : '#'}${item.number}`;
+/**
+ * How an item is written from another repository, as its platform would: `#412` in the same
+ * repository, `acme/app#412` on the same host, its whole reference elsewhere.
+ */
+function shortReference(item, from) {
+  const mark = (item.mergeRequest ? '!' : '#') + item.number;
+  if (item.repository.toLowerCase() === from.toLowerCase()) return mark;
+  const a = parseRepository(item.repository),
+    b = parseRepository(from);
+  return a && b && a.platform === b.platform && a.host === b.host
+    ? a.path + mark
+    : item.repository + mark;
+}
 /** A link between two items' durations (both must be on the timeline for it to be saved). */
 export const itemLink = (a, b) => ({
-  a: { duration: itemId(a.repository, a.number) },
-  b: { duration: itemId(b.repository, b.number) },
+  a: { duration: itemId(a.repository, a.number, !!a.mergeRequest) },
+  b: { duration: itemId(b.repository, b.number, !!b.mergeRequest) },
   related: true,
 });
 
 /**
- * References to items in text: `#12` (in `repository`), `owner/name#12`, and addresses of
- * issues and pull requests on github.com. Each once, in order.
+ * References to items in text, on `repository`'s platform and host: `#12` (in `repository`),
+ * `owner/name#12`, and addresses of its issues and pull requests; on GitLab also `!12` and
+ * `group/project!12` for merge requests, and nested groups. Each once, in order.
  */
 export function mentionedItems(text, repository) {
+  const r = parseRepository(repository);
   const found = new Map();
-  const add = (repo, number) => {
+  const add = (path, number, mergeRequest = false) => {
     const n = Number(number);
-    if (repositoryName(repo) && Number.isSafeInteger(n) && n > 0)
-      found.set(repo.toLowerCase() + '#' + n, { repository: repo, number: n });
+    const ref = path ? repositoryReference(r.platform, r.host, path) : repository;
+    if (repositoryName(ref) && Number.isSafeInteger(n) && n > 0)
+      found.set(`${ref.toLowerCase()}${mergeRequest ? '!' : '#'}${n}`, {
+        repository: ref,
+        number: n,
+        ...(mergeRequest ? { mergeRequest: true } : {}),
+      });
   };
   const source = String(text ?? '');
+  const host = r.host.replace(/[.]/g, '\\.');
+  const path =
+    r.platform === 'gitlab'
+      ? '[A-Za-z0-9_.-]+(?:/[A-Za-z0-9_.-]+)+'
+      : '[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+';
   for (const m of source.matchAll(
-    /https:\/\/github\.com\/([A-Za-z0-9_.-]+\/[A-Za-z0-9_.-]+)\/(?:issues|pull)\/(\d{1,9})\b/g,
+    new RegExp(
+      `https://${host}/(${path}?)/(?:-/)?(issues|pull|pulls|merge_requests)/(\\d{1,9})\\b`,
+      'g',
+    ),
   ))
-    add(m[1], m[2]);
+    add(m[1], m[3], m[2] === 'merge_requests');
+  const marks = r.platform === 'gitlab' ? '[#!]' : '#';
   for (const m of source.matchAll(
-    /(?<![\w/.#-])(?:([A-Za-z0-9_.-]+\/[A-Za-z0-9_.-]+))?#(\d{1,9})\b/g,
+    new RegExp(`(?<![\\w/.#!-])(?:(${path}))?(${marks})(\\d{1,9})\\b`, 'g'),
   ))
-    add(m[1] ?? repository, m[2]);
+    add(m[1], m[3], m[2] === '!');
   return [...found.values()];
 }
 
@@ -165,7 +210,8 @@ export function mentionChanges(source, text, time, by) {
       (m) =>
         !(
           m.repository.toLowerCase() === source.repository.toLowerCase() &&
-          m.number === source.number
+          m.number === source.number &&
+          !!m.mergeRequest === !!source.mergeRequest
         ),
     )
     .map((target) => ({
@@ -176,22 +222,22 @@ export function mentionChanges(source, text, time, by) {
         {
           ...eventMoment(
             target.repository,
-            { number: target.number },
+            { number: target.number, merge_request: !!target.mergeRequest },
             {
               verb: 'mentioned',
-              subject: `${source.repository}#${source.number}`,
+              subject: reference(source),
               time,
               person: by,
-              tags: [itemTag(source.repository, source.number)],
-              what: `Mentioned in ${source.repository}#${source.number}`,
+              tags: [itemTag(source.repository, source.number, !!source.mergeRequest)],
+              what: `Mentioned in ${shortReference(source, target.repository)}`,
             },
           ),
           // One moment per source, whenever it was (re)written.
           id: entityId(
             target.repository,
-            String(target.number),
+            ...itemKey({ number: target.number, merge_request: target.mergeRequest }),
             'mentioned',
-            slug(`${source.repository}#${source.number}`),
+            slug(reference(source)),
           ),
         },
       ],
@@ -343,29 +389,30 @@ export function timelineEvent(repository, item, event, kinds = ALL_KINDS) {
       const from = event.source?.issue;
       const repo = from?.repository?.full_name;
       if (!from || !repositoryName(repo)) return null;
-      const source = { repository: repo, number: from.number };
+      const source = { repository: repo, number: from.number, mergeRequest: !!from.merge_request };
       return {
         moments: [
           {
             ...eventMoment(repository, item, {
               verb: 'mentioned',
-              subject: `${repo}#${from.number}`,
+              subject: reference(source),
               time,
               person: actor,
-              tags: [itemTag(repo, from.number)],
-              what: `Mentioned in ${repo}#${from.number}${from.title ? ' ' + from.title : ''}`,
+              tags: [itemTag(repo, from.number, source.mergeRequest)],
+              what: `Mentioned in ${shortReference(source, repository)}${from.title ? ' ' + from.title : ''}`,
             }),
-            id: entityId(
-              repository,
-              String(item.number),
-              'mentioned',
-              slug(`${repo}#${from.number}`),
-            ),
+            id: entityId(repository, ...itemKey(item), 'mentioned', slug(reference(source))),
           },
         ],
         links:
           repo.toLowerCase() === repository.toLowerCase()
-            ? [itemLink(source, { repository, number: item.number })]
+            ? [
+                itemLink(source, {
+                  repository,
+                  number: item.number,
+                  mergeRequest: !!item.merge_request,
+                }),
+              ]
             : [],
       };
     }
@@ -617,12 +664,12 @@ export function releaseMoment(repository, release) {
       tags: [
         ...new Set(
           [
-            'github',
+            platformOf(repository),
             repositoryTag(repository),
             'released',
             'release:' + release.tag_name,
             ...(release.prerelease ? ['prerelease'] : []),
-            ...(release.author?.login ? [personTag(release.author.login)] : []),
+            ...(release.author?.login ? [personTag(release.author.login, repository)] : []),
           ].map(lowerTag),
         ),
       ],
@@ -639,7 +686,7 @@ export const releaseId = (repository, release) =>
  */
 export function milestoneChanges(repository, milestone) {
   const tags = [
-    'github',
+    platformOf(repository),
     repositoryTag(repository),
     'milestone',
     'milestone:' + milestone.title,
@@ -698,7 +745,7 @@ export function columnStint(repository, item, { project, column, start, end }) {
   return {
     id: entityId(
       repository,
-      String(item.number),
+      ...itemKey(item),
       'in',
       ...(project ? [slug(project)] : []),
       slug(column),
@@ -707,14 +754,16 @@ export function columnStint(repository, item, { project, column, start, end }) {
     start: seconds(start),
     end: end ? seconds(end) : { ongoing: true },
     metadata: {
-      title: `#${item.number} in ${column}${project ? ` (${project})` : ''}`.slice(0, 300),
+      title: `${item.merge_request ? '!' : '#'}${item.number} in ${column}${
+        project ? ` (${project})` : ''
+      }`.slice(0, 300),
       ...(item.html_url ? { url: item.html_url } : {}),
       tags: [
         ...new Set(
           [
-            'github',
+            platformOf(repository),
             repositoryTag(repository),
-            itemTag(repository, item.number),
+            itemTag(repository, item.number, !!item.merge_request),
             'in column',
             'status:' + column,
             ...(project ? ['project:' + project] : []),
@@ -807,4 +856,123 @@ export class StintTracker {
     if (durations.length) this.save();
     return durations;
   }
+}
+
+/**
+ * A commit, as a moment on its repository: when it was authored, titled with the first line
+ * of its message. Tagged with the platform, the repository, `commit`, the branch it was made
+ * on (as is, such as `feat/new_feature`) and its author's account when the platform knows it.
+ * Never its hash, which is in its ID: tags gather many moments, and a hash names one.
+ * `commit` is `{sha, message, time, url, login}`; `items` are the items it mentions that it may
+ * be linked to.
+ */
+export function commitMoment(repository, commit, branch) {
+  const message = String(commit.message ?? '');
+  const [first, ...rest] = message.split('\n');
+  const body = rest.join('\n').trim();
+  return {
+    id: entityId(repository, 'commit', commit.sha),
+    time: seconds(commit.time),
+    metadata: {
+      title: (first.trim() || commit.sha.slice(0, 12)).slice(0, 300),
+      ...(body || commit.url
+        ? {
+            description:
+              body.slice(0, 4000) + (commit.url ? (body ? '\n\n' : '') + commit.url : ''),
+          }
+        : {}),
+      ...(commit.url ? { url: commit.url } : {}),
+      tags: [
+        ...new Set(
+          [
+            platformOf(repository),
+            repositoryTag(repository),
+            'commit',
+            ...(branch ? [branch] : []),
+            ...(commit.login ? [personTag(commit.login, repository)] : []),
+          ].map(lowerTag),
+        ),
+      ],
+    },
+  };
+}
+/** Links from a commit's moment to the items its message names, in its repository. */
+export function commitLinks(repository, commit) {
+  return mentionedItems(commit.message, repository).map((item) => ({
+    a: { moment: entityId(repository, 'commit', commit.sha) },
+    b: { duration: itemId(item.repository, item.number, !!item.mergeRequest) },
+    related: true,
+  }));
+}
+/** A branch's moment: created or deleted (from a webhook), or begun (its first own commit). */
+export function branchMoment(repository, branch, { verb, time, person }) {
+  const what = {
+    branch: 'Branch',
+    'branch created': 'Created branch',
+    'branch deleted': 'Deleted branch',
+  }[verb];
+  return {
+    id: entityId(repository, 'branch', slug(branch), slug(verb), seconds(time)),
+    time: seconds(time),
+    metadata: {
+      title: `${what} ${branch}`.slice(0, 300),
+      tags: [
+        ...new Set(
+          [
+            platformOf(repository),
+            repositoryTag(repository),
+            verb,
+            branch,
+            ...(person ? [personTag(person, repository)] : []),
+          ].map(lowerTag),
+        ),
+      ],
+    },
+  };
+}
+/** A fork of the repository, as a moment when it was made, tagged `forked` and its owner. */
+export function forkMoment(repository, fork) {
+  return {
+    id: entityId(repository, 'fork', slug(fork.full_name)),
+    time: seconds(fork.created_at),
+    metadata: {
+      title: `Forked to ${fork.full_name}`.slice(0, 300),
+      ...(fork.html_url ? { url: fork.html_url } : {}),
+      tags: [
+        ...new Set(
+          [
+            platformOf(repository),
+            repositoryTag(repository),
+            'forked',
+            ...(fork.owner?.login ? [personTag(fork.owner.login, repository)] : []),
+          ].map(lowerTag),
+        ),
+      ],
+    },
+  };
+}
+/**
+ * A push's commits, from a webhook (`push`): moments tagged with the branch pushed to, and
+ * links to the items they name. Commits GitHub marks as not distinct were already pushed to
+ * another branch, which keeps them; tags never come from email addresses.
+ */
+export function pushChanges(repository, payload, kinds = ALL_KINDS) {
+  const branch = /^refs\/heads\/(.+)$/.exec(payload.ref ?? '')?.[1];
+  if (!branch || !keeps(kinds, 'commit')) return null;
+  const commits = (payload.commits ?? [])
+    .filter((c) => c.distinct !== false && c.id && c.timestamp)
+    .map((c) => ({
+      sha: c.id,
+      message: c.message,
+      time: c.timestamp,
+      url: c.url,
+      login: c.author?.username || null,
+    }));
+  return {
+    repository,
+    durations: [],
+    removed: [],
+    moments: commits.map((c) => commitMoment(repository, c, branch)),
+    links: keeps(kinds, 'item') ? commits.flatMap((c) => commitLinks(repository, c)) : [],
+  };
 }

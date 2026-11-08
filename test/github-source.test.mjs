@@ -19,6 +19,7 @@ import {
 } from '../server/github-source.mjs';
 import {
   StintTracker,
+  selectKinds,
   eventKinds,
   mentionChanges,
   projectStatusChange,
@@ -26,6 +27,7 @@ import {
 } from '../server/github-events.mjs';
 import { GithubIngest, listenGithub } from '../server/github-receiver.mjs';
 import { GithubReader, main, readRepository } from '../server/import-github.mjs';
+import { EVENT_KINDS } from '../server/github-events.mjs';
 import { validateDuration, Q } from '../dist/core.mjs';
 
 const TIMELINE = '6f1c2d3e-4a5b-4c6d-8e7f-90a1b2c3d4e5';
@@ -92,10 +94,14 @@ test('closed issues and merged pull requests end when they closed or merged', ()
 });
 
 test('a repository too long for a tag is named by a hash, the same each time', () => {
-  const name = 'acme/' + 'r'.repeat(60);
+  const name =
+    'gitlab:git.example.com/' +
+    Array(8)
+      .fill('group-' + 'g'.repeat(12))
+      .join('/');
   const tag = itemTag(name, 123456789);
-  assert.match(tag, /^github\/[0-9a-f]{16}#123456789$/);
-  assert.equal(itemTag(name.toUpperCase(), 123456789), tag);
+  assert.match(tag, /^gitlab:git\.example\.com\/[0-9a-f]{16}#123456789$/);
+  assert.equal(itemTag(name.replace('example', 'EXAMPLE'), 123456789), tag);
   assert.equal(repositoryTag('Acme/App'), 'github/acme/app');
   // Unassigned items carry no `assigned` tag.
   assert.ok(!itemDuration('acme/app', issue({ assignees: [] })).metadata.tags.includes('assigned'));
@@ -192,7 +198,7 @@ test('deliveries become changes: edits, events, deletions, mentions and links', 
   assert.deepEqual(
     pull.slice(1).map((c) => [c.repository, c.moments[0].metadata.title]),
     [
-      ['acme/app', 'Mentioned in acme/app#413: #412'],
+      ['acme/app', 'Mentioned in #413: #412'],
       ['other/lib', 'Mentioned in acme/app#413: #7'],
     ],
   );
@@ -203,7 +209,7 @@ test('deliveries become changes: edits, events, deletions, mentions and links', 
     comment: { body: 'Same as #9', user: { login: 'mona' }, updated_at: '2026-11-06T00:00:00Z' },
     repository,
   });
-  assert.equal(comment.moments[0].metadata.title, 'Mentioned in acme/app#412: #9');
+  assert.equal(comment.moments[0].metadata.title, 'Mentioned in #412: #9');
   assert.ok(!JSON.stringify(comment).includes('Same as'));
   // A review, a merge and a rename.
   const [review] = deliveryChanges('pull_request_review', {
@@ -253,10 +259,24 @@ test('deliveries become changes: edits, events, deletions, mentions and links', 
   const quiet = deliveryChanges(
     'issues',
     { action: 'labeled', label: { name: 'Bug' }, issue: issue(), repository },
-    eventKinds(['assignments']),
+    eventKinds(['assignments', 'items']),
   );
   assert.equal(quiet[0].moments.length, 0);
   assert.equal(quiet[0].durations.length, 1);
+  // Without items, their durations (and links, which need them) are left out.
+  const momentsOnly = deliveryChanges(
+    'pull_request',
+    {
+      action: 'labeled',
+      label: { name: 'Bug' },
+      pull_request: { ...issue({ number: 413, body: 'Fixes #412' }), merged_at: null },
+      repository,
+    },
+    selectKinds({ except: ['items'] }),
+  );
+  assert.equal(momentsOnly[0].durations.length, 0);
+  assert.equal(momentsOnly[0].links.length, 0);
+  assert.equal(momentsOnly[0].moments.length, 1);
   assert.deepEqual(deliveryChanges('star', { action: 'created', repository }), []);
   assert.throws(() => eventKinds(['labels', 'stars']), /Unknown kind/);
 });
@@ -292,7 +312,7 @@ test('every timeline event the importer reads becomes its moment', () => {
   });
   assert.equal(
     mention.moments[0].metadata.title,
-    'Mentioned in acme/app#9 Root cause: #412 Fix the login loop',
+    'Mentioned in #9 Root cause: #412 Fix the login loop',
   );
   assert.ok(mention.moments[0].metadata.tags.includes('github/acme/app#9'));
   assert.equal(mention.links.length, 1);
@@ -447,7 +467,7 @@ test('the receiver checks, routes, coalesces and saves deliveries', async () => 
   assert.equal(links.body.relationshipChanges.length, 1);
   assert.deepEqual(
     entities.body.changes.map((c) => c.event.metadata.title),
-    ['Closed: #412 Fix the login loop', 'Mentioned in acme/app#413: #412'],
+    ['Closed: #412 Fix the login loop', 'Mentioned in #413: #412'],
   );
   assert.deepEqual(ingest.stats, { deliveries: 5, rejected: 1, ignored: 1, saved: 4, failed: 0 });
 });
@@ -598,18 +618,62 @@ function fakeGithub() {
       due_on: null,
     },
   ];
+  // main has c3, c2, c1; feat/new_feature began from c2 with f1 and f2; old is merged.
+  const commit = (sha, message, date, login) => ({
+    sha,
+    html_url: `https://github.com/acme/app/commit/${sha}`,
+    commit: { message, author: { date } },
+    author: login ? { login } : null,
+  });
+  const commits = {
+    main: [
+      commit('c3', 'Fix the loop\n\nCloses #2', '2026-11-03T00:00:00Z', 'mona'),
+      commit('c2', 'Tidy', '2026-11-02T00:00:00Z', 'octo'),
+      commit('c1', 'Start', '2026-11-01T00:00:00Z', null),
+    ],
+    'feat/new_feature': [
+      commit('f2', 'More of it', '2026-11-04T00:00:00Z', 'mona'),
+      commit('f1', 'Begin the feature', '2026-11-03T12:00:00Z', 'mona'),
+      commit('c2', 'Tidy', '2026-11-02T00:00:00Z', 'octo'),
+    ],
+  };
+  const branches = [
+    { name: 'main', commit: { sha: 'c3' } },
+    { name: 'feat/new_feature', commit: { sha: 'f2' } },
+    { name: 'old', commit: { sha: 'c1' } },
+  ];
+  const forks = [
+    {
+      full_name: 'mona/app',
+      owner: { login: 'mona' },
+      created_at: '2026-11-05T00:00:00Z',
+      html_url: 'https://github.com/mona/app',
+    },
+  ];
   const seen = [];
   const fetcher = async (url, options) => {
     seen.push({ url, headers: options.headers });
     const u = new URL(url);
     const number = /\/issues\/(\d+)\/timeline$/.exec(u.pathname)?.[1];
+    if (u.pathname === '/repos/acme/app')
+      return {
+        status: 200,
+        json: async () => ({ default_branch: 'main' }),
+        headers: { get: () => null },
+      };
     const list = number
       ? timelines[number]
       : u.pathname.endsWith('/releases')
         ? releases
         : u.pathname.endsWith('/milestones')
           ? milestones
-          : items;
+          : u.pathname.endsWith('/branches')
+            ? branches
+            : u.pathname.endsWith('/commits')
+              ? (commits[u.searchParams.get('sha')] ?? [])
+              : u.pathname.endsWith('/forks')
+                ? forks
+                : items;
     const page = Number(u.searchParams.get('page') ?? '1');
     const slice = list.slice((page - 1) * 2, page * 2);
     const next = page * 2 < list.length ? new URL(url) : null;
@@ -626,7 +690,9 @@ function fakeGithub() {
 test('the importer reads every page of issues and their timelines, and links what it read', async () => {
   const github = fakeGithub();
   const reader = new GithubReader({ token: 'ghp_x', fetcher: github.fetcher });
-  const changes = await readRepository(reader, 'acme/app');
+  const changes = await readRepository(reader, 'acme/app', {
+    kinds: selectKinds({ except: ['commits', 'branches', 'forks'] }),
+  });
   assert.deepEqual(
     changes.durations.map((d) => [d.metadata.title, typeof d.end === 'string' ? 'closed' : 'open']),
     [
@@ -668,7 +734,10 @@ test('the importer reads every page of issues and their timelines, and links wha
     github.seen.every((r) => /^OpenChronology-github-source/.test(r.headers['User-Agent'])),
   );
   // Since a time: the listing asks GitHub for it, and earlier events are left out.
-  const recent = await readRepository(reader, 'acme/app', { since: '2026-11-01T12:30:00Z' });
+  const recent = await readRepository(reader, 'acme/app', {
+    since: '2026-11-01T12:30:00Z',
+    kinds: selectKinds({ except: ['commits', 'branches', 'forks'] }),
+  });
   assert.deepEqual(
     recent.moments.map((m) => m.metadata.tags[3]),
     ['closed', 'unassigned', 'moved', 'reviewed', 'release:v1.0.0', 'milestone:v1'],
@@ -687,16 +756,24 @@ test('the importer reads every page of issues and their timelines, and links wha
   assert.ok(github.seen.every((r) => !r.url.includes('/timeline')));
 });
 
-test('the command checks its arguments, and a dry run writes nothing', async () => {
+test('the command imports one repository into one timeline, of the kinds asked for', async () => {
   const lines = [];
   const out = { log: (l) => lines.push(l), error: (l) => lines.push(l) };
-  assert.equal(await main(['--repo', 'not-a-repo', '--timeline', TIMELINE], {}, out), 2);
+  const run = (...args) => main(args, {}, out);
+  assert.equal(await run('--repo', 'not-a-repo', '--timeline', TIMELINE), 2);
+  assert.equal(await run('--repo', 'acme/app'), 2, 'a timeline is needed');
+  assert.equal(await run('--repo', 'acme/app', '--repo', 'acme/other', '--timeline', TIMELINE), 2);
+  assert.equal(await run('--repo', 'acme/app', '--timeline', TIMELINE, '--since', 'soon'), 2);
+  assert.equal(await run('--repo', 'acme/app', '--timeline', TIMELINE, '--only', 'stars'), 2);
   assert.equal(
-    await main(['--repo', 'acme/app', '--timeline', TIMELINE, '--since', 'soon'], {}, out),
-    2,
-  );
-  assert.equal(
-    await main(['--repo', 'acme/app', '--timeline', TIMELINE, '--events', 'stars'], {}, out),
+    await run(
+      '--repo',
+      'acme/app',
+      '--timeline',
+      TIMELINE,
+      '--except',
+      Object.keys(EVENT_KINDS).join(','),
+    ),
     2,
   );
   const github = fakeGithub();
@@ -704,16 +781,108 @@ test('the command checks its arguments, and a dry run writes nothing', async () 
   globalThis.fetch = github.fetcher;
   try {
     lines.length = 0;
+    assert.equal(await run('--repo', 'acme/app', '--timeline', TIMELINE, '--dry-run'), 0);
+    assert.match(
+      lines.join('\n'),
+      /acme\/app → .*: would import 3 issues and pull requests \(2 open\), 5 commits, 12 other events, 4 other durations, 2 links\./,
+    );
+    // Only commits: no item is read, and no link made (they need the items).
+    lines.length = 0;
+    github.seen.length = 0;
     assert.equal(
-      await main(['--repo', 'acme/app', '--timeline', TIMELINE, '--dry-run'], {}, out),
+      await run('--repo', 'acme/app', '--timeline', TIMELINE, '--dry-run', '--only', 'commits'),
       0,
     );
+    assert.match(
+      lines.join('\n'),
+      /0 issues and pull requests \(0 open\), 5 commits, 0 other events, 0 other durations, 0 links/,
+    );
+    assert.ok(github.seen.every((r) => !new URL(r.url).pathname.includes('/issues')));
   } finally {
     globalThis.fetch = realFetch;
   }
-  assert.match(
-    lines[0],
-    /acme\/app → .*: would import 3 issues and pull requests \(2 open\), 4 other durations \(milestones, time in columns\), 10 events, 1 links\./,
+});
+
+test('commits are moments tagged with their branch, never their hash', async () => {
+  const github = fakeGithub();
+  const reader = new GithubReader({ fetcher: github.fetcher });
+  const changes = await readRepository(reader, 'acme/app', {
+    kinds: selectKinds({ only: ['commits', 'branches', 'forks', 'items'] }),
+  });
+  const commits = changes.moments.filter((m) => m.metadata.tags.includes('commit'));
+  assert.deepEqual(
+    commits.map((m) => [m.metadata.title, m.metadata.tags.slice(1)]),
+    [
+      ['Fix the loop', ['github/acme/app', 'commit', 'main', 'github/mona']],
+      ['Tidy', ['github/acme/app', 'commit', 'main', 'github/octo']],
+      ['Start', ['github/acme/app', 'commit', 'main']],
+      // The feature branch's own commits keep its name; c2 is main's.
+      ['More of it', ['github/acme/app', 'commit', 'feat/new_feature', 'github/mona']],
+      ['Begin the feature', ['github/acme/app', 'commit', 'feat/new_feature', 'github/mona']],
+    ],
+  );
+  assert.ok(commits.every((m) => m.metadata.tags.every((t) => !/c3|f2|c2|f1|c1/.test(t))));
+  assert.equal(commits[0].id, 'gh:acme:app:commit:c3');
+  assert.equal(
+    commits[0].metadata.description,
+    'Closes #2\n\nhttps://github.com/acme/app/commit/c3',
+  );
+  // The branch began at its first own commit; `old` (merged) has none, and is not read.
+  const branch = changes.moments.find((m) => m.metadata.tags.includes('branch'));
+  assert.equal(branch.metadata.title, 'Branch feat/new_feature');
+  assert.equal(branch.time, String(Date.parse('2026-11-03T12:00:00Z') / 1000));
+  assert.ok(!github.seen.some((r) => new URL(r.url).searchParams.get('sha') === 'old'));
+  assert.ok(changes.moments.some((m) => m.metadata.title === 'Forked to mona/app'));
+  // "Closes #2" links the commit to the issue, which was read.
+  assert.ok(
+    changes.links.some(
+      (l) => l.a.moment === 'gh:acme:app:commit:c3' && l.b.duration === 'gh:acme:app:2',
+    ),
+  );
+});
+
+test('a push, a new branch and a fork arrive as moments', () => {
+  const repository = { full_name: 'acme/app' };
+  const [push] = deliveryChanges('push', {
+    ref: 'refs/heads/feat/new_feature',
+    commits: [
+      {
+        id: 'a1',
+        message: 'Begin #2',
+        timestamp: '2026-11-03T00:00:00Z',
+        url: 'https://github.com/acme/app/commit/a1',
+        author: { username: 'mona', email: 'mona@example.com' },
+      },
+      { id: 'a0', message: 'Already on main', timestamp: '2026-11-02T00:00:00Z', distinct: false },
+    ],
+    repository,
+  });
+  assert.deepEqual(
+    push.moments.map((m) => m.metadata.tags.slice(1)),
+    [['github/acme/app', 'commit', 'feat/new_feature', 'github/mona']],
+  );
+  assert.ok(!JSON.stringify(push).includes('example.com'), 'no email addresses');
+  assert.equal(push.links[0].b.duration, 'gh:acme:app:2');
+  const [created] = deliveryChanges('create', {
+    ref: 'feat/new_feature',
+    ref_type: 'branch',
+    repository,
+    sender: { login: 'mona' },
+  });
+  assert.equal(created.moments[0].metadata.title, 'Created branch feat/new_feature');
+  assert.deepEqual(deliveryChanges('create', { ref: 'v1', ref_type: 'tag', repository }), []);
+  const [fork] = deliveryChanges('fork', {
+    forkee: { full_name: 'mona/app', owner: { login: 'mona' }, created_at: '2026-11-05T00:00:00Z' },
+    repository,
+  });
+  assert.equal(fork.moments[0].metadata.title, 'Forked to mona/app');
+  assert.deepEqual(
+    deliveryChanges(
+      'push',
+      { ref: 'refs/heads/main', commits: [], repository },
+      selectKinds({ except: ['commits'] }),
+    ),
+    [],
   );
 });
 

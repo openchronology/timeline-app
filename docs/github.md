@@ -1,14 +1,14 @@
 # GitHub to timelines
 
-<!-- description: Mirror GitHub issues and pull requests into timelines as durations, ongoing while open, with their events as moments, by webhook or import. -->
+<!-- description: Mirror GitHub, Forgejo and Gitea issues, pull requests and commits into timelines, ongoing while open, by webhook or import. -->
 
-OpenChronology can aggregate the work your tools already record. For GitHub (#538), each issue and pull request becomes a **duration**:
+OpenChronology can aggregate the work your tools already record, from GitHub, and from Forgejo and Gitea ([below](#forgejo-and-gitea)) (#538). Each issue and pull request becomes a **duration**:
 
 - it starts when the item was opened;
 - it is [ongoing](durations.md#ongoing-durations) while the item is open;
 - it ends when the item was closed or merged.
 
-What happens to them becomes **moments**: labels, milestones, assignments, reviews, mentions, moves on a project board and more. Items that name each other are **linked**. Two tools write them, and both use the same IDs:
+What happens to them becomes **moments**: labels, milestones, assignments, reviews, mentions, moves on a project board and more. So do **commits**, branches, forks and releases. Items that name each other are **linked**. Two tools write them, and both use the same IDs:
 
 - **The webhook receiver** (`server/github-receiver.mjs`) keeps timelines in step as things happen.
 - **The importer** (`och-import-github`, `server/import-github.mjs`) brings in what already exists, and can run again at any time to bring timelines up to date.
@@ -31,7 +31,7 @@ Each tool only reads from GitHub. Nothing is written back.
 
 Each moment is titled with what happened and the item, such as `Labelled bug: #412 Fix the login loop`. Its tags are:
 
-- `github`;
+- the platform: `github`, `forgejo` or `gitlab`;
 - the repository's and the item's tags;
 - the event, such as `labeled` or `merged`;
 - what it was about, such as `label:bug`;
@@ -41,6 +41,10 @@ The person is the one assigned, the reviewer whose review was requested or given
 
 | Kind          | Events, and their tags                                                                                                                                                        |
 | ------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `items`       | Each issue and pull request's duration, above. Without it, links (which need the durations) are left out too                                                                  |
+| `commits`     | Each commit, below                                                                                                                                                            |
+| `branches`    | `branch created`, `branch deleted` (live), or `branch` (imported: when a branch began, at its first commit of its own), with the branch's name                                |
+| `forks`       | `forked`: each fork, at when it was made, with its owner's `github/<login>`                                                                                                   |
 | `assignments` | `assigned`, `unassigned`                                                                                                                                                      |
 | `labels`      | `labeled`, `unlabeled`, with `label:<name>`                                                                                                                                   |
 | `milestones`  | `milestoned`, `demilestoned`, with `milestone:<title>`. Each milestone is also a duration from creation to closing (ongoing while open), with a `due` moment at its due date  |
@@ -53,7 +57,30 @@ The person is the one assigned, the reviewer whose review was requested or given
 | `releases`    | `released`: each published release, a moment on its repository, with `release:<tag>` (and `prerelease`)                                                                       |
 | `other`       | `locked`, `unlocked`, `pinned`, `unpinned`, `transferred`                                                                                                                     |
 
-All kinds are recorded unless the routing rules list some (`"events": ["labels", "reviews"]`), or the importer is given `--events`. A comment's text is never copied: comments only add the `mentioned` moments of the items they name.
+All kinds are recorded, unless you choose:
+
+- **Only some:** `--only commits` for the importer, or `"only": ["commits"]` in the routing rules.
+- **All but some:** `--except forks,branches`, or `"except": ["forks", "branches"]`.
+
+A comment's text is never copied: comments only add the `mentioned` moments of the items they name.
+
+### Commits
+
+Each commit is a moment on its repository, when it was authored, titled with its message's first line. The rest of the message, and its address, are its notes. Its tags are:
+
+- the platform, and the repository's tag (`github/acme/app`): it belongs to the repository, not to an item;
+- `commit`;
+- the branch it was made on, as it is named, such as `feat/new_feature`;
+- its author's account (`github/<login>`), when the platform knows it.
+
+A commit's hash is in its ID and its address, never in a tag: a tag gathers many moments, and a hash names one. Email addresses are not copied.
+
+Separating by a branch's tag shows the work done on it; by `commit`, every commit against the issues and releases around it. A commit that names an item (`Fixes #12`) is linked to it.
+
+A commit is tagged with the branch it was made on:
+
+- **The importer** reads the default branch first, then each other branch only as far as its own commits, so a commit later merged keeps its first branch. A branch whose last commit was already read (merged, say) costs no request.
+- **The receiver** tags each push with the branch pushed to. GitHub marks commits already pushed to another branch, and those keep their first tag. Forgejo does not, so on Forgejo a commit merged without a merge commit takes the branch it was merged into.
 
 **Project boards.** A move is recorded live from GitHub's `projects_v2_item` deliveries, which GitHub sends for organization projects only. The receiver needs a `GITHUB_TOKEN` to name the moved item, since deliveries identify it by node ID. The importer records the moves an item's timeline lists. GitHub's timelines have [mostly stopped recording status changes since September 2026](https://github.com/orgs/community/discussions/209484), so history before the receiver started may be missing.
 
@@ -102,7 +129,7 @@ IDs come from the source: `gh:<owner>:<repo>:<number>` for an item, and `gh:<own
 
 1. Create the timelines. Choose the **Gregorian** time display (**Time display**): an open item ends "now", and only calendar timelines have one. Both tools check this before writing.
 2. In **Account → API keys**, create a **read/write** key for an account that can write those timelines.
-3. Write the routing rules to `github-routes.json`. The first rule matching a repository wins, then `default`; a repository nothing matches is not kept. Names ignore case.
+3. For the receiver, write the routing rules to `github-routes.json`. The first rule matching a repository wins, then `default`; a repository nothing matches is not kept. Names ignore case. A rule names a repository as the importer does (below), and `*` stands for everything under an owner or group, such as `forgejo:codeberg.org/acme/*`.
 
 ```json
 {
@@ -111,7 +138,7 @@ IDs come from the source: `gh:<owner>:<repo>:<number>` for an item, and `gh:<own
     { "repository": "acme/*", "timeline": "0b7e1111-2222-4333-8444-555566667777" }
   ],
   "default": "6f1c2d3e-4a5b-4c6d-8e7f-90a1b2c3d4e5",
-  "events": ["assignments", "labels", "milestones", "state", "reviews", "mentions", "status"]
+  "except": ["forks", "branches"]
 }
 ```
 
@@ -121,33 +148,38 @@ IDs come from the source: `gh:<owner>:<repo>:<number>` for an item, and `gh:<own
 export OCH_API_URL=https://timescale.info OCH_API_KEY=och_key_... GITHUB_TOKEN=github_pat_...
 
 och-import-github --repo acme/app --timeline 6f1c… --dry-run
-och-import-github --repo acme/app --repo acme/site --config github-routes.json
-och-import-github --repo acme/app --timeline 6f1c… --since 2026-11-01
+och-import-github --repo acme/app --timeline 6f1c… --only commits
+och-import-github --repo acme/app --timeline 6f1c… --except forks,branches --since 2026-11-01
+FORGEJO_TOKEN=… och-import-github --repo forgejo:codeberg.org/acme/app --timeline 0b7e…
 ```
 
 `npm run import:github -- …` runs it from a checkout.
 
-| Option              | Meaning                                                                                                         |
-| ------------------- | --------------------------------------------------------------------------------------------------------------- |
-| `--repo owner/name` | A repository to import; repeat for several.                                                                     |
-| `--timeline <uuid>` | The timeline to write to, for every repository.                                                                 |
-| `--config <file>`   | Routing rules instead (default `GITHUB_ROUTES`, else `github-routes.json`).                                     |
-| `--since <time>`    | Only items updated since then (GitHub's `since`), and events since then. Use it to bring a timeline up to date. |
-| `--events <kinds>`  | Only these kinds of event, comma-separated (default: the routes' `events`, else all).                           |
-| `--no-events`       | No events: only the items, without reading each one's timeline.                                                 |
-| `--dry-run`         | Read GitHub and report what would be written, without writing.                                                  |
+It imports one repository into one timeline at a time.
+
+| Option                | Meaning                                                                                                                       |
+| --------------------- | ----------------------------------------------------------------------------------------------------------------------------- |
+| `--repo <repository>` | The repository: `owner/name` on github.com, or `<platform>:<host>/<path>` elsewhere, such as `forgejo:codeberg.org/acme/app`. |
+| `--timeline <uuid>`   | The timeline to write to.                                                                                                     |
+| `--only <kinds>`      | Only these kinds, comma-separated: `--only commits`.                                                                          |
+| `--except <kinds>`    | Every kind but these: `--except forks,branches`.                                                                              |
+| `--since <time>`      | Only what was updated or happened since then. Use it to bring a timeline up to date.                                          |
+| `--dry-run`           | Read the repository and report what would be written, without writing.                                                        |
 
 **Access and limits:**
 
 - **Token:** `GITHUB_TOKEN` is a personal access token, or a fine-grained one with read access to **Issues** and **Pull requests**. It is needed for private repositories. It raises GitHub's limit from 60 requests an hour to 5,000.
-- **Requests:** listing the items costs one request per 100 of them. Each item's events cost at least one more, since every item has its own timeline. A repository with 2,000 issues therefore costs about 2,020 requests, under half an hour of GitHub's hourly limit. `--since` keeps later runs small, and `--no-events` skips the timelines.
+- **Requests:**
+  - **Items:** listing them costs one request per 100. Each item's events cost at least one more, since every item has its own timeline. A repository with 2,000 issues therefore costs about 2,020 requests, under half an hour of GitHub's hourly limit.
+  - **Commits:** one request per 100 commits on the default branch, plus one per other branch that has commits of its own.
+  - **Keeping it small:** `--since` keeps later runs small, and `--only commits` reads no items at all.
 - **Rate limit:** when the limit runs out, the importer waits if it resets within 15 minutes, and otherwise stops with a message.
 - **GitHub Enterprise:** set `GITHUB_API_URL`, such as `https://github.example.com/api/v3`.
 
 Exit codes:
 
 - **0:** everything was imported.
-- **1:** a repository could not be read or written.
+- **1:** the repository could not be read, or the timeline written.
 - **2:** a usage error.
 
 ## Following changes live
@@ -164,20 +196,21 @@ Then, in the repository's or organization's **Settings → Webhooks → Add webh
 - **Payload URL:** the receiver's address.
 - **Content type:** `application/json`.
 - **Secret:** the same value as `GITHUB_WEBHOOK_SECRET`.
-- **Events:** **Issues**, **Pull requests**, **Pull request reviews**, **Issue comments** (for mentions), **Sub-issues**, **Releases** and **Milestones**. On an organization, also **Projects v2 items**, for moves on its boards; these need `GITHUB_TOKEN`.
+- **Events:** **Issues**, **Pull requests**, **Pull request reviews**, **Issue comments** (for mentions), **Sub-issues**, **Releases**, **Milestones**, **Pushes** (for commits), **Branch or tag creation** and **deletion**, and **Forks**. On an organization, also **Projects v2 items**, for moves on its boards; these need `GITHUB_TOKEN`.
 
 GitHub's first delivery is a ping, which the receiver answers.
 
-| Variable                     | Default                  | Meaning                                                                                    |
-| ---------------------------- | ------------------------ | ------------------------------------------------------------------------------------------ |
-| `OCH_API_URL`, `OCH_API_KEY` | (required)               | The server's origin and a read/write API key.                                              |
-| `GITHUB_WEBHOOK_SECRET`      | (required)               | The webhook's secret. Deliveries without a valid `X-Hub-Signature-256` are refused (401).  |
-| `GITHUB_ROUTES`              | `github-routes.json`     | Path of the routing rules; `GITHUB_ROUTES_JSON` may hold them inline instead.              |
-| `GITHUB_HOST`, `GITHUB_PORT` | `127.0.0.1`, `5580`      | Address and port to listen on.                                                             |
-| `GITHUB_FLUSH_MS`            | `1000`                   | How long changes gather before they are saved.                                             |
-| `GITHUB_STATE`               | (none)                   | A file in which to remember each item's open column, across restarts.                      |
-| `GITHUB_TOKEN`               | (none)                   | A token that can read the organization's issues, to name the items of project board moves. |
-| `GITHUB_API_URL`             | `https://api.github.com` | GitHub Enterprise's API, for that.                                                         |
+| Variable                     | Default                  | Meaning                                                                                          |
+| ---------------------------- | ------------------------ | ------------------------------------------------------------------------------------------------ |
+| `OCH_API_URL`, `OCH_API_KEY` | (required)               | The server's origin and a read/write API key.                                                    |
+| `GITHUB_WEBHOOK_SECRET`      | (one of these)           | The GitHub webhook's secret. Deliveries without a valid `X-Hub-Signature-256` are refused (401). |
+| `FORGEJO_WEBHOOK_SECRET`     | (one of these)           | The Forgejo or Gitea webhook's secret, checked against `X-Forgejo-Signature`.                    |
+| `GITHUB_ROUTES`              | `github-routes.json`     | Path of the routing rules; `GITHUB_ROUTES_JSON` may hold them inline instead.                    |
+| `GITHUB_HOST`, `GITHUB_PORT` | `127.0.0.1`, `5580`      | Address and port to listen on.                                                                   |
+| `GITHUB_FLUSH_MS`            | `1000`                   | How long changes gather before they are saved.                                                   |
+| `GITHUB_STATE`               | (none)                   | A file in which to remember each item's open column, across restarts.                            |
+| `GITHUB_TOKEN`               | (none)                   | A token that can read the organization's issues, to name the items of project board moves.       |
+| `GITHUB_API_URL`             | `https://api.github.com` | GitHub Enterprise's API, for that.                                                               |
 
 **How it saves:**
 
@@ -187,6 +220,28 @@ GitHub's first delivery is a ping, which the receiver answers.
 - **Retries:** when the server is unreachable or busy, it keeps the changes and retries.
 - **Stopping:** on SIGTERM or SIGINT it saves what is queued, for up to ten seconds, before exiting.
 - **Missed deliveries:** to catch up on any, run the importer with `--since`.
+
+## Forgejo and Gitea
+
+Forgejo and Gitea repositories are named with their host, as `forgejo:<host>/<owner>/<name>`, such as `forgejo:codeberg.org/acme/app`. Their tags name it too:
+
+- the repository: `forgejo:codeberg.org/acme/app`;
+- an item: `forgejo:codeberg.org/acme/app#5`;
+- a person: `forgejo:codeberg.org/mona`.
+
+github.com keeps its short form, `github/acme/app#412`, and GitHub Enterprise names its host like Forgejo does (`github:ghe.example.com/acme/app`). Everything above applies, with these differences:
+
+- **Importer:** set `FORGEJO_TOKEN` to an access token that can read the repository.
+- **Receiver:** in the repository's **Settings → Webhooks → Add webhook → Forgejo** (or Gitea):
+  - **Target URL:** the receiver's address.
+  - **Content type:** `application/json`.
+  - **Secret:** the value of `FORGEJO_WEBHOOK_SECRET`.
+  - **Trigger on:** issues, pull requests and their reviews, comments, releases, pushes, branch creation and deletion, and forks.
+
+  One receiver takes GitHub's and Forgejo's deliveries together, each checked against its own secret.
+
+- **Labels:** Forgejo's deliveries say only that an item's labels changed, not which. The item's `label:` tags follow, but a label moment is recorded only by the importer, which reads it from the item's timeline.
+- **Not on Forgejo:** project boards, sub-issues and review requests by team.
 
 ## Running it as a service
 

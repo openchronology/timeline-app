@@ -13,6 +13,16 @@ import { pathToFileURL } from 'node:url';
 import { TimelineWriter, temporary } from './timeline-writer.mjs';
 import { deliveryChanges, loadRoutes, validSignature } from './github-source.mjs';
 import { StintTracker, keeps, projectStatusChange } from './github-events.mjs';
+import { forgejoDelivery, validForgejoSignature } from './forgejo-source.mjs';
+
+/** A delivery's JSON body, or null when it is not JSON. */
+function parse(body) {
+  try {
+    return JSON.parse(body.toString('utf8'));
+  } catch {
+    return null;
+  }
+}
 import { loadConfiguration } from './env-file.mjs';
 import { relationshipKey } from '../dist/core.mjs';
 
@@ -90,6 +100,7 @@ export class GithubIngest {
     api,
     key,
     secret,
+    secrets = {},
     routes,
     fetcher = fetch,
     flushMs = 1000,
@@ -98,9 +109,14 @@ export class GithubIngest {
     githubApi = 'https://api.github.com',
     stints = new StintTracker(),
   }) {
-    if (!secret) throw new Error('GITHUB_WEBHOOK_SECRET must be the webhook’s secret.');
+    if (!secret && !secrets.forgejo)
+      throw new Error(
+        'Set the webhook’s secret: GITHUB_WEBHOOK_SECRET for GitHub, FORGEJO_WEBHOOK_SECRET for Forgejo or Gitea.',
+      );
     this.writer = new TimelineWriter({ api, key, fetcher });
     this.secret = secret;
+    // Other platforms' webhook secrets: `forgejo`.
+    this.secrets = secrets;
     this.routes = routes;
     this.fetcher = fetcher;
     this.token = token;
@@ -134,18 +150,49 @@ export class GithubIngest {
    * signature, 400 for a body that is not JSON, otherwise 202 (queued) or 204 (not kept).
    */
   receive(event, signature, body) {
-    if (!validSignature(this.secret, body, signature)) {
+    if (!this.secret || !validSignature(this.secret, body, signature)) {
       this.stats.rejected++;
       return 401;
     }
-    let payload;
-    try {
-      payload = JSON.parse(body.toString('utf8'));
-    } catch {
-      return 400;
-    }
+    const payload = parse(body);
+    if (!payload) return 400;
     this.stats.deliveries++;
     if (event === 'ping') return 204;
+    return this.handle(event, payload);
+  }
+  /**
+   * A delivery from any platform, told apart by its headers (lower-case names, as Node gives
+   * them): GitHub's (`x-github-event`) or Forgejo's and Gitea's (`x-forgejo-event`,
+   * `x-gitea-event`), each checked against its own secret. 400 for anything else.
+   */
+  receiveFrom(headers, body) {
+    if (headers['x-github-event'])
+      return this.receive(String(headers['x-github-event']), headers['x-hub-signature-256'], body);
+    const forgejo = headers['x-forgejo-event'] ?? headers['x-gitea-event'];
+    if (forgejo) {
+      const signature = headers['x-forgejo-signature'] ?? headers['x-gitea-signature'];
+      if (!this.secrets.forgejo || !validForgejoSignature(this.secrets.forgejo, body, signature)) {
+        this.stats.rejected++;
+        return 401;
+      }
+      const payload = parse(body);
+      if (!payload) return 400;
+      this.stats.deliveries++;
+      const delivery = forgejoDelivery(
+        String(forgejo),
+        headers['x-forgejo-event-type'] ?? headers['x-gitea-event-type'],
+        payload,
+      );
+      if (!delivery) {
+        this.stats.ignored++;
+        return 204;
+      }
+      return this.handle(delivery.event, delivery.payload);
+    }
+    return 400;
+  }
+  /** A checked delivery, in GitHub's shape: queued (202) or not kept (204). */
+  handle(event, payload) {
     if (event === 'projects_v2_item') {
       // A board's status change names its issue by node ID: resolved, then queued.
       if (!this.token || !keeps(this.routes.kinds, 'moved')) {
@@ -309,11 +356,7 @@ export function listenGithub(ingest, { host = '127.0.0.1', port = 5580 } = {}) {
     });
     request.on('end', () => {
       if (response.writableEnded) return;
-      const status = ingest.receive(
-        String(request.headers['x-github-event'] ?? ''),
-        request.headers['x-hub-signature-256'],
-        Buffer.concat(chunks),
-      );
+      const status = ingest.receiveFrom(request.headers, Buffer.concat(chunks));
       response.writeHead(status).end();
     });
   });
@@ -339,7 +382,8 @@ export async function main(env = process.env) {
   const ingest = new GithubIngest({
     api: env.OCH_API_URL,
     key: env.OCH_API_KEY,
-    secret: env.GITHUB_WEBHOOK_SECRET,
+    secret: env.GITHUB_WEBHOOK_SECRET || undefined,
+    secrets: { forgejo: env.FORGEJO_WEBHOOK_SECRET || undefined },
     routes: loadRoutes(env),
     flushMs: env.GITHUB_FLUSH_MS ? Number(env.GITHUB_FLUSH_MS) : undefined,
     token: env.GITHUB_TOKEN || undefined,
