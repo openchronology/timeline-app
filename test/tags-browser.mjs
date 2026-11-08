@@ -3,6 +3,27 @@
 import assert from 'node:assert/strict';
 import { readFile } from 'node:fs/promises';
 import { closeMomentDetails } from './moment-dialog-browser.mjs';
+/**
+ * Separates the open timeline by `groups` of tags (#548): one separation per group, each
+ * tag typed into its picker and chosen with Enter, then Separate.
+ */
+export async function separateBy(page, ...groups) {
+  await page.locator('#separate-button').click();
+  const dialog = page.locator('#separate-dialog');
+  await dialog.waitFor({ state: 'visible' });
+  for (const [i, tags] of groups.entries()) {
+    if (i > 0) await dialog.locator('#separate-add').click();
+    const item = dialog.locator('.separation-item').nth(i);
+    if (!(await item.locator('.tag-picker-panel').isVisible()))
+      await item.locator('.tag-picker-toggle').click();
+    for (const tag of tags) {
+      await item.locator('.tag-picker-search').fill(tag);
+      await item.locator('.tag-picker-search').press('Enter');
+    }
+  }
+  await page.locator('#separate-submit').click();
+  await dialog.waitFor({ state: 'hidden' });
+}
 /** Entity tags are edited on moments and durations and separate a timeline into two tracks. */
 export async function checkTags(page, restore) {
   const imported = async (doc) => {
@@ -51,16 +72,36 @@ export async function checkTags(page, restore) {
     const saved = await exported();
     assert.deepEqual(saved.events.find((e) => e.id === 'b').metadata.tags, ['trade', 'ports']);
     const before = await page.locator('#left-bound').inputValue();
-    // Separation lists tags with counts and pulls tagged entities into a track above.
+    // The picker lists tags with counts, most used first; a separation pulls tagged entities
+    // into a track above.
     await page.locator('#separate-button').click();
     const dialog = page.locator('#separate-dialog');
-    await dialog.getByLabel('war (3)').waitFor();
-    assert.deepEqual(await dialog.locator('.checkbox-label').allTextContents(), [
-      'war (3)',
-      'trade (2)',
-      'ports (1)',
-    ]);
-    await dialog.getByLabel('war (3)').check();
+    await dialog.locator('.tag-picker-toggle').click();
+    await dialog.locator('.tag-picker-options [role="option"]').first().waitFor();
+    await page.waitForFunction(
+      () =>
+        document.querySelectorAll('#separate-dialog .tag-picker-options [role="option"]').length ===
+        3,
+    );
+    assert.deepEqual(
+      await dialog.locator('.tag-picker-options [role="option"]').allTextContents(),
+      ['war3', 'trade2', 'ports1'],
+    );
+    // Searching narrows them; choosing adds a chip; its × removes it.
+    await dialog.locator('.tag-picker-search').fill('tr');
+    assert.deepEqual(
+      await dialog.locator('.tag-picker-options [role="option"]').allTextContents(),
+      ['trade2', 'Add “tr”'],
+    );
+    await dialog.locator('.tag-picker-search').press('Enter');
+    assert.deepEqual(await dialog.locator('.tag-chip').allTextContents(), ['trade×']);
+    await dialog.getByRole('button', { name: 'Remove trade' }).click();
+    assert.equal(await dialog.locator('.tag-chip').count(), 0);
+    await dialog.locator('.tag-picker-search').fill('war');
+    await dialog.locator('.tag-picker-search').press('Enter');
+    await dialog.locator('.tag-picker-search').press('Escape');
+    assert.equal(await dialog.isVisible(), true, 'Escape closes the picker, not the dialog');
+    assert.equal(await dialog.locator('.tag-picker-panel').isVisible(), false);
     await page.locator('#separate-submit').click();
     await dialog.waitFor({ state: 'hidden' });
     await page.locator('#separation-settings').waitFor({ state: 'visible' });
@@ -89,6 +130,35 @@ export async function checkTags(page, restore) {
     await page.locator('#separation-rejoin').click();
     await page.locator('#separation-settings').waitFor({ state: 'hidden' });
     await page.locator('#add-button').waitFor({ state: 'visible' });
+    // Several separations (#548): a track each, above everything else; the button stays, with
+    // how many are shown, and its dialog lists them to change.
+    await separateBy(page, ['war'], ['ports']);
+    await page.locator('#separation-settings').waitFor({ state: 'visible' });
+    assert.equal(await page.locator('#separation-heading').textContent(), '2 separations');
+    assert.equal(await page.locator('#separation-tags').textContent(), 'war · ports');
+    assert.equal(await page.locator('#separate-button').isVisible(), true);
+    assert.equal(await page.locator('#separate-count').textContent(), '2');
+    assert.equal(await page.locator('#comparison-tracks > *').count(), 3);
+    assert((await top('Battle')) < (await top('Market')), 'war above ports');
+    await page.locator('#separate-button').click();
+    const editing = page.locator('#separate-dialog');
+    assert.deepEqual(await editing.locator('.separation-item .tag-chip').allTextContents(), [
+      'war×',
+      'ports×',
+    ]);
+    await editing.getByRole('button', { name: 'Remove separation 2' }).click();
+    assert.equal(await editing.locator('.separation-item').count(), 1);
+    await page.locator('#separate-submit').click();
+    await editing.waitFor({ state: 'hidden' });
+    await page.waitForFunction(
+      () => document.getElementById('separation-heading').textContent === 'Separated by tags',
+    );
+    assert.equal(await page.locator('#separate-count').textContent(), '1');
+    // Rejoining all from the dialog shows the whole timeline, and the count goes.
+    await page.locator('#separate-button').click();
+    await page.locator('#separate-clear').click();
+    await page.locator('#separation-settings').waitFor({ state: 'hidden' });
+    assert.equal(await page.locator('#separate-count').isVisible(), false);
     // A default view (#416): a timeline saved separated opens that way, keeping its title.
     const viewed = {
       ...doc,
@@ -111,8 +181,8 @@ export async function checkTags(page, restore) {
     assert.equal('view' in (await exported()), false);
     await page.locator('#separate-button').click();
     assert.equal(await page.locator('#separate-default').isVisible(), false);
-    await page.locator('#separate-dialog').getByLabel('war (3)').check();
-    await page.locator('#separate-submit').click();
+    await page.locator('#separate-dialog [data-close="separate-dialog"]').first().click();
+    await separateBy(page, ['war']);
     await page.locator('#separation-default').click();
     await page.locator('#separation-default-clear').waitFor({ state: 'visible' });
     await page.locator('#separation-rejoin').click();

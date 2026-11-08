@@ -2,6 +2,7 @@
 // The editor as the desktop app runs it, with the native SQLite store stood in for: views, windows
 // read ahead, native search and tag views, sparse duration saves, and advice when slow.
 import assert from 'node:assert/strict';
+import { separateBy } from './tags-browser.mjs';
 import { closeMomentDetails } from './moment-dialog-browser.mjs';
 import { readFile } from 'node:fs/promises';
 import { resolve } from 'node:path';
@@ -337,9 +338,7 @@ export async function checkDesktopCache(browser) {
     assert.equal(document.events.length, 10002);
     assert(document.events.some((e) => e.id === 'far'));
     // Separating a file queries native tag views of the saved state.
-    await page.locator('#separate-button').click();
-    await page.locator('#separate-dialog').getByLabel('local (1)').check();
-    await page.locator('#separate-submit').click();
+    await separateBy(page, ['local']);
     await page.locator('#separation-settings').waitFor({ state: 'visible' });
     // The marker can linger from the joined view; wait for both separated tracks' queries.
     const queried = (mode) =>

@@ -381,7 +381,9 @@ Every point has a place. Explore the spaces between them.</textarea>
                 title="Follow new server moments after 15 seconds without navigation"
                 ><input id="follow-latest" type="checkbox" /> Follow latest moments</label
               >
-              <button id="separate-button" data-phone-menu>Separate by tags</button>
+              <button id="separate-button" data-phone-menu>
+                Separate by tags<span id="separate-count" class="button-count" hidden></span>
+              </button>
               <button id="presentation-button" data-phone-menu>Time display</button>
               <button id="plugins-button" data-phone-menu>Plugins</button>
               <button id="compare-button" data-phone-menu>Compare</button>
@@ -724,20 +726,23 @@ Every point has a place. Explore the spaces between them.</textarea>
           <button type="button" data-close="separate-dialog" aria-label="Close">×</button>
         </div>
         <p class="field-hint">
-          Events with any chosen tag move into a track above the rest of the timeline. Nothing is
-          changed or saved.
+          Each separation moves the events with any of its tags into a track of its own, above the
+          rest of the timeline. Nothing is changed or saved.
         </p>
         <p id="separate-default" class="field-hint" hidden>
           <span id="separate-default-text"></span>
           <button type="button" id="separate-default-clear" hidden>Clear default view</button>
         </p>
-        <div id="separate-tags" class="separate-tags" role="group" aria-label="Tags"></div>
-        <label
-          >Other tags<input id="separate-extra" spellcheck="false" placeholder="Comma-separated"
-        /></label>
+        <p id="separate-related" class="field-hint" hidden>
+          <span id="separate-related-text"></span>
+          <button type="button" id="separate-related-remove">Remove</button>
+        </p>
+        <ol id="separate-list" class="separate-list" aria-label="Separations"></ol>
+        <button type="button" id="separate-add">+ Add a separation</button>
         <p id="separate-error" class="form-error" role="alert"></p>
         <div class="dialog-actions">
           <button id="separate-submit" class="button-primary" type="submit">Separate</button
+          ><button type="button" id="separate-clear" hidden>Rejoin all</button
           ><button type="button" data-close="separate-dialog">Cancel</button>
         </div>
       </form>

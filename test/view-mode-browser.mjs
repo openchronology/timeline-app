@@ -1,6 +1,7 @@
 // Copyright (c) 2026 Athan Clark. SPDX-License-Identifier: GPL-3.0-only
 // View mode (#233): reading a timeline you can edit as its viewers do, in the reader.
 import assert from 'node:assert/strict';
+import { separateBy } from './tags-browser.mjs';
 import { closeMomentDetails } from './moment-dialog-browser.mjs';
 import {
   DATING_CONTEXT,
@@ -158,9 +159,7 @@ export async function checkViewMode(page, restore) {
   await page.waitForFunction(() => !document.getElementById('inspector').open);
 
   // Separated (#345), its tracks still open in the reader, as the timeline keeps them.
-  await page.locator('#separate-button').click();
-  await page.locator('#separate-extra').fill('pacific');
-  await page.locator('#separate-submit').click();
+  await separateBy(page, ['pacific']);
   await page.locator('#separation-settings').waitFor();
   // Separation re-keys markers into tracks, which ease into place: click once they hold still.
   const settled = async (selector) => {

@@ -13,7 +13,14 @@ test('a stored view is read back whole', () => {
     separation: { tags: ['deploy', 'incident'] },
     follow: true,
   };
-  assert.deepEqual(readViewState(JSON.stringify(state)), state);
+  // A tab's one separation by tags is read back as one group of them (#548).
+  assert.deepEqual(readViewState(JSON.stringify(state)), {
+    ...state,
+    separation: { groups: [['deploy', 'incident']] },
+  });
+  const several = { separation: { groups: [['deploy'], ['incident', 'ops']] } };
+  assert.deepEqual(readViewState(JSON.stringify(several)), several);
+  assert.deepEqual(readViewState(JSON.stringify({ separation: { groups: [['ok'], []] } })), {});
   const related = { related: { duration: 'd1' }, depth: 'all', label: 'Release' };
   assert.deepEqual(readViewState(JSON.stringify({ separation: related })), {
     separation: related,

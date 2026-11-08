@@ -1,6 +1,7 @@
 // Copyright (c) 2026 Athan Clark. SPDX-License-Identifier: GPL-3.0-only
 // Follow latest in the editor, and the view kept across a reload (#128).
 import assert from 'node:assert/strict';
+import { separateBy } from './tags-browser.mjs';
 import { readFile } from 'node:fs/promises';
 import { resolve } from 'node:path';
 import { demo, Q, TimelineIndex, Viewport } from '../dist/core.mjs';
@@ -167,9 +168,7 @@ export async function checkFollowLatest(browser) {
     await shows(zoomed);
     assert.equal(await page.locator('#follow-latest').isChecked(), true);
     assert.equal(await page.locator('#density').inputValue(), '36');
-    await page.locator('#separate-button').click();
-    await page.locator('#separate-extra').fill('ops');
-    await page.locator('#separate-submit').click();
+    await separateBy(page, ['ops']);
     await page.locator('#separation-settings').waitFor();
     await page.waitForTimeout(500);
     await reload();

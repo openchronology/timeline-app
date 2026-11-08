@@ -4,6 +4,7 @@
 // event to the other, with the Relationship arrows plugin's arrowheads; only the upper track's
 // queries ask for arcs. SCREENSHOT_DIR, when set, keeps light and dark screenshots.
 import assert from 'node:assert/strict';
+import { separateBy } from './tags-browser.mjs';
 import { spawn } from 'node:child_process';
 import { resolve } from 'node:path';
 import { mkdir, readFile } from 'node:fs/promises';
@@ -116,9 +117,7 @@ try {
   await frame.locator('.edge-arc').nth(3).waitFor({ state: 'attached' });
 
   // Separate by "war".
-  await frame.locator('#separate-button').click();
-  await frame.locator('#separate-dialog').getByLabel('war (2)').check();
-  await frame.locator('#separate-submit').click();
+  await separateBy(frame, ['war']);
   await frame.locator('#separation-settings').waitFor({ state: 'visible' });
   const editor = page.frames().find((f) => f.url().includes('/editor'));
   assert(editor, 'the editor frame');

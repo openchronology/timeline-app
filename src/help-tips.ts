@@ -40,7 +40,7 @@ export const HELP_TIPS: readonly HelpTip[] = [
     selector: '#separate-heading',
     topic: 'tags#separating-by-tags',
     about: 'separating by tags',
-    tip: 'Moves what carries any of the chosen tags into a track above the rest, to compare them. It changes nothing.',
+    tip: 'Each separation moves what carries any of its tags into a track above the rest, to compare them. It changes nothing.',
   },
   {
     selector: '#map-heading',
