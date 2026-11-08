@@ -4,8 +4,8 @@
   "private": true,
   "type": "module",
   "bin": {
-    "och-import-logs": "server/import-logs.mjs",
-    "och-import-github": "server/import-github.mjs"
+    "och-import-github": "server/import-github.mjs",
+    "och-import-logs": "server/import-logs.mjs"
   },
   "engines": {
     "node": ">=22"
