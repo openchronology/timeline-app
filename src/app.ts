@@ -98,6 +98,7 @@ import {
   anchorOf,
   isOngoing,
   nowCoordinate,
+  frameWithOngoing,
   resolveDuration,
   validateDuration,
   durationPlugins,
@@ -1202,10 +1203,22 @@ async function timelineQuery<T>(query: Record<string, unknown>, signal?: AbortSi
           ]),
       ]),
     ];
-    return window.__TAURI__!.core.invoke<T>('desktop_query', {
+    // The desktop store has no clock of its own: ongoing durations (#537) end at this one.
+    const now = nowCoordinate(model?.presentation ?? remote?.presentation, Date.now());
+    const result = await window.__TAURI__!.core.invoke<T>('desktop_query', {
       generation: local.generation,
-      query: { ...query, metadata_keys },
+      query: { ...query, metadata_keys, ...(now ? { now: now.toString() } : {}) },
     });
+    // A window carries them resolved, apart: their placeholders go, and they join it.
+    const { ongoing, ...frame } = result as Frame & { ongoing?: DurationBand[] };
+    if (query.kind !== 'overview' || !ongoing) return result;
+    return frameWithOngoing(
+      frame,
+      ongoing,
+      Q.parse(String(query.lower)),
+      Q.parse(String(query.upper)),
+      Q.parse(frame.threshold ?? String(query.threshold)),
+    ) as T;
   }
   if (!remote) throw new Error('No indexed timeline is open.');
   return api<T>(`timelines/${remote.id}/query`, 'POST', query, signal);

@@ -18,6 +18,7 @@ import {
   nowCoordinate,
   isOngoing,
   printEntityTime,
+  frameWithOngoing,
 } from '../dist/core.mjs';
 
 const gregorian = { ...DEFAULT_PRESENTATION, mode: 'gregorian' };
@@ -164,4 +165,44 @@ test('joining a window keeps the longest and counts every match', () => {
 
 test('an ongoing end reads as "now"', () => {
   assert.equal(printEntityTime(null, { start: '1/1', end: { ongoing: true } }), '1/1 – now');
+});
+
+test("a store's placeholder window, joined with its ongoing durations, is what the index draws", () => {
+  const now = 50000;
+  const durations = [];
+  for (let i = 0; i < 40; i++)
+    durations.push({
+      id: 'd' + String(i).padStart(2, '0'),
+      start: String(i * 1000),
+      end: i % 3 ? String(i * 1000 + (i % 7) * 400) : { ongoing: true },
+      metadata: { title: 'Span ' + i },
+    });
+  const document = validateDocument({ ...doc(), events: [], durations });
+  // The stores hold each ongoing duration as a point at its start.
+  const placeholders = validateDocument({
+    ...doc(),
+    events: [],
+    durations: durations.map((d) => (isOngoing(d.end) ? { ...d, end: d.start } : d)),
+  });
+  const ongoing = document.durations
+    .filter((d) => isOngoing(d.end))
+    .map((d) => resolveDuration(d, () => undefined, Q.from(BigInt(now))));
+  for (const [left, span] of [
+    [0, 60000],
+    [0, 600000],
+    [20000, 3000],
+    [45000, 20000],
+  ]) {
+    const view = new Viewport(Q.from(BigInt(left)), Q.from(BigInt(span)));
+    const index = new TimelineIndex(document);
+    index.clock = at(now);
+    const expected = index.frame(view, 1000);
+    const stored = new TimelineIndex(placeholders).frame(view, 1000);
+    const threshold = view.threshold(1000, 24);
+    const joined = frameWithOngoing(stored, ongoing, view.left, view.right, threshold);
+    const ids = (f) => f.durations.map((d) => d.id + ':' + d.last).sort();
+    assert.deepEqual(ids(joined), ids(expected), `bands in [${left}, +${span}]`);
+    const counted = (f) => f.groups.reduce((n, g) => n + BigInt(g.durationCount ?? '0'), 0n);
+    assert.equal(counted(joined), counted(expected), `summaries in [${left}, +${span}]`);
+  }
 });

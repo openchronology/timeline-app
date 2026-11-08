@@ -2,9 +2,9 @@
 // Summary groups: collapsed durations in frame form, and nearby groups merged into one at the
 // view's grouping distance.
 import { Rational as Q } from 'rational-ordered-map';
-import { durationOverview } from './durations.js';
-import type { DurationSummary } from './durations.js';
-import type { FrameGroup } from './core.js';
+import { durationOverview, isOngoing, summariesWithOngoing, withOngoing } from './durations.js';
+import type { DurationBand, DurationSummary } from './durations.js';
+import type { Frame, FrameGroup } from './core.js';
 
 /** Groups of collapsed durations, in frame form: no moments, a duration count. */
 export function durationGroups(summaries: readonly DurationSummary[]): FrameGroup[] {
@@ -56,4 +56,62 @@ export function coalesceGroups(groups: readonly FrameGroup[], threshold: Q): Fra
     } else out.push(group);
   }
   return out;
+}
+/**
+ * A window from an interval tree that holds each ongoing duration as a placeholder, a point at
+ * its start (#537), with those durations resolved at "now" in its place: `ongoing` holds them
+ * resolved. Each placeholder was summarized in the group holding its start, so it is taken out
+ * of that group's count; then the resolved durations join the bands (withOngoing) or, when
+ * shorter than `threshold`, the summaries. The PostgreSQL and SQLite stores answer windows
+ * this way.
+ */
+export function frameWithOngoing<F extends Frame>(
+  frame: F,
+  ongoing: readonly DurationBand[],
+  lower: Q,
+  upper: Q,
+  threshold: Q,
+): F {
+  if (!ongoing.length) return frame;
+  let groups = frame.groups.map((g) => ({ ...g }));
+  for (const band of ongoing) {
+    const start = Q.parse(band.first);
+    if (start.compare(lower) < 0 || start.compare(upper) > 0) continue;
+    const group = groups.find(
+      (g) =>
+        BigInt(g.durationCount ?? '0') > 0n &&
+        Q.parse(g.first).compare(start) <= 0 &&
+        Q.parse(g.last).compare(start) >= 0,
+    );
+    if (!group) continue;
+    const left = BigInt(group.durationCount!) - 1n;
+    if (left > 0n) group.durationCount = left.toString();
+    else delete group.durationCount;
+    if (group.duration?.id === band.id) delete group.duration;
+  }
+  groups = groups.filter((g) => BigInt(g.count) > 0n || BigInt(g.durationCount ?? '0') > 0n);
+  const added = durationGroups(summariesWithOngoing([], ongoing, lower, upper, threshold));
+  if (added.length) groups = coalesceGroups([...groups, ...added], threshold);
+  const durations = (frame.durations ?? []).filter((band) => !isOngoing(band.end));
+  const bands = withOngoing(
+    frame.durationsTruncated
+      ? {
+          durations,
+          durationsTruncated: true,
+          durationsTotal: frame.durationsTotal ?? durations.length,
+          ...(frame.durationsTotalMore ? { durationsTotalMore: true } : {}),
+        }
+      : { durations, durationsTruncated: false },
+    ongoing,
+    lower,
+    upper,
+    256,
+    threshold.compare(Q.zero) > 0 ? threshold : null,
+  );
+  const result = { ...frame, ...bands, groups };
+  if (!bands.durationsTruncated) {
+    delete result.durationsTotal;
+    delete result.durationsTotalMore;
+  }
+  return result;
 }

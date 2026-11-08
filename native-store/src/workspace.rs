@@ -162,6 +162,10 @@ pub struct Query {
     /// separation asks for none, since the upper track's answer has every arc.
     #[serde(default)]
     pub arcs: Option<bool>,
+    /// The current time as an exact coordinate, for timelines that have one (#537): ongoing
+    /// durations end there. Without it they stay points at their starts.
+    #[serde(default)]
+    pub now: Option<String>,
 }
 /// A private temporary directory, removed with the last snapshot that uses it.
 struct Directory(PathBuf);
@@ -485,7 +489,12 @@ impl Snapshot {
             return Ok(result);
         }
         let _gate = self.query_gate.lock().map_err(|e| e.to_string())?;
-        for value in [&q.lower, &q.upper, &q.threshold] {
+        for value in [
+            &q.lower,
+            &q.upper,
+            &q.threshold,
+            q.now.as_deref().unwrap_or(""),
+        ] {
             if value.len() > 65536 {
                 return Err("Viewport rational exceeds query budget".into());
             }
@@ -583,6 +592,7 @@ impl Snapshot {
                 sort,
                 offset,
                 q.limit.unwrap_or(25).clamp(1, 100),
+                q.now.as_deref(),
             );
         }
         if q.kind == "durations" {
@@ -596,6 +606,7 @@ impl Snapshot {
                 &q.upper,
                 after.map(|c| (c.time.as_str(), c.id.as_str())),
                 q.limit.unwrap_or(25).clamp(1, 100),
+                q.now.as_deref(),
             );
         }
         // The remaining kinds take a viewport; q() also rejects malformed bounds here.
@@ -660,6 +671,14 @@ impl Snapshot {
                         groups = super::coalesce_groups(&db, groups, &threshold)?;
                     }
                     result["groups"] = json!(groups);
+                    // The ongoing durations, resolved at `now` (#537): the editor takes their
+                    // placeholders out of this window and adds them (frameWithOngoing).
+                    if let Some(now) = q.now.as_deref() {
+                        let ongoing = super::ongoing_bands(&db, now)?;
+                        if !ongoing.is_empty() {
+                            result["ongoing"] = json!(ongoing);
+                        }
+                    }
                     result["visitedNodes"] = json!(visited);
                     result["threshold"] = json!(threshold);
                     result
@@ -1032,7 +1051,7 @@ fn apply_changes(
         tree.remove(id)?;
         // The duration as now stored, with its endpoint JSON and resolved times, as in
         // rebuild_duration_index (lib.rs); no row means it was deleted.
-        let rows = db.query("SELECT CASE WHEN d.start_moment IS NULL THEN json_quote(d.start_time) ELSE json_object('moment',d.start_moment) END,CASE WHEN d.end_moment IS NULL THEN json_quote(d.end_time) ELSE json_object('moment',d.end_moment) END,COALESCE(d.start_time,(SELECT e.time FROM events e WHERE e.id=d.start_moment)),COALESCE(d.end_time,(SELECT e.time FROM events e WHERE e.id=d.end_moment)),d.metadata FROM durations d WHERE d.id=?1", &[id])?;
+        let rows = db.query("SELECT CASE WHEN d.start_moment IS NULL THEN json_quote(d.start_time) ELSE json_object('moment',d.start_moment) END,CASE WHEN d.end_moment IS NOT NULL THEN json_object('moment',d.end_moment) WHEN d.end_time IS NOT NULL THEN json_quote(d.end_time) ELSE json('{\"ongoing\":true}') END,COALESCE(d.start_time,(SELECT e.time FROM events e WHERE e.id=d.start_moment)),COALESCE(d.end_time,(SELECT e.time FROM events e WHERE e.id=d.end_moment),CASE WHEN d.end_moment IS NULL THEN COALESCE(d.start_time,(SELECT e.time FROM events e WHERE e.id=d.start_moment)) END),d.metadata FROM durations d WHERE d.id=?1", &[id])?;
         let after = match rows.first() {
             Some(r) => {
                 let (Some(start), Some(end)) = (&r[2], &r[3]) else {
@@ -2351,6 +2370,104 @@ mod duration_tests {
         assert!(Snapshot::from_document(&invalid).is_err());
         invalid.durations[0].start = json!({"moment":"absent"});
         assert!(Snapshot::from_document(&invalid).is_err());
+    }
+    #[test]
+    fn ongoing_durations_end_at_now_in_windows_lists_and_pages() {
+        let doc: Document = serde_json::from_value(json!({"format":"openchronology","version":1,"title":"Open work","description":"","presentation":{"version":1,"mode":"gregorian","unit":"","scale":"1/1","origin":"0/1","digits":12},"events":[],"durations":[{"id":"done","start":"0/1","end":"50/1","metadata":{"title":"Done"}},{"id":"issue","start":"100/1","end":{"ongoing":true},"metadata":{"title":"Login loop"}}]})).unwrap();
+        let snapshot = Snapshot::from_document(&doc).unwrap();
+        assert_eq!(snapshot.document().unwrap().durations, doc.durations);
+        let at = |extra: Value| -> Query {
+            let mut q = json!({"kind":"overview","lower":"0/1","upper":"1000/1","threshold":"0/1","now":"500/1","limit":10});
+            for (k, v) in extra.as_object().unwrap() {
+                q[k] = v.clone();
+            }
+            serde_json::from_value(q).unwrap()
+        };
+        // The window carries the ongoing duration resolved at now, for the editor to merge.
+        let window = snapshot.query(&at(json!({}))).unwrap();
+        assert_eq!(window["ongoing"][0]["id"], "issue");
+        assert_eq!(window["ongoing"][0]["last"], "500/1");
+        assert_eq!(window["ongoing"][0]["end"], json!({"ongoing": true}));
+        // Without a "now" it carries none, and the duration stays a point at its start.
+        let mut still = at(json!({}));
+        still.now = None;
+        assert!(snapshot.query(&still).unwrap().get("ongoing").is_none());
+        // Lists see it ending now: longest first, then in a page wholly inside a span.
+        let list = snapshot
+            .query(&at(json!({"kind":"durations","overlapping":true})))
+            .unwrap();
+        assert_eq!(list["total"], 2);
+        assert_eq!(list["durations"][0]["id"], "issue");
+        assert_eq!(list["durations"][0]["last"], "500/1");
+        let page = |upper: &str| {
+            snapshot
+                .query(&at(json!({"kind":"durations","upper":upper})))
+                .unwrap()["durations"]
+                .as_array()
+                .unwrap()
+                .iter()
+                .map(|b| b["id"].as_str().unwrap().to_string())
+                .collect::<Vec<_>>()
+        };
+        assert_eq!(page("600/1"), vec!["done", "issue"]);
+        assert_eq!(page("200/1"), vec!["done"]);
+        // Closing it, then opening it again, in sparse saves.
+        let settings = snapshot.header().unwrap().document;
+        let target = snapshot.directory().join("ongoing.och");
+        let close: Patch = serde_json::from_value(json!({"settings":settings,"changes":[],"durationChanges":[{"id":"issue","duration":{"id":"issue","start":"100/1","end":"300/1","metadata":{}}}]})).unwrap();
+        let closed = snapshot.save_patch(&target, &close).unwrap();
+        assert!(closed
+            .query(&at(json!({})))
+            .unwrap()
+            .get("ongoing")
+            .is_none());
+        let reopen: Patch = serde_json::from_value(json!({"settings":settings,"changes":[],"durationChanges":[{"id":"issue","duration":doc.durations[1]}]})).unwrap();
+        let reopened = closed.save_patch(&target, &reopen).unwrap();
+        assert_eq!(
+            reopened.query(&at(json!({}))).unwrap()["ongoing"][0]["last"],
+            "500/1"
+        );
+        // A timeline without a calendar has no "now".
+        let mut uncalendared = doc.clone();
+        uncalendared.presentation = None;
+        assert!(Snapshot::from_document(&uncalendared).is_err());
+        // A start cannot be ongoing.
+        let mut invalid = doc.clone();
+        invalid.durations[1].start = json!({"ongoing": true});
+        assert!(Snapshot::from_document(&invalid).is_err());
+    }
+    #[test]
+    fn files_from_before_ongoing_durations_take_one_when_saved() {
+        let db = Connection::open(Path::new(":memory:"), true).unwrap();
+        // The table as earlier versions made it: an end needed a time or a moment.
+        db.execute("CREATE TABLE durations(id TEXT PRIMARY KEY,start_time TEXT COLLATE RATIONAL_V1 CHECK(start_time IS NULL OR q_is_canonical(start_time)=1),start_moment TEXT,end_time TEXT COLLATE RATIONAL_V1 CHECK(end_time IS NULL OR q_is_canonical(end_time)=1),end_moment TEXT,metadata TEXT NOT NULL,CHECK((start_time IS NULL)<>(start_moment IS NULL)),CHECK((end_time IS NULL)<>(end_moment IS NULL))) STRICT", &[]).unwrap();
+        db.execute(
+            "INSERT INTO durations VALUES('old','0/1',NULL,'1/1',NULL,'{}')",
+            &[],
+        )
+        .unwrap();
+        let ongoing: super::super::Duration = serde_json::from_value(
+            json!({"id":"new","start":"2/1","end":{"ongoing":true},"metadata":{}}),
+        )
+        .unwrap();
+        super::super::insert_duration(&db, &ongoing).unwrap();
+        assert_eq!(
+            db.scalar("SELECT count(*) FROM durations", &[]).unwrap(),
+            "2"
+        );
+        assert_eq!(
+            db.scalar(
+                "SELECT count(*) FROM durations WHERE end_time IS NULL AND end_moment IS NULL",
+                &[]
+            )
+            .unwrap(),
+            "1"
+        );
+        // Both anchor indexes are back.
+        assert_eq!(
+            db.scalar("SELECT count(*) FROM sqlite_schema WHERE type='index' AND name LIKE 'durations_%_moment'", &[]).unwrap(),
+            "2"
+        );
     }
 }
 /// Validation placeholder for an anchor, so a single duration validates without its moments.

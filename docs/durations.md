@@ -45,7 +45,7 @@ An end of `{"ongoing": true}` is the current time: the band runs up to now and k
 - "Now" is not uncertainty: an end that happened at an unknown time is a different question.
 - The interval trees cannot hold a time that moves, so they hold an ongoing duration as a point at its start. A window's ongoing durations are resolved at the current time, then ranked, counted and summarized with the rest (#537).
 - The server stores each as that point too, beside its definition, and resolves a timeline's ongoing durations at its own clock in every window, summary, list and lookup (read through a partial index, at most 10,000 per timeline). If a timeline's display stops being Gregorian, its ongoing durations stay points at their starts.
-- The desktop's SQLite store and `och-convert` cannot hold them yet: that is the last stage of #537.
+- The desktop's SQLite store (and `och-convert`) stores an ongoing end as neither a time nor a moment, and holds the duration in its interval tree as that same point. The desktop app passes its clock with each query: lists and pages resolve ongoing durations in SQL, and windows return them resolved for the app to merge (`frameWithOngoing`, which the server uses too). Files written before this keep their `durations` table until the first ongoing duration is saved into them, which copies it into one that allows it; earlier versions of the app cannot open a file holding one.
 
 ### Earlier linked durations
 
