@@ -1,0 +1,438 @@
+// Copyright (c) 2026 Athan Clark. SPDX-License-Identifier: GPL-3.0-only
+// GitHub as a source (#538): issues and pull requests as durations (ongoing while open),
+// assignments as moments, "closes #n" as links; the webhook receiver's signatures, routing,
+// batching and retries; and the importer's paging, against fake GitHub and OpenChronology APIs.
+import test from 'node:test';
+import assert from 'node:assert/strict';
+import { createHmac } from 'node:crypto';
+import {
+  assignmentMoment,
+  closedIssues,
+  deliveryChanges,
+  entityId,
+  githubRoutes,
+  itemDuration,
+  validSignature,
+  NOTES_LIMIT,
+} from '../server/github-source.mjs';
+import { GithubIngest, listenGithub } from '../server/github-receiver.mjs';
+import { GithubReader, main, readRepository } from '../server/import-github.mjs';
+import { validateDuration, Q } from '../dist/core.mjs';
+
+const TIMELINE = '6f1c2d3e-4a5b-4c6d-8e7f-90a1b2c3d4e5';
+const OTHER = '0b7e1111-2222-4333-8444-555566667777';
+const KEY = 'och_key_' + 'a'.repeat(32) + '_' + 'b'.repeat(64);
+const issue = (overrides = {}) => ({
+  number: 412,
+  title: 'Fix the login loop',
+  body: 'It loops.',
+  state: 'open',
+  created_at: '2026-11-01T10:00:00Z',
+  updated_at: '2026-11-02T10:00:00Z',
+  closed_at: null,
+  html_url: 'https://github.com/acme/app/issues/412',
+  assignees: [{ login: 'octo' }],
+  labels: [{ name: 'Bug' }, { name: 'p1, urgent' }],
+  milestone: { title: 'v2' },
+  ...overrides,
+});
+
+test('an open issue is an ongoing duration, with its number, text, address and tags', () => {
+  const d = itemDuration('acme/app', issue());
+  assert.equal(d.id, 'gh:acme:app:412');
+  assert.equal(d.start, String(Date.parse('2026-11-01T10:00:00Z') / 1000));
+  assert.deepEqual(d.end, { ongoing: true });
+  assert.equal(d.metadata.title, '#412 Fix the login loop');
+  assert.equal(d.metadata.description, 'It loops.\n\nhttps://github.com/acme/app/issues/412');
+  assert.deepEqual(d.metadata.tags, [
+    'github',
+    'repository:acme/app',
+    'issue',
+    'state:open',
+    'assignee:octo',
+    'label:bug',
+    'label:p1  urgent',
+    'milestone:v2',
+  ]);
+  // The core accepts it as it is.
+  assert.deepEqual(validateDuration(d, Q.parse).end, { ongoing: true });
+});
+
+test('closed issues and merged pull requests end when they closed or merged', () => {
+  const closed = itemDuration(
+    'acme/app',
+    issue({ state: 'closed', closed_at: '2026-11-03T00:00:00Z' }),
+  );
+  assert.equal(closed.end, String(Date.parse('2026-11-03T00:00:00Z') / 1000));
+  assert.ok(closed.metadata.tags.includes('state:closed'));
+  // From the issues listing, a pull request carries pull_request.merged_at.
+  const merged = itemDuration(
+    'acme/app',
+    issue({
+      state: 'closed',
+      closed_at: '2026-11-04T00:00:00Z',
+      pull_request: { merged_at: '2026-11-04T00:00:00Z' },
+    }),
+  );
+  assert.ok(merged.metadata.tags.includes('pull request'));
+  assert.ok(merged.metadata.tags.includes('state:merged'));
+  const long = itemDuration('acme/app', issue({ body: 'x'.repeat(NOTES_LIMIT + 50) }));
+  assert.ok(long.metadata.description.startsWith('x'.repeat(NOTES_LIMIT) + '…'));
+});
+
+test('IDs stay within 128 characters, hashing a long repository name', () => {
+  const name = 'o'.repeat(39) + '/' + 'r'.repeat(100);
+  const id = entityId(name, '7');
+  assert.ok(id.length <= 128 && /^gh:[0-9a-f]{24}:7$/.test(id));
+  assert.equal(entityId(name, '7'), id);
+});
+
+test('pull requests close the issues their text names', () => {
+  assert.deepEqual(closedIssues('Fixes #12, closes: #13 and resolved #12. See #14.'), [12, 13]);
+  assert.deepEqual(closedIssues(null), []);
+});
+
+test('signatures are checked against the secret', () => {
+  const body = Buffer.from('{"zen":"hi"}');
+  const sign = (secret) => 'sha256=' + createHmac('sha256', secret).update(body).digest('hex');
+  assert.ok(validSignature('s3cret', body, sign('s3cret')));
+  assert.ok(!validSignature('s3cret', body, sign('other')));
+  assert.ok(!validSignature('s3cret', body, undefined));
+  assert.ok(!validSignature('s3cret', body, 'sha256=abc'));
+});
+
+test('routes choose a timeline by repository, then the default', () => {
+  const routes = githubRoutes({
+    routes: [
+      { repository: 'acme/app', timeline: TIMELINE },
+      { repository: 'ACME/*', timeline: OTHER },
+    ],
+  });
+  assert.equal(routes.route('acme/App'), TIMELINE);
+  assert.equal(routes.route('acme/site'), OTHER);
+  assert.equal(routes.route('else/where'), null);
+  assert.equal(githubRoutes({ default: TIMELINE }).route('else/where'), TIMELINE);
+  assert.throws(() => githubRoutes({ routes: [{ repository: 'acme', timeline: TIMELINE }] }));
+});
+
+test('deliveries become changes: edits, assignments, deletions and links', () => {
+  const repository = { full_name: 'acme/app' };
+  const edited = deliveryChanges('issues', { action: 'labeled', issue: issue(), repository });
+  assert.equal(edited.durations[0].id, 'gh:acme:app:412');
+  assert.equal(edited.moments.length, 0);
+  const assigned = deliveryChanges('issues', {
+    action: 'assigned',
+    issue: issue(),
+    assignee: { login: 'octo' },
+    repository,
+  });
+  assert.equal(assigned.moments[0].metadata.title, 'Assigned octo: #412 Fix the login loop');
+  // The same delivery twice is the same moment.
+  assert.equal(
+    assigned.moments[0].id,
+    deliveryChanges('issues', {
+      action: 'assigned',
+      issue: issue(),
+      assignee: { login: 'octo' },
+      repository,
+    }).moments[0].id,
+  );
+  assert.deepEqual(
+    deliveryChanges('issues', { action: 'deleted', issue: issue(), repository }).removed,
+    ['gh:acme:app:412'],
+  );
+  const pull = deliveryChanges('pull_request', {
+    action: 'opened',
+    pull_request: { ...issue({ number: 413, body: 'Fixes #412' }), merged_at: null },
+    repository,
+  });
+  assert.deepEqual(pull.links, [
+    { a: { duration: 'gh:acme:app:413' }, b: { duration: 'gh:acme:app:412' }, related: true },
+  ]);
+  assert.equal(deliveryChanges('star', { action: 'created', repository }), null);
+});
+
+/** A fake OpenChronology API: a Gregorian timeline per ID; saves recorded; failures scripted. */
+function fakeServer({ failures = [], refuse = () => null } = {}) {
+  const saves = [];
+  const fetcher = async (url, options = {}) => {
+    const path = new URL(url).pathname;
+    const respond = (status, value) => ({
+      status,
+      json: async () => value,
+      headers: { get: () => null },
+    });
+    if (!options.method || options.method === 'GET')
+      return respond(200, {
+        revision: 'r' + saves.length,
+        title: 'Work',
+        description: '',
+        presentation: { version: 1, mode: 'gregorian', unit: '', scale: '1/1', origin: '0/1' },
+      });
+    const body = JSON.parse(options.body);
+    const failure = refuse(body) ?? failures.shift();
+    if (failure) return respond(failure.status, { error: failure.error ?? 'failed' });
+    saves.push({ path, body });
+    return respond(200, { revision: 'r' + saves.length });
+  };
+  return { fetcher, saves };
+}
+const delivery = (ingest, event, payload, secret = 's3cret') => {
+  const body = Buffer.from(JSON.stringify(payload));
+  return ingest.receive(
+    event,
+    'sha256=' + createHmac('sha256', secret).update(body).digest('hex'),
+    body,
+  );
+};
+
+test('the receiver checks, routes, coalesces and saves deliveries', async () => {
+  const server = fakeServer();
+  const ingest = new GithubIngest({
+    api: 'http://och.test',
+    key: KEY,
+    secret: 's3cret',
+    routes: githubRoutes({ routes: [{ repository: 'acme/*', timeline: TIMELINE }] }),
+    fetcher: server.fetcher,
+    flushMs: 60000,
+  });
+  await ingest.check();
+  const repository = { full_name: 'acme/app' };
+  assert.equal(
+    delivery(ingest, 'issues', { action: 'opened', issue: issue(), repository }, 'bad'),
+    401,
+  );
+  assert.equal(delivery(ingest, 'ping', { zen: 'hi', repository }), 204);
+  assert.equal(
+    delivery(ingest, 'issues', {
+      action: 'opened',
+      issue: issue(),
+      repository: { full_name: 'else/where' },
+    }),
+    204,
+  );
+  assert.equal(delivery(ingest, 'issues', { action: 'opened', issue: issue(), repository }), 202);
+  assert.equal(
+    delivery(ingest, 'issues', {
+      action: 'closed',
+      issue: issue({ state: 'closed', closed_at: '2026-11-05T00:00:00Z' }),
+      repository,
+    }),
+    202,
+  );
+  assert.equal(
+    delivery(ingest, 'pull_request', {
+      action: 'opened',
+      pull_request: { ...issue({ number: 413, body: 'Closes #412' }), merged_at: null },
+      repository,
+    }),
+    202,
+  );
+  await ingest.drain();
+  // One save of both items (the issue's last state), then the link on its own.
+  assert.equal(server.saves.length, 2);
+  const [entities, links] = server.saves;
+  assert.equal(entities.path, `/api/timelines/${TIMELINE}/changes`);
+  assert.deepEqual(
+    entities.body.durationChanges.map((c) => [c.id, c.duration.end]),
+    [
+      ['gh:acme:app:412', String(Date.parse('2026-11-05T00:00:00Z') / 1000)],
+      ['gh:acme:app:413', { ongoing: true }],
+    ],
+  );
+  assert.equal(links.body.relationshipChanges.length, 1);
+  assert.deepEqual(ingest.stats, { deliveries: 5, rejected: 1, ignored: 1, saved: 2, failed: 0 });
+});
+
+test('the receiver retries what the server could not take, and drops what it refused', async () => {
+  const server = fakeServer({ failures: [{ status: 503 }] });
+  const errors = [];
+  const ingest = new GithubIngest({
+    api: 'http://och.test',
+    key: KEY,
+    secret: 's3cret',
+    routes: githubRoutes({ default: TIMELINE }),
+    fetcher: server.fetcher,
+    flushMs: 60000,
+    log: { error: (line) => errors.push(line), log() {} },
+  });
+  const repository = { full_name: 'acme/app' };
+  delivery(ingest, 'issues', { action: 'opened', issue: issue(), repository });
+  await ingest.flush(TIMELINE);
+  assert.equal(server.saves.length, 0);
+  assert.equal(ingest.pending.get(TIMELINE).size, 1, 'kept for later');
+  await ingest.drain();
+  assert.equal(server.saves.length, 1);
+  // A link the server refuses (its issue is not on the timeline) is let go quietly.
+  const refusing = fakeServer({
+    refuse: (body) => (body.relationshipChanges ? { status: 400, error: 'unknown entity' } : null),
+  });
+  const linker = new GithubIngest({
+    api: 'http://och.test',
+    key: KEY,
+    secret: 's3cret',
+    routes: githubRoutes({ default: TIMELINE }),
+    fetcher: refusing.fetcher,
+    flushMs: 60000,
+  });
+  delivery(linker, 'pull_request', {
+    action: 'opened',
+    pull_request: { ...issue({ number: 413, body: 'Closes #9' }), merged_at: null },
+    repository,
+  });
+  // The pull request saves; its link is refused, and not retried.
+  await linker.drain();
+  assert.equal(refusing.saves.length, 1);
+  assert.equal(linker.pending.get(TIMELINE)?.size ?? 0, 0);
+  assert.equal(errors.length, 0);
+});
+
+test('the receiver serves webhooks over HTTP', async () => {
+  const server = fakeServer();
+  const ingest = new GithubIngest({
+    api: 'http://och.test',
+    key: KEY,
+    secret: 's3cret',
+    routes: githubRoutes({ default: TIMELINE }),
+    fetcher: server.fetcher,
+    flushMs: 60000,
+  });
+  const listening = await listenGithub(ingest, { port: 0 });
+  try {
+    const url = `http://127.0.0.1:${listening.port}/`;
+    const body = JSON.stringify({
+      action: 'opened',
+      issue: issue(),
+      repository: { full_name: 'acme/app' },
+    });
+    const sign = 'sha256=' + createHmac('sha256', 's3cret').update(body).digest('hex');
+    const post = (headers) => fetch(url, { method: 'POST', body, headers });
+    assert.equal(
+      (await post({ 'X-GitHub-Event': 'issues', 'X-Hub-Signature-256': sign })).status,
+      202,
+    );
+    assert.equal((await post({ 'X-GitHub-Event': 'issues' })).status, 401);
+    assert.equal((await fetch(url)).status, 404);
+  } finally {
+    await listening.close();
+  }
+  await ingest.drain();
+  assert.equal(server.saves.length, 1);
+});
+
+/** A fake GitHub API: issues and events in pages of two, with Link headers. */
+function fakeGithub() {
+  const items = [
+    issue({ number: 1, state: 'closed', closed_at: '2026-11-02T00:00:00Z' }),
+    issue({ number: 2 }),
+    { ...issue({ number: 3, body: 'Fixes #2 and #99' }), pull_request: { merged_at: null } },
+  ];
+  const events = [
+    {
+      id: 501,
+      event: 'assigned',
+      created_at: '2026-11-01T11:00:00Z',
+      assignee: { login: 'octo' },
+      issue: items[1],
+    },
+    { id: 502, event: 'labeled', created_at: '2026-11-01T12:00:00Z', issue: items[1] },
+    {
+      id: 503,
+      event: 'unassigned',
+      created_at: '2026-11-01T13:00:00Z',
+      assignee: { login: 'octo' },
+      issue: items[1],
+    },
+  ];
+  const seen = [];
+  const fetcher = async (url, options) => {
+    seen.push({ url, headers: options.headers });
+    const u = new URL(url);
+    const list = u.pathname.endsWith('/issues/events') ? events : items;
+    const page = Number(u.searchParams.get('page') ?? '1');
+    const slice = list.slice((page - 1) * 2, page * 2);
+    const next = page * 2 < list.length ? new URL(url) : null;
+    next?.searchParams.set('page', String(page + 1));
+    return {
+      status: 200,
+      json: async () => slice,
+      headers: { get: (name) => (name === 'link' && next ? `<${next.href}>; rel="next"` : null) },
+    };
+  };
+  return { fetcher, seen };
+}
+
+test('the importer reads every page of issues and assignments, and links what closes what', async () => {
+  const github = fakeGithub();
+  const reader = new GithubReader({ token: 'ghp_x', fetcher: github.fetcher });
+  const changes = await readRepository(reader, 'acme/app');
+  assert.deepEqual(
+    changes.durations.map((d) => [d.id, typeof d.end === 'string' ? 'closed' : 'open']),
+    [
+      ['gh:acme:app:1', 'closed'],
+      ['gh:acme:app:2', 'open'],
+      ['gh:acme:app:3', 'open'],
+    ],
+  );
+  assert.deepEqual(
+    changes.moments.map((m) => m.id),
+    ['gh:acme:app:2:assigned:501', 'gh:acme:app:2:unassigned:503'],
+  );
+  // #99 was not read, so only the link to #2 is made.
+  assert.equal(changes.links.length, 1);
+  assert.ok(github.seen.every((r) => r.headers.Authorization === 'Bearer ghp_x'));
+  assert.ok(
+    github.seen.every((r) => /^OpenChronology-github-source/.test(r.headers['User-Agent'])),
+  );
+  // Since a time: the listing asks GitHub for it, and earlier assignments are left out.
+  const recent = await readRepository(reader, 'acme/app', { since: '2026-11-01T12:30:00Z' });
+  assert.deepEqual(
+    recent.moments.map((m) => m.id),
+    ['gh:acme:app:2:unassigned:503'],
+  );
+  assert.ok(
+    github.seen.some((r) => new URL(r.url).searchParams.get('since') === '2026-11-01T12:30:00Z'),
+  );
+});
+
+test('the command checks its arguments, and a dry run writes nothing', async () => {
+  const lines = [];
+  const out = { log: (l) => lines.push(l), error: (l) => lines.push(l) };
+  assert.equal(await main(['--repo', 'not-a-repo', '--timeline', TIMELINE], {}, out), 2);
+  assert.equal(
+    await main(['--repo', 'acme/app', '--timeline', TIMELINE, '--since', 'soon'], {}, out),
+    2,
+  );
+  const github = fakeGithub();
+  const realFetch = globalThis.fetch;
+  globalThis.fetch = github.fetcher;
+  try {
+    lines.length = 0;
+    assert.equal(
+      await main(['--repo', 'acme/app', '--timeline', TIMELINE, '--dry-run'], {}, out),
+      0,
+    );
+  } finally {
+    globalThis.fetch = realFetch;
+  }
+  assert.match(
+    lines[0],
+    /acme\/app → .*: would import 3 issues and pull requests \(2 open\), 2 assignments, 1 links\./,
+  );
+});
+
+test('assignment moments carry who and what', () => {
+  const m = assignmentMoment('acme/app', issue(), {
+    action: 'unassigned',
+    assignee: { login: 'octo' },
+    time: '2026-11-01T13:00:00Z',
+    id: 7,
+  });
+  assert.equal(m.id, 'gh:acme:app:412:unassigned:7');
+  assert.deepEqual(m.metadata.tags, [
+    'github',
+    'repository:acme/app',
+    'unassigned',
+    'assignee:octo',
+  ]);
+});

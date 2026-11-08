@@ -288,6 +288,7 @@ export const HELP_SECTIONS = [
       'syslog',
       'journald',
       'log-import',
+      'github',
       'licensing',
     ],
   },
