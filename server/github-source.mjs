@@ -27,24 +27,74 @@ export const USER_AGENT =
 /** The most characters of an issue's text a duration keeps as its notes. */
 export const NOTES_LIMIT = 4000;
 const ID = /^[A-Za-z0-9_.:-]{1,128}$/;
-const REPOSITORY = /^[A-Za-z0-9_.-]{1,100}\/[A-Za-z0-9_.-]{1,100}$/;
-
-/** Whether `name` is a repository's full name, `owner/name`. */
-export const repositoryName = (name) => typeof name === 'string' && REPOSITORY.test(name);
+/**
+ * A repository reference: `owner/name` on github.com, or `<platform>:<host>/<path>` elsewhere,
+ * such as `forgejo:codeberg.org/acme/app` or `gitlab:git.example.com/group/subgroup/app`
+ * (GitLab nests groups; GitHub and Forgejo have an owner and a name). The platforms each
+ * have a public host whose references may leave it out: github.com and gitlab.com.
+ */
+const REFERENCE =
+  /^(?:(github|gitlab|forgejo):([A-Za-z0-9.-]{1,253}(?::\d{1,5})?)\/)?([A-Za-z0-9_.-]{1,100}(?:\/[A-Za-z0-9_.-]{1,100}){1,20})$/;
+/** Each platform's public host, and its IDs' prefix. */
+export const PLATFORMS = {
+  github: { host: 'github.com', prefix: 'gh' },
+  gitlab: { host: 'gitlab.com', prefix: 'gl' },
+  forgejo: { host: null, prefix: 'fj' },
+};
+/**
+ * A repository reference's parts, `{platform, host, path, public}`, or null when it is not
+ * one: `owner/name` is github.com's; GitHub and Forgejo paths are `owner/name`.
+ */
+export function parseRepository(reference) {
+  const m = typeof reference === 'string' ? REFERENCE.exec(reference) : null;
+  if (!m) return null;
+  const platform = m[1] ?? 'github',
+    host = (m[2] ?? PLATFORMS[platform].host)?.toLowerCase(),
+    path = m[3];
+  if (!host || (platform !== 'gitlab' && path.split('/').length !== 2)) return null;
+  return { platform, host, path, public: host === PLATFORMS[platform].host };
+}
+/** A reference in its usual form: without the host on github.com, with it everywhere else. */
+export function repositoryReference(platform, host, path) {
+  const h = host.toLowerCase();
+  return platform === 'github' && h === 'github.com' ? path : `${platform}:${h}/${path}`;
+}
+/** Whether `name` is a repository reference (see parseRepository). */
+export const repositoryName = (name) => parseRepository(name) !== null;
+/** A repository's platform: `github`, `gitlab` or `forgejo`. */
+export const platformOf = (repository) => parseRepository(repository)?.platform ?? 'github';
 
 /**
  * An entity ID derived from its source, so redelivered webhooks and repeated imports update
- * rather than duplicate: `gh:<owner>:<repo>:<rest>`, or with the repository hashed when that
- * would pass the 128 characters IDs may have.
+ * rather than duplicate: `gh:<owner>:<repo>:<rest>` on github.com, `<prefix>:<host>:<path
+ * parts>:<rest>` elsewhere (`fj`, `gl`), or with the repository hashed when that would pass
+ * the 128 characters IDs may have.
  */
 export function entityId(repository, ...rest) {
-  const plain = ['gh', ...repository.split('/'), ...rest].join(':');
+  const r = parseRepository(repository);
+  const prefix = PLATFORMS[r.platform].prefix;
+  const plain = [
+    prefix,
+    ...(r.public ? [] : [r.host.replace(/:/g, '.')]),
+    ...r.path.split('/'),
+    ...rest,
+  ].join(':');
   if (ID.test(plain)) return plain;
-  const hash = createHash('sha256').update(repository.toLowerCase()).digest('hex').slice(0, 24);
-  return ['gh', hash, ...rest].join(':');
+  const hash = createHash('sha256')
+    .update(r.public ? r.path.toLowerCase() : `${r.host}/${r.path.toLowerCase()}`)
+    .digest('hex')
+    .slice(0, 24);
+  return [prefix, hash, ...rest].join(':');
 }
-/** An item's duration ID: issues and pull requests share their repository's numbers. */
-export const itemId = (repository, number) => entityId(repository, String(number));
+/**
+ * An item's place in its repository: its number, and for a GitLab merge request (numbered
+ * apart from issues) `mr` before it.
+ */
+export const itemKey = (item) =>
+  item.merge_request ? ['mr', String(item.number)] : [String(item.number)];
+/** An item's duration ID. */
+export const itemId = (repository, number, mergeRequest = false) =>
+  entityId(repository, ...itemKey({ number, merge_request: mergeRequest }));
 
 /** A GitHub timestamp (ISO 8601, whole seconds) as a stored Gregorian coordinate: Unix seconds. */
 export function seconds(timestamp) {
@@ -53,33 +103,48 @@ export function seconds(timestamp) {
   return String(Math.floor(ms / 1000));
 }
 
-/** A tag as entity tags allow it: lower case, no commas or control characters, 64 at most. */
-function tag(text) {
+/** A tag as events' tags allow it: lower case, no commas or control characters, 128 at most. */
+export function tag(text) {
   return String(text)
     .normalize('NFC')
     .replace(/[\x00-\x1f\x7f,]/g, ' ')
     .trim()
     .toLowerCase()
-    .slice(0, 64)
+    .slice(0, 128)
     .trim();
 }
 
-/** Room in a tag's 64 characters for a repository, leaving `#` and a nine-digit number. */
-const TAG_ROOM = 64 - 1 - 9;
+/** Room in a tag's 128 characters for a repository, leaving `#` or `!` and a nine-digit number. */
+const TAG_ROOM = 128 - 1 - 9;
 /**
- * A repository's tag, `github/<owner>/<name>`, as GitHub writes a reference to it. A name too
- * long for tags is shortened to a hash of it, the same every time for the same repository.
+ * What a platform's tags start with: `github/` or `gitlab/` on the public hosts, and
+ * `<platform>:<host>/` elsewhere, such as `forgejo:codeberg.org/`.
+ */
+export function tagPrefix(repository) {
+  const r = parseRepository(repository);
+  return r.public ? `${r.platform}/` : `${r.platform}:${r.host}/`;
+}
+/**
+ * A repository's tag, as its platform writes a reference to it: `github/acme/app`,
+ * `gitlab:git.example.com/group/subgroup/app`. One too long for tags is shortened to a hash
+ * of it, the same every time for the same repository.
  */
 export function repositoryTag(repository) {
-  const name = repository.toLowerCase();
-  return 'github/'.length + name.length <= TAG_ROOM
-    ? 'github/' + name
-    : 'github/' + createHash('sha256').update(name).digest('hex').slice(0, 16);
+  const r = parseRepository(repository),
+    prefix = tagPrefix(repository),
+    path = r.path.toLowerCase();
+  return prefix.length + path.length <= TAG_ROOM
+    ? prefix + path
+    : prefix + createHash('sha256').update(path).digest('hex').slice(0, 16);
 }
-/** An item's tag, `github/<owner>/<name>#<number>`: the item's duration and its moments carry it. */
-export const itemTag = (repository, number) => repositoryTag(repository) + '#' + number;
-/** A person's tag, `github/<login>` (a login has at most 39 characters). */
-export const personTag = (login) => tag('github/' + login);
+/**
+ * An item's tag, `github/acme/app#412`, or for a GitLab merge request `…!12`: the item's
+ * duration and its moments carry it.
+ */
+export const itemTag = (repository, number, mergeRequest = false) =>
+  repositoryTag(repository) + (mergeRequest ? '!' : '#') + number;
+/** A person's tag on a repository's platform: `github/mona`, `forgejo:codeberg.org/mona`. */
+export const personTag = (login, repository) => tag(tagPrefix(repository) + login);
 
 /** Whether a GitHub issue (from the REST API or a webhook) is a pull request. */
 export const isPullRequest = (item) => !!item.pull_request || 'merged_at' in item;
@@ -93,7 +158,8 @@ export const isPullRequest = (item) => !!item.pull_request || 'merged_at' in ite
  * milestone. Its own come first, so the 40 an entity may carry never leave them out.
  */
 export function itemDuration(repository, item) {
-  const pull = isPullRequest(item);
+  const pull = isPullRequest(item),
+    mr = !!item.merge_request;
   const merged = item.merged_at ?? item.pull_request?.merged_at ?? null;
   const closed = item.state === 'closed';
   const body = typeof item.body === 'string' ? item.body : '';
@@ -102,25 +168,25 @@ export function itemDuration(repository, item) {
     (item.html_url ? (body ? '\n\n' : '') + item.html_url : '');
   const assignees = item.assignees ?? (item.assignee ? [item.assignee] : []);
   const tags = [
-    'github',
+    platformOf(repository),
     repositoryTag(repository),
-    itemTag(repository, item.number),
-    pull ? 'pull request' : 'issue',
+    itemTag(repository, item.number, mr),
+    mr ? 'merge request' : pull ? 'pull request' : 'issue',
     'state:' + (merged ? 'merged' : closed ? 'closed' : 'open'),
     ...(assignees.length ? ['assigned'] : []),
-    ...assignees.map((user) => personTag(user.login)),
+    ...assignees.map((user) => personTag(user.login, repository)),
     ...(item.labels ?? []).map((label) => 'label:' + (label.name ?? label)),
     ...(item.milestone?.title ? ['milestone:' + item.milestone.title] : []),
   ]
     .map(tag)
     .filter(Boolean);
   return {
-    id: itemId(repository, item.number),
+    id: itemId(repository, item.number, mr),
     start: seconds(item.created_at),
     end:
       closed && (merged ?? item.closed_at) ? seconds(merged ?? item.closed_at) : { ongoing: true },
     metadata: {
-      title: `#${item.number} ${item.title ?? ''}`.trim().slice(0, 300),
+      title: `${mr ? '!' : '#'}${item.number} ${item.title ?? ''}`.trim().slice(0, 300),
       ...(notes ? { description: notes } : {}),
       ...(item.html_url ? { url: item.html_url } : {}),
       tags: [...new Set(tags)].slice(0, 40),
@@ -177,16 +243,23 @@ export function githubRoutes(config) {
   const uuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
   if (!config || typeof config !== 'object') throw new Error('The routes must be a JSON object.');
   const routes = (config.routes ?? []).map((route, i) => {
-    if (
-      typeof route?.repository !== 'string' ||
-      !/^[A-Za-z0-9_.-]{1,100}\/(\*|[A-Za-z0-9_.-]{1,100})$/.test(route.repository) ||
-      !uuid.test(route.timeline ?? '')
-    )
+    // A repository reference, whose last part may be `*`: everything under that owner or
+    // group (on GitLab, in its subgroups too).
+    const pattern = typeof route?.repository === 'string' ? route.repository : '';
+    const parsed = parseRepository(pattern.replace(/\/\*$/, '/x'));
+    if (!parsed || !uuid.test(route.timeline ?? ''))
       throw new Error(
-        `Route ${i + 1} needs a repository ("owner/name" or "owner/*") and a timeline ID.`,
+        `Route ${i + 1} needs a repository (such as "owner/name", "owner/*" or "forgejo:codeberg.org/owner/*") and a timeline ID.`,
       );
-    const [owner, name] = route.repository.toLowerCase().split('/');
-    return { owner, name, timeline: route.timeline.toLowerCase() };
+    const wild = pattern.endsWith('/*'),
+      path = parsed.path.toLowerCase();
+    return {
+      platform: parsed.platform,
+      host: parsed.host,
+      path: wild ? path.slice(0, -1) : path,
+      wild,
+      timeline: route.timeline.toLowerCase(),
+    };
   });
   if (config.default !== undefined && !uuid.test(config.default))
     throw new Error('The default timeline must be a timeline ID.');
@@ -197,10 +270,16 @@ export function githubRoutes(config) {
     // `events` lists some.
     kinds: eventKinds(config.events),
     route(repository) {
-      const [owner, name] = repository.toLowerCase().split('/');
+      const r = parseRepository(repository);
+      if (!r) return null;
+      const path = r.path.toLowerCase();
       return (
-        routes.find((r) => r.owner === owner && (r.name === '*' || r.name === name))?.timeline ??
-        fallback
+        routes.find(
+          (route) =>
+            route.platform === r.platform &&
+            route.host === r.host &&
+            (route.wild ? path.startsWith(route.path) : path === route.path),
+        )?.timeline ?? fallback
       );
     },
   };
@@ -284,7 +363,7 @@ export function deliveryChanges(event, payload, kinds = eventKinds()) {
         repository,
         durations: [],
         moments: [],
-        removed: [itemId(repository, item.number)],
+        removed: [itemId(repository, item.number, !!item.merge_request)],
         links: [],
       },
     ];

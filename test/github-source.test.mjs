@@ -92,10 +92,14 @@ test('closed issues and merged pull requests end when they closed or merged', ()
 });
 
 test('a repository too long for a tag is named by a hash, the same each time', () => {
-  const name = 'acme/' + 'r'.repeat(60);
+  const name =
+    'gitlab:git.example.com/' +
+    Array(8)
+      .fill('group-' + 'g'.repeat(12))
+      .join('/');
   const tag = itemTag(name, 123456789);
-  assert.match(tag, /^github\/[0-9a-f]{16}#123456789$/);
-  assert.equal(itemTag(name.toUpperCase(), 123456789), tag);
+  assert.match(tag, /^gitlab:git\.example\.com\/[0-9a-f]{16}#123456789$/);
+  assert.equal(itemTag(name.replace('example', 'EXAMPLE'), 123456789), tag);
   assert.equal(repositoryTag('Acme/App'), 'github/acme/app');
   // Unassigned items carry no `assigned` tag.
   assert.ok(!itemDuration('acme/app', issue({ assignees: [] })).metadata.tags.includes('assigned'));
@@ -192,7 +196,7 @@ test('deliveries become changes: edits, events, deletions, mentions and links', 
   assert.deepEqual(
     pull.slice(1).map((c) => [c.repository, c.moments[0].metadata.title]),
     [
-      ['acme/app', 'Mentioned in acme/app#413: #412'],
+      ['acme/app', 'Mentioned in #413: #412'],
       ['other/lib', 'Mentioned in acme/app#413: #7'],
     ],
   );
@@ -203,7 +207,7 @@ test('deliveries become changes: edits, events, deletions, mentions and links', 
     comment: { body: 'Same as #9', user: { login: 'mona' }, updated_at: '2026-11-06T00:00:00Z' },
     repository,
   });
-  assert.equal(comment.moments[0].metadata.title, 'Mentioned in acme/app#412: #9');
+  assert.equal(comment.moments[0].metadata.title, 'Mentioned in #412: #9');
   assert.ok(!JSON.stringify(comment).includes('Same as'));
   // A review, a merge and a rename.
   const [review] = deliveryChanges('pull_request_review', {
@@ -292,7 +296,7 @@ test('every timeline event the importer reads becomes its moment', () => {
   });
   assert.equal(
     mention.moments[0].metadata.title,
-    'Mentioned in acme/app#9 Root cause: #412 Fix the login loop',
+    'Mentioned in #9 Root cause: #412 Fix the login loop',
   );
   assert.ok(mention.moments[0].metadata.tags.includes('github/acme/app#9'));
   assert.equal(mention.links.length, 1);
@@ -447,7 +451,7 @@ test('the receiver checks, routes, coalesces and saves deliveries', async () => 
   assert.equal(links.body.relationshipChanges.length, 1);
   assert.deepEqual(
     entities.body.changes.map((c) => c.event.metadata.title),
-    ['Closed: #412 Fix the login loop', 'Mentioned in acme/app#413: #412'],
+    ['Closed: #412 Fix the login loop', 'Mentioned in #413: #412'],
   );
   assert.deepEqual(ingest.stats, { deliveries: 5, rejected: 1, ignored: 1, saved: 4, failed: 0 });
 });

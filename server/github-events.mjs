@@ -14,11 +14,16 @@ import {
   USER_AGENT,
   entityId,
   itemId,
+  itemKey,
   itemTag,
+  parseRepository,
   personTag,
+  platformOf,
   repositoryName,
+  repositoryReference,
   repositoryTag,
   seconds,
+  tag as lowerTag,
 } from './github-source.mjs';
 
 /**
@@ -78,14 +83,6 @@ function slug(text) {
     ? safe
     : safe + '-' + createHash('sha256').update(plain).digest('hex').slice(0, 8);
 }
-const lowerTag = (text) =>
-  String(text)
-    .normalize('NFC')
-    .replace(/[\x00-\x1f\x7f,]/g, ' ')
-    .trim()
-    .toLowerCase()
-    .slice(0, 64)
-    .trim();
 
 /**
  * One moment on an item: `verb` (an EVENT_KINDS verb) of `subject` (a label, a milestone, a
@@ -97,24 +94,26 @@ export function eventMoment(repository, item, { verb, subject, time, person, tag
   return {
     id: entityId(
       repository,
-      String(item.number),
+      ...itemKey(item),
       slug(verb),
       ...(subject ? [slug(subject)] : []),
       seconds(time),
     ),
     time: seconds(time),
     metadata: {
-      title: `${what}: #${item.number} ${item.title ?? ''}`.trim().slice(0, 300),
+      title: `${what}: ${item.merge_request ? '!' : '#'}${item.number} ${item.title ?? ''}`
+        .trim()
+        .slice(0, 300),
       ...(item.html_url ? { url: item.html_url } : {}),
       tags: [
         ...new Set(
           [
-            'github',
+            platformOf(repository),
             repositoryTag(repository),
-            itemTag(repository, item.number),
+            itemTag(repository, item.number, !!item.merge_request),
             verb,
             ...tags,
-            ...(person ? [personTag(person)] : []),
+            ...(person ? [personTag(person, repository)] : []),
           ].map(lowerTag),
         ),
       ].slice(0, 40),
@@ -124,33 +123,64 @@ export function eventMoment(repository, item, { verb, subject, time, person, tag
 const labelName = (label) => (typeof label === 'string' ? label : label?.name) ?? '';
 const login = (user) => user?.login ?? null;
 
+/** How an item is written in text: `acme/app#412`, or `group/app!12` for a merge request. */
+const reference = (item) => `${item.repository}${item.mergeRequest ? '!' : '#'}${item.number}`;
+/**
+ * How an item is written from another repository, as its platform would: `#412` in the same
+ * repository, `acme/app#412` on the same host, its whole reference elsewhere.
+ */
+function shortReference(item, from) {
+  const mark = (item.mergeRequest ? '!' : '#') + item.number;
+  if (item.repository.toLowerCase() === from.toLowerCase()) return mark;
+  const a = parseRepository(item.repository),
+    b = parseRepository(from);
+  return a && b && a.platform === b.platform && a.host === b.host
+    ? a.path + mark
+    : item.repository + mark;
+}
 /** A link between two items' durations (both must be on the timeline for it to be saved). */
 export const itemLink = (a, b) => ({
-  a: { duration: itemId(a.repository, a.number) },
-  b: { duration: itemId(b.repository, b.number) },
+  a: { duration: itemId(a.repository, a.number, !!a.mergeRequest) },
+  b: { duration: itemId(b.repository, b.number, !!b.mergeRequest) },
   related: true,
 });
 
 /**
- * References to items in text: `#12` (in `repository`), `owner/name#12`, and addresses of
- * issues and pull requests on github.com. Each once, in order.
+ * References to items in text, on `repository`'s platform and host: `#12` (in `repository`),
+ * `owner/name#12`, and addresses of its issues and pull requests; on GitLab also `!12` and
+ * `group/project!12` for merge requests, and nested groups. Each once, in order.
  */
 export function mentionedItems(text, repository) {
+  const r = parseRepository(repository);
   const found = new Map();
-  const add = (repo, number) => {
+  const add = (path, number, mergeRequest = false) => {
     const n = Number(number);
-    if (repositoryName(repo) && Number.isSafeInteger(n) && n > 0)
-      found.set(repo.toLowerCase() + '#' + n, { repository: repo, number: n });
+    const ref = path ? repositoryReference(r.platform, r.host, path) : repository;
+    if (repositoryName(ref) && Number.isSafeInteger(n) && n > 0)
+      found.set(`${ref.toLowerCase()}${mergeRequest ? '!' : '#'}${n}`, {
+        repository: ref,
+        number: n,
+        ...(mergeRequest ? { mergeRequest: true } : {}),
+      });
   };
   const source = String(text ?? '');
+  const host = r.host.replace(/[.]/g, '\\.');
+  const path =
+    r.platform === 'gitlab'
+      ? '[A-Za-z0-9_.-]+(?:/[A-Za-z0-9_.-]+)+'
+      : '[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+';
   for (const m of source.matchAll(
-    /https:\/\/github\.com\/([A-Za-z0-9_.-]+\/[A-Za-z0-9_.-]+)\/(?:issues|pull)\/(\d{1,9})\b/g,
+    new RegExp(
+      `https://${host}/(${path}?)/(?:-/)?(issues|pull|pulls|merge_requests)/(\\d{1,9})\\b`,
+      'g',
+    ),
   ))
-    add(m[1], m[2]);
+    add(m[1], m[3], m[2] === 'merge_requests');
+  const marks = r.platform === 'gitlab' ? '[#!]' : '#';
   for (const m of source.matchAll(
-    /(?<![\w/.#-])(?:([A-Za-z0-9_.-]+\/[A-Za-z0-9_.-]+))?#(\d{1,9})\b/g,
+    new RegExp(`(?<![\\w/.#!-])(?:(${path}))?(${marks})(\\d{1,9})\\b`, 'g'),
   ))
-    add(m[1] ?? repository, m[2]);
+    add(m[1], m[3], m[2] === '!');
   return [...found.values()];
 }
 
@@ -165,7 +195,8 @@ export function mentionChanges(source, text, time, by) {
       (m) =>
         !(
           m.repository.toLowerCase() === source.repository.toLowerCase() &&
-          m.number === source.number
+          m.number === source.number &&
+          !!m.mergeRequest === !!source.mergeRequest
         ),
     )
     .map((target) => ({
@@ -176,22 +207,22 @@ export function mentionChanges(source, text, time, by) {
         {
           ...eventMoment(
             target.repository,
-            { number: target.number },
+            { number: target.number, merge_request: !!target.mergeRequest },
             {
               verb: 'mentioned',
-              subject: `${source.repository}#${source.number}`,
+              subject: reference(source),
               time,
               person: by,
-              tags: [itemTag(source.repository, source.number)],
-              what: `Mentioned in ${source.repository}#${source.number}`,
+              tags: [itemTag(source.repository, source.number, !!source.mergeRequest)],
+              what: `Mentioned in ${shortReference(source, target.repository)}`,
             },
           ),
           // One moment per source, whenever it was (re)written.
           id: entityId(
             target.repository,
-            String(target.number),
+            ...itemKey({ number: target.number, merge_request: target.mergeRequest }),
             'mentioned',
-            slug(`${source.repository}#${source.number}`),
+            slug(reference(source)),
           ),
         },
       ],
@@ -343,29 +374,30 @@ export function timelineEvent(repository, item, event, kinds = ALL_KINDS) {
       const from = event.source?.issue;
       const repo = from?.repository?.full_name;
       if (!from || !repositoryName(repo)) return null;
-      const source = { repository: repo, number: from.number };
+      const source = { repository: repo, number: from.number, mergeRequest: !!from.merge_request };
       return {
         moments: [
           {
             ...eventMoment(repository, item, {
               verb: 'mentioned',
-              subject: `${repo}#${from.number}`,
+              subject: reference(source),
               time,
               person: actor,
-              tags: [itemTag(repo, from.number)],
-              what: `Mentioned in ${repo}#${from.number}${from.title ? ' ' + from.title : ''}`,
+              tags: [itemTag(repo, from.number, source.mergeRequest)],
+              what: `Mentioned in ${shortReference(source, repository)}${from.title ? ' ' + from.title : ''}`,
             }),
-            id: entityId(
-              repository,
-              String(item.number),
-              'mentioned',
-              slug(`${repo}#${from.number}`),
-            ),
+            id: entityId(repository, ...itemKey(item), 'mentioned', slug(reference(source))),
           },
         ],
         links:
           repo.toLowerCase() === repository.toLowerCase()
-            ? [itemLink(source, { repository, number: item.number })]
+            ? [
+                itemLink(source, {
+                  repository,
+                  number: item.number,
+                  mergeRequest: !!item.merge_request,
+                }),
+              ]
             : [],
       };
     }
@@ -617,12 +649,12 @@ export function releaseMoment(repository, release) {
       tags: [
         ...new Set(
           [
-            'github',
+            platformOf(repository),
             repositoryTag(repository),
             'released',
             'release:' + release.tag_name,
             ...(release.prerelease ? ['prerelease'] : []),
-            ...(release.author?.login ? [personTag(release.author.login)] : []),
+            ...(release.author?.login ? [personTag(release.author.login, repository)] : []),
           ].map(lowerTag),
         ),
       ],
@@ -639,7 +671,7 @@ export const releaseId = (repository, release) =>
  */
 export function milestoneChanges(repository, milestone) {
   const tags = [
-    'github',
+    platformOf(repository),
     repositoryTag(repository),
     'milestone',
     'milestone:' + milestone.title,
@@ -698,7 +730,7 @@ export function columnStint(repository, item, { project, column, start, end }) {
   return {
     id: entityId(
       repository,
-      String(item.number),
+      ...itemKey(item),
       'in',
       ...(project ? [slug(project)] : []),
       slug(column),
@@ -707,14 +739,16 @@ export function columnStint(repository, item, { project, column, start, end }) {
     start: seconds(start),
     end: end ? seconds(end) : { ongoing: true },
     metadata: {
-      title: `#${item.number} in ${column}${project ? ` (${project})` : ''}`.slice(0, 300),
+      title: `${item.merge_request ? '!' : '#'}${item.number} in ${column}${
+        project ? ` (${project})` : ''
+      }`.slice(0, 300),
       ...(item.html_url ? { url: item.html_url } : {}),
       tags: [
         ...new Set(
           [
-            'github',
+            platformOf(repository),
             repositoryTag(repository),
-            itemTag(repository, item.number),
+            itemTag(repository, item.number, !!item.merge_request),
             'in column',
             'status:' + column,
             ...(project ? ['project:' + project] : []),

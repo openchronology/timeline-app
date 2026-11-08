@@ -22,8 +22,10 @@ import {
   itemDuration,
   itemId,
   loadRoutes,
+  parseRepository,
   repositoryName,
 } from './github-source.mjs';
+import { forgejoTimelineEvent } from './forgejo-source.mjs';
 import {
   EVENT_KINDS,
   eventKinds,
@@ -46,11 +48,26 @@ const MAX_RATE_WAIT = 15 * 60 * 1000;
  * limit that resets within 15 minutes, and sends the token (if any) only to the API's origin.
  */
 export class GithubReader {
-  constructor({ api = 'https://api.github.com', token, fetcher = fetch, log = console }) {
+  /**
+   * @param {object} options `api` (its origin and path, such as https://api.github.com or
+   *   https://codeberg.org/api/v1), `token`, `scheme` (the Authorization scheme: `Bearer`, or
+   *   `token` for Forgejo), `pageSize` (`[parameter, value]`: GitHub's `per_page` 100,
+   *   Forgejo's `limit` 50), `fetcher` and `log`
+   */
+  constructor({
+    api = 'https://api.github.com',
+    token,
+    scheme = 'Bearer',
+    pageSize = ['per_page', '100'],
+    fetcher = fetch,
+    log = console,
+  }) {
     if (!/^https:\/\//.test(api) && !/^http:\/\/(localhost|127\.0\.0\.1)[:/]/.test(api))
       throw new Error('GITHUB_API_URL must be an https origin.');
     this.api = api.replace(/\/+$/, '');
     this.token = token;
+    this.scheme = scheme;
+    this.pageSize = pageSize;
     this.fetcher = fetcher;
     this.log = log;
     this.requests = 0;
@@ -65,7 +82,7 @@ export class GithubReader {
           Accept: 'application/vnd.github+json',
           'X-GitHub-Api-Version': '2022-11-28',
           'User-Agent': USER_AGENT,
-          ...(this.token ? { Authorization: 'Bearer ' + this.token } : {}),
+          ...(this.token ? { Authorization: `${this.scheme} ${this.token}` } : {}),
         },
       });
       const remaining = response.headers.get('x-ratelimit-remaining');
@@ -92,7 +109,7 @@ export class GithubReader {
   /** Every item of a listing, page after page. */
   async *list(path, query = {}) {
     const url = new URL(this.api + path);
-    for (const [key, value] of Object.entries({ per_page: '100', ...query }))
+    for (const [key, value] of Object.entries({ [this.pageSize[0]]: this.pageSize[1], ...query }))
       if (value !== undefined) url.searchParams.set(key, value);
     let next = url.href;
     while (next) {
@@ -115,9 +132,14 @@ export class GithubReader {
  * read, since a link to one the timeline lacks would be refused.
  */
 export async function readRepository(reader, repository, { since, kinds = eventKinds() } = {}) {
+  // The API names a repository by its path on its own host; Forgejo's timelines are translated
+  // into GitHub's shapes (forgejo-source.mjs).
+  const { platform, host, path } = parseRepository(repository);
+  const translate =
+    platform === 'forgejo' ? (event) => forgejoTimelineEvent(event, host) : (event) => event;
   const durations = [],
     numbers = new Map();
-  for await (const item of reader.list(`/repos/${repository}/issues`, {
+  for await (const item of reader.list(`/repos/${path}/issues`, {
     state: 'all',
     sort: 'created',
     direction: 'asc',
@@ -132,9 +154,9 @@ export async function readRepository(reader, repository, { since, kinds = eventK
   if (kinds.size)
     for (const item of numbers.values()) {
       const moves = [];
-      for await (const event of reader.list(
-        `/repos/${repository}/issues/${item.number}/timeline`,
-      )) {
+      for await (const entry of reader.list(`/repos/${path}/issues/${item.number}/timeline`)) {
+        const event = translate(entry);
+        if (!event) continue;
         const move = moveOf(event);
         if (move) moves.push(move);
         const time = event.created_at ?? event.submitted_at;
@@ -150,13 +172,13 @@ export async function readRepository(reader, repository, { since, kinds = eventK
     }
   // The repository's releases and milestones.
   if (keeps(kinds, 'released'))
-    for await (const release of reader.list(`/repos/${repository}/releases`)) {
+    for await (const release of reader.list(`/repos/${path}/releases`)) {
       const moment = releaseMoment(repository, release);
       if (moment && (!since || Date.parse(release.published_at) >= Date.parse(since)))
         moments.push(moment);
     }
   if (keeps(kinds, 'milestone'))
-    for await (const milestone of reader.list(`/repos/${repository}/milestones`, {
+    for await (const milestone of reader.list(`/repos/${path}/milestones`, {
       state: 'all',
     })) {
       if (since && Date.parse(milestone.updated_at) < Date.parse(since)) continue;
@@ -247,11 +269,30 @@ export async function main(argv = process.argv.slice(2), env = process.env, out 
     return 2;
   }
   const since = options.since ? new Date(options.since).toISOString() : undefined;
-  const reader = new GithubReader({
-    api: env.GITHUB_API_URL || undefined,
-    token: env.GITHUB_TOKEN,
-    log: out,
-  });
+  // One reader per platform and host, with that platform's API, token and paging.
+  const readers = new Map();
+  const readerFor = (repository) => {
+    const { platform, host, public: isPublic } = parseRepository(repository);
+    const key = platform + ':' + host;
+    if (!readers.has(key))
+      readers.set(
+        key,
+        platform === 'forgejo'
+          ? new GithubReader({
+              api: `https://${host}/api/v1`,
+              token: env.FORGEJO_TOKEN,
+              scheme: 'token',
+              pageSize: ['limit', '50'],
+              log: out,
+            })
+          : new GithubReader({
+              api: isPublic ? env.GITHUB_API_URL || undefined : `https://${host}/api/v3`,
+              token: env.GITHUB_TOKEN,
+              log: out,
+            }),
+      );
+    return readers.get(key);
+  };
   const writer = options['dry-run']
     ? null
     : new TimelineWriter({ api: env.OCH_API_URL, key: env.OCH_API_KEY });
@@ -266,7 +307,7 @@ export async function main(argv = process.argv.slice(2), env = process.env, out 
     }
     let changes;
     try {
-      changes = await readRepository(reader, repository, { since, kinds });
+      changes = await readRepository(readerFor(repository), repository, { since, kinds });
     } catch (error) {
       out.error(`${repository}: ${error.message}`);
       failed = true;
@@ -303,7 +344,7 @@ export async function main(argv = process.argv.slice(2), env = process.env, out 
       failed = true;
     }
   }
-  out.log(`GitHub requests: ${reader.requests}.`);
+  out.log(`Requests: ${[...readers.values()].reduce((n, r) => n + r.requests, 0)}.`);
   return failed ? 1 : 0;
 }
 const invoked = (() => {
