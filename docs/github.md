@@ -17,31 +17,38 @@ Each tool only reads from GitHub. Nothing is written back.
 
 ## What a timeline shows
 
-| On GitHub                          | On the timeline                                                                 |
-| ---------------------------------- | ------------------------------------------------------------------------------- |
-| An issue or pull request is opened | A duration from its creation, ongoing, titled `#412 Fix the login loop`         |
-| It is closed or merged             | The duration ends then                                                          |
-| It is reopened                     | The end is ongoing again                                                        |
-| It is edited, labelled, milestoned | The duration's title, notes and tags follow                                     |
-| Someone is assigned or unassigned  | A moment at that time, tagged `assigned` or `unassigned` and `assignee:<login>` |
-| A pull request says "closes #12"   | A link between the pull request and issue 12, when both are on the timeline     |
-| An issue is deleted                | Its duration is removed (webhook only)                                          |
+| On GitHub                          | On the timeline                                                                                     |
+| ---------------------------------- | --------------------------------------------------------------------------------------------------- |
+| An issue or pull request is opened | A duration from its creation, ongoing, titled `#412 Fix the login loop`                             |
+| It is closed or merged             | The duration ends then                                                                              |
+| It is reopened                     | The end is ongoing again                                                                            |
+| It is edited, labelled, milestoned | The duration's title, notes and tags follow                                                         |
+| Someone is assigned or unassigned  | A moment at that time, tagged with the item's tag, `assigned` or `unassigned`, and `github/<login>` |
+| A pull request says "closes #12"   | A link between the pull request and issue 12, when both are on the timeline                         |
+| An issue is deleted                | Its duration is removed (webhook only)                                                              |
 
 A duration's notes are the first 4,000 characters of the item's text, followed by its address, and its `url` field links to it.
 
-Its tags are:
+Its tags are written as GitHub writes references:
 
 - `github`;
-- `repository:<owner/name>`;
+- `github/<owner>/<name>`, the repository;
+- `github/<owner>/<name>#<number>`, the item itself, such as `github/acme/app#412`;
 - `issue` or `pull request`;
 - `state:open`, `state:closed` or `state:merged`;
-- `assignee:<login>` for each assignee;
+- `assigned`, while it has assignees, and `github/<login>` for each of them;
 - `label:<name>` for each label;
 - `milestone:<title>`.
 
-Tags are lower case, at most 64 characters and at most 40 per item.
+An assignment moment carries the item's tag, `assigned` or `unassigned`, and the person's `github/<login>`.
 
-**Separating by tags** draws a chart of the work. Separate by `assignee:` tags for one row per person, or by `label:` tags for one row per kind of work.
+Tags are lower case, at most 64 characters and at most 40 per entity. A repository whose name is too long for that is tagged by a hash of its name instead, such as `github/3f9a0c…#412`. The hash is the same on every import and delivery.
+
+**Separating by tags** draws a chart of the work:
+
+- **By person:** separate by `github/<login>` tags for one row per person. Separate by `assigned` to compare assigned work with work nobody has taken.
+- **By kind of work:** separate by `label:` tags.
+- **One item's history:** separate by an item's tag, such as `github/acme/app#412`, to gather its duration and every assignment made on it.
 
 IDs come from the source: `gh:<owner>:<repo>:<number>` for an item, and `gh:<owner>:<repo>:<number>:assigned:<event>` for an assignment. So a delivery GitHub sends twice, or an import run again, updates the same entities rather than adding copies.
 

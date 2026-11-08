@@ -11,6 +11,8 @@ import {
   deliveryChanges,
   entityId,
   githubRoutes,
+  itemTag,
+  repositoryTag,
   itemDuration,
   validSignature,
   NOTES_LIMIT,
@@ -46,10 +48,12 @@ test('an open issue is an ongoing duration, with its number, text, address and t
   assert.equal(d.metadata.description, 'It loops.\n\nhttps://github.com/acme/app/issues/412');
   assert.deepEqual(d.metadata.tags, [
     'github',
-    'repository:acme/app',
+    'github/acme/app',
+    'github/acme/app#412',
     'issue',
     'state:open',
-    'assignee:octo',
+    'assigned',
+    'github/octo',
     'label:bug',
     'label:p1  urgent',
     'milestone:v2',
@@ -78,6 +82,16 @@ test('closed issues and merged pull requests end when they closed or merged', ()
   assert.ok(merged.metadata.tags.includes('state:merged'));
   const long = itemDuration('acme/app', issue({ body: 'x'.repeat(NOTES_LIMIT + 50) }));
   assert.ok(long.metadata.description.startsWith('x'.repeat(NOTES_LIMIT) + '…'));
+});
+
+test('a repository too long for a tag is named by a hash, the same each time', () => {
+  const name = 'acme/' + 'r'.repeat(60);
+  const tag = itemTag(name, 123456789);
+  assert.match(tag, /^github\/[0-9a-f]{16}#123456789$/);
+  assert.equal(itemTag(name.toUpperCase(), 123456789), tag);
+  assert.equal(repositoryTag('Acme/App'), 'github/acme/app');
+  // Unassigned items carry no `assigned` tag.
+  assert.ok(!itemDuration('acme/app', issue({ assignees: [] })).metadata.tags.includes('assigned'));
 });
 
 test('IDs stay within 128 characters, hashing a long repository name', () => {
@@ -429,10 +443,12 @@ test('assignment moments carry who and what', () => {
     id: 7,
   });
   assert.equal(m.id, 'gh:acme:app:412:unassigned:7');
+  // It carries its item's tag, so separating by it gathers the item and its assignments.
   assert.deepEqual(m.metadata.tags, [
     'github',
-    'repository:acme/app',
+    'github/acme/app',
+    'github/acme/app#412',
     'unassigned',
-    'assignee:octo',
+    'github/octo',
   ]);
 });

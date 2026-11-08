@@ -52,14 +52,33 @@ function tag(text) {
     .trim();
 }
 
+/** Room in a tag's 64 characters for a repository, leaving `#` and a nine-digit number. */
+const TAG_ROOM = 64 - 1 - 9;
+/**
+ * A repository's tag, `github/<owner>/<name>`, as GitHub writes a reference to it. A name too
+ * long for tags is shortened to a hash of it, the same every time for the same repository.
+ */
+export function repositoryTag(repository) {
+  const name = repository.toLowerCase();
+  return 'github/'.length + name.length <= TAG_ROOM
+    ? 'github/' + name
+    : 'github/' + createHash('sha256').update(name).digest('hex').slice(0, 16);
+}
+/** An item's tag, `github/<owner>/<name>#<number>`: the item's duration and its moments carry it. */
+export const itemTag = (repository, number) => repositoryTag(repository) + '#' + number;
+/** A person's tag, `github/<login>` (a login has at most 39 characters). */
+export const personTag = (login) => tag('github/' + login);
+
 /** Whether a GitHub issue (from the REST API or a webhook) is a pull request. */
 export const isPullRequest = (item) => !!item.pull_request || 'merged_at' in item;
 
 /**
  * The duration of an issue or pull request in `repository`: from when it was opened, until it
  * was closed (or merged), or ongoing while it is open. Its title carries its number; its notes
- * the start of its text and its address; its tags the repository, the kind, the state, the
- * assignees, the labels and the milestone.
+ * the start of its text and its address. Its tags: `github`, the repository's
+ * (`github/<owner>/<name>`), its own (`github/<owner>/<name>#<n>`), the kind, the state,
+ * `assigned` and each assignee's (`github/<login>`) while it has any, the labels and the
+ * milestone. Its own come first, so the 40 an entity may carry never leave them out.
  */
 export function itemDuration(repository, item) {
   const pull = isPullRequest(item);
@@ -69,14 +88,15 @@ export function itemDuration(repository, item) {
   const notes =
     (body.length > NOTES_LIMIT ? body.slice(0, NOTES_LIMIT) + '…' : body) +
     (item.html_url ? (body ? '\n\n' : '') + item.html_url : '');
+  const assignees = item.assignees ?? (item.assignee ? [item.assignee] : []);
   const tags = [
     'github',
-    'repository:' + repository,
+    repositoryTag(repository),
+    itemTag(repository, item.number),
     pull ? 'pull request' : 'issue',
     'state:' + (merged ? 'merged' : closed ? 'closed' : 'open'),
-    ...(item.assignees ?? (item.assignee ? [item.assignee] : [])).map(
-      (user) => 'assignee:' + user.login,
-    ),
+    ...(assignees.length ? ['assigned'] : []),
+    ...assignees.map((user) => personTag(user.login)),
     ...(item.labels ?? []).map((label) => 'label:' + (label.name ?? label)),
     ...(item.milestone?.title ? ['milestone:' + item.milestone.title] : []),
   ]
@@ -120,9 +140,10 @@ export function assignmentMoment(repository, item, { action, assignee, time, id 
       ...(item.html_url ? { url: item.html_url } : {}),
       tags: [
         'github',
-        'repository:' + repository,
+        repositoryTag(repository),
+        itemTag(repository, item.number),
         action === 'assigned' ? 'assigned' : 'unassigned',
-        'assignee:' + login,
+        personTag(login),
       ].map(tag),
     },
   };
