@@ -382,7 +382,7 @@ Every point has a place. Explore the spaces between them.</textarea>
                 ><input id="follow-latest" type="checkbox" /> Follow latest moments</label
               >
               <button id="separate-button" data-phone-menu>
-                Separate by tags<span id="separate-count" class="button-count" hidden></span>
+                Separate<span id="separate-count" class="button-count" hidden></span>
               </button>
               <button id="views-button" data-phone-menu>Views</button>
               <button id="presentation-button" data-phone-menu>Time display</button>
@@ -458,19 +458,26 @@ Every point has a place. Explore the spaces between them.</textarea>
             them to the latest version, and Reload latest discards them.
             <button id="live-reload">Reload latest</button>
           </div>
-          <section id="separation-settings" class="comparison-settings" hidden>
+          <!-- One line above the tracks: what is shown and what to do with it. Each
+               separation's tags and times are in the Separate dialog, not here. -->
+          <section id="separation-settings" class="comparison-settings separation-bar" hidden>
             <div class="comparison-heading">
               <strong id="separation-heading">Separated by tags</strong>
               <span id="separation-tags" class="separation-tags"></span>
-              <button id="separation-map" hidden>Shift or scale these…</button>
-              <button id="separation-default" hidden>Make this the default view</button>
-              <button id="separation-default-clear" hidden>Clear default view</button>
-              <button id="separation-rejoin">Rejoin</button>
+              <span id="separation-default-badge" class="separation-badge" hidden
+                >Default view</span
+              >
+              <span class="separation-actions">
+                <button id="separation-map" hidden>Shift or scale these…</button>
+                <button id="separation-default" hidden>Make this the default view</button>
+                <button id="separation-default-clear" hidden>Clear default view</button>
+                <button id="separation-rejoin">Rejoin</button>
+              </span>
             </div>
-            <p id="separation-note" class="field-hint">
+            <p id="separation-note" class="sr-only">
               Read-only. Events with any of these tags are shown above; everything else stays below.
             </p>
-            <p id="separation-default-note" class="field-hint" hidden></p>
+            <p id="separation-default-note" class="sr-only" hidden></p>
           </section>
           <section id="comparison-settings" class="comparison-settings" hidden>
             <div class="comparison-heading">
@@ -513,7 +520,10 @@ Every point has a place. Explore the spaces between them.</textarea>
                 Fit the timeline
               </button>
             </div>
-            <div id="loading-window" class="loading-window" hidden>Loading this window…</div>
+            <div id="loading-window" class="loading-window" role="status" hidden>
+              <span class="loading-spinner" aria-hidden="true"></span
+              ><span class="sr-only">Loading this window…</span>
+            </div>
           </div>
           <div class="timeline-footer">
             <button id="timeline-help-button" data-phone-menu>Help</button>
@@ -723,7 +733,7 @@ Every point has a place. Explore the spaces between them.</textarea>
     <dialog id="separate-dialog" aria-labelledby="separate-heading">
       <form id="separate-form">
         <div class="dialog-heading">
-          <h2 id="separate-heading">Separate by tags</h2>
+          <h2 id="separate-heading">Separate</h2>
           <button type="button" data-close="separate-dialog" aria-label="Close">×</button>
         </div>
         <p class="field-hint">

@@ -9757,7 +9757,7 @@ function startSeparation(by: SeparationTrack[] | Separation) {
           : 'Separated: connected to',
   );
   // With disjoins' times when already read (a timeline held here); else once they are.
-  text('separation-tags', separationLabel(choice));
+  showSeparationLabel(choice);
   text(
     'separation-note',
     count > 1
@@ -10998,6 +10998,7 @@ function updateDefaultViewControls() {
   el('separation-default').hidden = !shown || isDefault || !settable;
   el('separation-default-clear').hidden = !isDefault || !settable;
   el('separation-default-note').hidden = !isDefault;
+  el('separation-default-badge').hidden = !isDefault;
   text(
     'separation-default-note',
     isDefault
@@ -11006,6 +11007,7 @@ function updateDefaultViewControls() {
         : 'This is the timeline’s default view: it opens this way for everyone.'
       : '',
   );
+  el('separation-default-badge').title = el('separation-default-note').textContent ?? '';
   el('separate-default').hidden = !saved;
   el('separate-default-clear').hidden = !saved || !settable;
   text(
@@ -12535,6 +12537,17 @@ function disjoinName(when: DisjoinTime | UnionTime, at: Q | null | undefined): s
  * The bar's label for separations: each one's tags (or the entity whose relationships it
  * follows), and when it disjoins and unites.
  */
+/**
+ * The bar's one line: one separation's tags or entity, cut to fit, with the whole of it (and
+ * where it disjoins and unites) as its title; several are named by the heading alone, their
+ * details in the Separate dialog.
+ */
+function showSeparationLabel(choice: Separation) {
+  const label = separationLabel(choice);
+  text('separation-tags', label);
+  el('separation-tags').title = label;
+  el('separation-settings').toggleAttribute('data-many', choice.tracks.length > 1);
+}
 function separationLabel(choice: Separation) {
   const name = (track: number | null) => (track === null ? 'main' : `separation ${track + 1}`);
   return choice.tracks
@@ -12667,7 +12680,7 @@ async function resolveDisjoins(choice: {
     );
   }
   if (separation === choice) {
-    text('separation-tags', separationLabel(choice));
+    showSeparationLabel(choice);
     requestRender();
   }
 }
