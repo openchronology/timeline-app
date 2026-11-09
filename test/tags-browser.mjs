@@ -169,7 +169,11 @@ export async function checkTags(page, restore) {
     assert((await top('Treaty')) < (await top('Market')), 'the treaty forked away');
     assert(Math.abs((await top('Battle')) - (await top('Market'))) < 40, 'the battle had not');
     assert.equal(await page.locator('.separation-fork-line').count(), 1);
-    assert.equal(await page.locator('.separation-before').count(), 1);
+    // Its track is empty before then: no axis there, nor ticks.
+    assert(
+      (await page.locator('.axis-tick .tick-notch[hidden]').count()) > 0,
+      'the separated track has no ticks before its disjoin',
+    );
     // Rejoining all from the dialog shows the whole timeline, and the count goes.
     await page.locator('#separate-button').click();
     await page.locator('#separate-clear').click();

@@ -3433,19 +3433,12 @@ dialog button {
 .separation-disjoin-time {
   width: 14em;
 }
-/* Where a separation disjoins (#549): shaded before, and a fork from its source's axis. */
-.separation-before {
-  fill: var(--workspace);
-  opacity: 0.75;
-}
+/* Where a separation disjoins (#549): the timeline it leaves arcs away to its track, drawn
+   as the axes are. */
 .separation-fork-line {
-  stroke: var(--focus);
-  stroke-width: 2;
-  stroke-dasharray: 5 4;
+  stroke: var(--timeline-measure-soft, var(--stage-measure-soft));
+  stroke-width: 1.5;
   fill: none;
-}
-.separation-fork-point {
-  fill: var(--focus);
 }
 .tag-picker-empty {
   padding: 6px 8px;

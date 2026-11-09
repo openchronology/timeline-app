@@ -1530,16 +1530,41 @@ function renderAxis() {
       title.textContent = track.source.title;
       title.style.top = `${rowPlan.rows.get(track.source.key)?.title ?? 22}px`;
       axis.append(title);
-      if (!index) continue;
-      const line = baseline.cloneNode(true) as HTMLElement;
-      line.style.top = `${192 + (rowPlan.rows.get(track.source.key)?.offset ?? 0)}px`;
-      axis.append(line);
-      for (const tick of originalTicks) {
-        const clone = tick.cloneNode(true) as HTMLElement;
-        clone.style.transform = `translateY(${rowPlan.rows.get(track.source.key)?.offset ?? 0}px)`;
-        clone.querySelector('.tick-guide')?.remove();
-        axis.append(clone);
+      // A separation that disjoins (#549) has no axis before it: its track begins there.
+      const disjoin =
+        separation && 'tracks' in separation ? separation.tracks[index]?.disjoin : undefined;
+      const begins = disjoin ? Q.parse(disjoin.at) : null;
+      const before = (tick: HTMLElement) =>
+        !!begins && Q.parse(tick.dataset.time!).compare(begins) < 0;
+      let line: HTMLElement = baseline;
+      const ticks = index ? [] : originalTicks;
+      if (index) {
+        line = baseline.cloneNode(true) as HTMLElement;
+        // From the left, whatever the first track's start (it may disjoin).
+        line.style.left = `${inset() / uiScale}px`;
+        line.hidden = false;
+        line.style.top = `${192 + (rowPlan.rows.get(track.source.key)?.offset ?? 0)}px`;
+        axis.append(line);
+        for (const tick of originalTicks) {
+          const clone = tick.cloneNode(true) as HTMLElement;
+          clone.style.transform = `translateY(${rowPlan.rows.get(track.source.key)?.offset ?? 0}px)`;
+          clone.querySelector('.tick-guide')?.remove();
+          // Shown, whatever the first track hides before its disjoin.
+          clone.querySelectorAll<HTMLElement>('[hidden]').forEach((part) => (part.hidden = false));
+          axis.append(clone);
+          ticks.push(clone);
+        }
       }
+      if (!begins) continue;
+      const start = (inset() + viewport.x(begins, width())) / uiScale,
+        end = (stageWidth() - inset()) / uiScale;
+      line.hidden = start >= end;
+      line.style.left = `${Math.max(inset() / uiScale, start)}px`;
+      // The first track's ticks also draw the guides every track shares: those stay.
+      for (const tick of ticks)
+        if (before(tick))
+          for (const part of tick.children)
+            if (!part.classList.contains('tick-guide')) (part as HTMLElement).hidden = true;
     }
   }
   // The exact view, for tests and benchmarks: the bounds' text may be rounded.
@@ -11347,29 +11372,20 @@ function renderSeparationForks(svg: Element) {
     const x = (inset() + viewport.x(Q.parse(track.disjoin.at), width())) / uiScale;
     const own = axis(keys[i]),
       from = axis(track.disjoin.from === null ? keys[keys.length - 1] : keys[track.disjoin.from]);
-    if (x > 0) {
-      const shade = document.createElementNS(ns, 'rect');
-      shade.setAttribute('class', 'separation-fork separation-before');
-      shade.setAttribute('x', '0');
-      shade.setAttribute('y', String(own - 150));
-      shade.setAttribute('width', String(Math.min(x, right)));
-      shade.setAttribute('height', '300');
-      svg.prepend(shade);
-    }
-    if (x >= 0 && x <= right) {
-      const line = document.createElementNS(ns, 'path');
-      line.setAttribute('class', 'separation-fork separation-fork-line');
-      line.setAttribute('d', `M${x} ${from} L${x} ${own}`);
-      const dot = document.createElementNS(ns, 'circle');
-      dot.setAttribute('class', 'separation-fork separation-fork-point');
-      dot.setAttribute('cx', String(x));
-      dot.setAttribute('cy', String(from));
-      dot.setAttribute('r', '4');
-      const title = document.createElementNS(ns, 'title');
-      title.textContent = `Separation ${i + 1} disjoins here`;
-      dot.append(title);
-      svg.append(line, dot);
-    }
+    // The timeline it disjoins from arcs away to its track, arriving where the track begins,
+    // as a relationship's arc curves between two tracks.
+    const reach = Math.min(96, Math.max(48, Math.abs(own - from) / 3));
+    if (x < -reach || x - reach > right) return;
+    const curve = document.createElementNS(ns, 'path');
+    curve.setAttribute('class', 'separation-fork separation-fork-line');
+    curve.setAttribute(
+      'd',
+      `M${x - reach} ${from} C${x - reach / 3} ${from} ${x - (2 * reach) / 3} ${own} ${x} ${own}`,
+    );
+    const title = document.createElementNS(ns, 'title');
+    title.textContent = `${keys[i] ? comparison!.tracks[i].source.title : 'A separation'} disjoins here`;
+    curve.append(title);
+    svg.append(curve);
   });
 }
 function renderEdgeArcs() {
