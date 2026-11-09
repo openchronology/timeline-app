@@ -747,6 +747,76 @@ Every point has a place. Explore the spaces between them.</textarea>
         </div>
       </form>
     </dialog>
+    <dialog id="join-dialog" aria-labelledby="join-heading">
+      <form id="join-form">
+        <div class="dialog-heading">
+          <h2 id="join-heading">Add a disjoin or union</h2>
+          <button type="button" data-close="join-dialog" aria-label="Close">×</button>
+        </div>
+        <fieldset class="map-scope join-kind">
+          <legend>Kind</legend>
+          <label class="checkbox-label"
+            ><input type="radio" name="join-kind" value="disjoins" checked /> Disjoin: its events
+            leave a track for this separation's</label
+          >
+          <label class="checkbox-label"
+            ><input type="radio" name="join-kind" value="unions" /> Union: its events join another
+            track, and this one ends</label
+          >
+        </fieldset>
+        <label class="join-track"
+          ><span id="join-track-label">From</span
+          ><select id="join-track"></select
+        ></label>
+        <div class="event-kind" role="tablist" aria-label="When">
+          <button
+            type="button"
+            role="tab"
+            id="join-at-tab"
+            data-when="at"
+            aria-controls="join-at"
+            aria-selected="true"
+          >
+            Exact time</button
+          ><button
+            type="button"
+            role="tab"
+            id="join-moment-tab"
+            data-when="moment"
+            aria-controls="join-moment"
+            aria-selected="false"
+          >
+            A moment</button
+          ><button
+            type="button"
+            role="tab"
+            id="join-bound-tab"
+            data-when="bound"
+            aria-controls="join-bound"
+            aria-selected="false"
+          >
+            Earliest moment
+          </button>
+        </div>
+        <div id="join-at" role="tabpanel" aria-labelledby="join-at-tab">
+          <label
+            >Time<input id="join-time" spellcheck="false" autocomplete="off" placeholder="Time"
+          /></label>
+        </div>
+        <div id="join-moment" role="tabpanel" aria-labelledby="join-moment-tab" hidden>
+          <button type="button" id="join-moment-choose">Choose a moment…</button>
+          <p class="field-hint">Followed as it moves.</p>
+        </div>
+        <div id="join-bound" role="tabpanel" aria-labelledby="join-bound-tab" hidden>
+          <p id="join-bound-text" class="field-hint"></p>
+        </div>
+        <p id="join-error" class="form-error" role="alert"></p>
+        <div class="dialog-actions">
+          <button id="join-submit" class="button-primary" type="submit">Add</button
+          ><button type="button" data-close="join-dialog">Cancel</button>
+        </div>
+      </form>
+    </dialog>
     <dialog id="map-dialog" aria-labelledby="map-heading">
       <form id="map-form">
         <div class="dialog-heading">

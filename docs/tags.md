@@ -18,15 +18,17 @@ Each separation's events (those carrying any of its tags) move into a track of t
 
 ### Disjoining and uniting
 
-A separation can **disjoin** and **unite** at times, rather than being its own timeline from start to end. Under its tags, **+ Add a disjoin** and **+ Add a union** add one each, and **×** removes one.
+A separation can **disjoin** and **unite** at times, rather than being its own timeline from start to end. Under its tags, one list shows its disjoins and unions as cards, each labelled **Disjoin** or **Union**; it scrolls when there are many. **+ Add a disjoin or union** opens a dialog for a new one, and a card's **Edit** opens the same dialog for it. **×** removes one.
+
+In the dialog, choose **Disjoin** or **Union**, the track, and when, on one of three tabs: **Exact time**, **A moment**, or **Earliest moment** (a disjoin) / **Latest moment** (a union).
 
 A disjoin names the track it disjoins **from**: the main timeline, or another separation. A union names the track it unites **into**, in the same way. A separation has at most one of each for each track. Several are useful when separations meet: separation A can disjoin from separation B at one time and from the main timeline at another.
 
 Each is at one of these times:
 
-- **at the time**: typed as the timeline displays times, or chosen in its date picker;
-- **at a moment**: chosen in the moment picker, and followed as that moment moves;
-- **at its first moment** (a disjoin) or **at its last moment** (a union): the earliest or latest moment carrying the separation's tags, followed as moments are added, moved or removed.
+- **an exact time**: typed as the timeline displays times, or chosen in its date picker;
+- **a moment**: chosen in the moment picker, and followed as that moment moves;
+- **the earliest moment** (a disjoin) or **the latest moment** (a union) carrying the separation's tags, followed as moments are added, moved or removed.
 
 Until that moment exists, the disjoin or union waits.
 
