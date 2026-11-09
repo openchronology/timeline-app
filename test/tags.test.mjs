@@ -14,6 +14,8 @@ import {
   viewFilterKey,
   validateEntityTags,
   validateTags,
+  validateSeparations,
+  separationTracks,
 } from '../dist/core.mjs';
 const doc = () => ({
   format: 'openchronology',
@@ -148,4 +150,197 @@ test('events may carry tags of up to 128 characters; timelines keep 64 (#538)', 
     /1–64 characters/,
     'a timeline’s own tags stay short',
   );
+});
+
+test('separations disjoin from each source at a time, a moment, or their first moment (#549)', () => {
+  const doc = validateDocument({
+    format: 'openchronology',
+    version: 1,
+    title: 'Disjoins',
+    description: '',
+    events: [
+      { id: 'w1', time: '1/1', metadata: { tags: ['war'] } },
+      { id: 'w6', time: '6/1', metadata: { tags: ['war'] } },
+      { id: 't2', time: '2/1', metadata: { tags: ['trade'] } },
+      { id: 'fair', time: '7/1', metadata: { tags: ['trade', 'war'] } },
+      { id: 'x', time: '3/1', metadata: {} },
+    ],
+    durations: [{ id: 'd', start: '8/1', end: '9/1', metadata: { tags: ['war'] } }],
+  });
+  const ids = (separations, track) => {
+    const side = filterDocument(doc, { separations, track });
+    return [...side.events.map((e) => e.id), ...(side.durations ?? []).map((d) => d.id)].sort();
+  };
+  // At an exact time: war leaves the main timeline at 5.
+  const at = [{ tags: ['war'], disjoins: [{ from: null, at: '5' }] }];
+  assert.deepEqual(ids(at, 0), ['d', 'fair', 'w6']);
+  assert.deepEqual(ids(at, null), ['t2', 'w1', 'x']);
+  // At a moment's time, followed as it moves.
+  const moment = [{ tags: ['war'], disjoins: [{ from: null, moment: 't2' }] }];
+  assert.deepEqual(ids(moment, 0), ['d', 'fair', 'w6']);
+  const moved = {
+    ...doc,
+    events: doc.events.map((e) => (e.id === 't2' ? { ...e, time: '6/1' } : e)),
+  };
+  assert.deepEqual(
+    filterDocument(moved, { separations: moment, track: 0 })
+      .events.map((e) => e.id)
+      .sort(),
+    ['fair', 'w6'],
+  );
+  // At the first moment with its tags: here from the start; a moment gone waits forever.
+  const first = [{ tags: ['trade'], disjoins: [{ from: null, first: true }] }];
+  assert.deepEqual(ids(first, 0), ['fair', 't2']);
+  assert.deepEqual(ids([{ tags: ['war'], disjoins: [{ from: null, moment: 'gone' }] }], 0), []);
+  // From two sources: trade takes from the main timeline at 1, and from war's track only at
+  // 9, so the fair (at 7, in war's track) stays with war.
+  const two = [
+    { tags: ['war'] },
+    {
+      tags: ['trade'],
+      disjoins: [
+        { from: null, at: '1' },
+        { from: 0, at: '9' },
+      ],
+    },
+  ];
+  assert.deepEqual(ids(two, 1), ['t2']);
+  assert.deepEqual(ids(two, 0), ['d', 'fair', 'w1', 'w6']);
+  assert.deepEqual(ids(two, null), ['x']);
+  // Without disjoins, a separation is its own throughout.
+  assert.deepEqual([...separationTracks([{ tags: ['war'] }], ['war'], Q.from(0n))], [0]);
+  // Validation.
+  assert.deepEqual(
+    validateSeparations([{ tags: ['War'], disjoins: [{ from: null, at: '10/2' }] }]),
+    [{ tags: ['war'], disjoins: [{ from: null, at: '5/1' }] }],
+  );
+  for (const [bad, error] of [
+    [[{ tags: ['war'], disjoins: [{ from: 0, at: '5' }] }], /another separation/],
+    [[{ tags: ['war'], disjoins: [{ from: 1, at: '5' }] }], /another separation/],
+    [
+      [
+        {
+          tags: ['war'],
+          disjoins: [
+            { from: null, at: '5' },
+            { from: null, first: true },
+          ],
+        },
+      ],
+      /at most once/,
+    ],
+    [[{ tags: ['war'], disjoins: [{ from: null, at: 'soon' }] }], /exact rational/],
+    [[{ tags: ['war'], disjoins: [{ from: null, at: '5', first: true }] }], /a time, a moment, or/],
+    [[{ tags: ['war'], disjoins: [{ from: null, moment: 'a b' }] }], /by its ID/],
+  ])
+    assert.throws(() => validateSeparations(bad), error);
+  assert.notEqual(
+    viewFilterKey({ separations: at, track: 0 }),
+    viewFilterKey({ separations: moment, track: 0 }),
+  );
+});
+
+test('separations disjoin from later ones, and unite at a time, a moment, or their last moment (#549)', () => {
+  const doc = validateDocument({
+    format: 'openchronology',
+    version: 1,
+    title: 'Unions',
+    description: '',
+    events: [
+      { id: 'w1', time: '1/1', metadata: { tags: ['war'] } },
+      { id: 't2', time: '2/1', metadata: { tags: ['trade'] } },
+      { id: 'tw3', time: '3/1', metadata: { tags: ['trade', 'war'] } },
+      { id: 'w6', time: '6/1', metadata: { tags: ['war'] } },
+      { id: 'fair', time: '7/1', metadata: { tags: ['trade', 'war'] } },
+      { id: 'x', time: '3/1', metadata: {} },
+    ],
+    durations: [{ id: 'd', start: '8/1', end: '9/1', metadata: { tags: ['war'] } }],
+  });
+  const ids = (separations, track) => {
+    const side = filterDocument(doc, { separations: validateSeparations(separations), track });
+    return [...side.events.map((e) => e.id), ...(side.durations ?? []).map((d) => d.id)].sort();
+  };
+  // War disjoins from trade (a later separation) at 4, and from the main timeline at 6: trade
+  // is taken first, so the events carrying both stay with trade until 4.
+  const complex = [
+    {
+      tags: ['war'],
+      disjoins: [
+        { from: 1, at: '4' },
+        { from: null, at: '6' },
+      ],
+    },
+    { tags: ['trade'] },
+  ];
+  assert.deepEqual(ids(complex, 0), ['d', 'fair', 'w6']);
+  assert.deepEqual(ids(complex, 1), ['t2', 'tw3']);
+  assert.deepEqual(ids(complex, null), ['w1', 'x']);
+  // A union at a time: from 6, war's events are back on the main timeline.
+  const back = [{ tags: ['war'], unions: [{ into: null, at: '6' }] }];
+  assert.deepEqual(ids(back, 0), ['tw3', 'w1']);
+  assert.deepEqual(ids(back, null), ['d', 'fair', 't2', 'w6', 'x']);
+  // At a moment's time, and at its last moment (the fair, at 7; durations follow it).
+  assert.deepEqual(ids([{ tags: ['war'], unions: [{ into: null, moment: 'w6' }] }], 0), [
+    'tw3',
+    'w1',
+  ]);
+  assert.deepEqual(ids([{ tags: ['war'], unions: [{ into: null, last: true }] }], 0), [
+    'tw3',
+    'w1',
+    'w6',
+  ]);
+  // Into another separation, followed through that one's own union.
+  const into = [
+    { tags: ['war'], unions: [{ into: 1, at: '6' }] },
+    { tags: ['trade'], unions: [{ into: null, at: '7' }] },
+  ];
+  assert.deepEqual(ids(into, 0), ['tw3', 'w1']);
+  assert.deepEqual(ids(into, 1), ['t2', 'tw3', 'w6']);
+  assert.deepEqual(ids(into, null), ['d', 'fair', 'x']);
+  // Disjoining and uniting: its own track between 2 and 7.
+  const between = [
+    { tags: ['war'], disjoins: [{ from: null, at: '2' }], unions: [{ into: null, at: '7' }] },
+  ];
+  assert.deepEqual(ids(between, 0), ['tw3', 'w6']);
+  // The latest union passed applies; unions into each other stop rather than go round.
+  assert.deepEqual(
+    ids(
+      [
+        {
+          tags: ['war'],
+          unions: [
+            { into: 1, at: '2' },
+            { into: null, at: '6' },
+          ],
+        },
+        { tags: ['trade'], unions: [{ into: 0, at: '2' }] },
+      ],
+      null,
+    ),
+    ['d', 'fair', 'w6', 'x'],
+  );
+  for (const [bad, error] of [
+    [
+      [
+        { tags: ['a'], disjoins: [{ from: 1, at: '1' }] },
+        { tags: ['b'], disjoins: [{ from: 0, at: '1' }] },
+      ],
+      /circle/,
+    ],
+    [[{ tags: ['war'], unions: [{ into: null, first: true }] }], /a time, a moment, or the last/],
+    [[{ tags: ['war'], disjoins: [{ from: null, last: true }] }], /a time, a moment, or the first/],
+    [
+      [
+        {
+          tags: ['war'],
+          unions: [
+            { into: null, at: '1' },
+            { into: null, last: true },
+          ],
+        },
+      ],
+      /at most once/,
+    ],
+  ])
+    assert.throws(() => validateSeparations(bad), error);
 });

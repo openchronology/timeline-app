@@ -853,12 +853,121 @@ fn has_any_tag(metadata: &Map<String, Value>, tags: &[String]) -> bool {
                 .any(|t| t.as_str().is_some_and(|t| tags.iter().any(|w| w == t)))
         })
 }
+/// A disjoin or a union (#549): the track it leaves or joins (`None`: the main timeline) and
+/// the entities at or after its time.
+pub type Join = (Option<usize>, HashSet<String>);
+/// One of several separations (#549): its tags; when it disjoins, its disjoins; and its unions,
+/// earliest first.
+pub type SeparationTrack = (Vec<String>, Option<Vec<Join>>, Vec<Join>);
 /// What puts an entity on the upper side of a separation.
 pub enum Membership {
     /// Any of these (normalized) tags.
     Tags(Vec<String>),
     /// This entity ("m:<id>" or "d:<id>") and its relations: direct, or all reachable.
     Related { start: String, direct: bool },
+    /// One track (`None`: the rest) of several separations, each its tags, disjoins and unions,
+    /// taken in `order`: each after those it disjoins from (#549). `key` names the view.
+    Tracks {
+        separations: Vec<SeparationTrack>,
+        order: Vec<usize>,
+        track: Option<usize>,
+        key: String,
+    },
+}
+/// The order separations are taken in (src/tags.ts separationOrder): each after those it
+/// disjoins from; None when they disjoin from each other in a circle.
+pub fn separation_order(disjoins: &[Vec<Option<usize>>]) -> Option<Vec<usize>> {
+    fn visit(
+        i: usize,
+        disjoins: &[Vec<Option<usize>>],
+        state: &mut Vec<u8>,
+        order: &mut Vec<usize>,
+    ) -> bool {
+        match state[i] {
+            2 => return true,
+            1 => return false,
+            _ => {}
+        }
+        state[i] = 1;
+        for from in disjoins[i].iter().flatten() {
+            if *from >= disjoins.len() || !visit(*from, disjoins, state, order) {
+                return false;
+            }
+        }
+        state[i] = 2;
+        order.push(i);
+        true
+    }
+    let mut state = vec![0u8; disjoins.len()];
+    let mut order = Vec::new();
+    for i in 0..disjoins.len() {
+        if !visit(i, disjoins, &mut state, &mut order) {
+            return None;
+        }
+    }
+    Some(order)
+}
+/// The tracks an entity is on among several separations (src/tags.ts separationTracks).
+fn entity_tracks(
+    separations: &[SeparationTrack],
+    order: &[usize],
+    key: &str,
+    metadata: &Map<String, Value>,
+) -> HashSet<Option<usize>> {
+    // Where an entity taken by separation `i` is: there, or where its latest union passed
+    // goes, followed on (and stopped where unions go round).
+    let unite = |i: usize| -> Option<usize> {
+        let mut seen = HashSet::new();
+        let mut current = Some(i);
+        while let Some(c) = current {
+            if !seen.insert(c) {
+                break;
+            }
+            match separations[c]
+                .2
+                .iter()
+                .rev()
+                .find(|(_, after)| after.contains(key))
+            {
+                Some((into, _)) => current = *into,
+                None => break,
+            }
+        }
+        current
+    };
+    // Each in order: without disjoins a separation takes the entity beside its tracks; with
+    // them, it takes it from a track it is on (the main one when on none) once that track's
+    // disjoin has come, and it leaves that track.
+    let mut on: HashSet<Option<usize>> = HashSet::new();
+    for &i in order {
+        let (tags, disjoins, _) = &separations[i];
+        if !has_any_tag(metadata, tags) {
+            continue;
+        }
+        let Some(disjoins) = disjoins else {
+            on.insert(unite(i));
+            continue;
+        };
+        let home: HashSet<Option<usize>> = if on.is_empty() {
+            HashSet::from([None])
+        } else {
+            on.clone()
+        };
+        let leaving: Vec<Option<usize>> = disjoins
+            .iter()
+            .filter(|(from, after)| home.contains(from) && after.contains(key))
+            .map(|(from, _)| *from)
+            .collect();
+        on = home;
+        if !leaving.is_empty() {
+            on.retain(|t| !leaving.contains(t));
+            on.insert(unite(i));
+        }
+    }
+    if on.is_empty() {
+        on.insert(None);
+    }
+    on
 }
 /// The "m:<id>" or "d:<id>" key of an entity reference, or None if it is invalid.
 fn ref_key(value: &Value) -> Option<String> {
@@ -879,7 +988,7 @@ pub fn filter_document(mut doc: Document, membership: &Membership, any: bool) ->
         .map(|e| (e.id.clone(), e.time.clone()))
         .collect();
     let related: Option<HashSet<String>> = match membership {
-        Membership::Tags(_) => None,
+        Membership::Tags(_) | Membership::Tracks { .. } => None,
         Membership::Related { start, direct } => {
             let mut graph: std::collections::HashMap<String, Vec<String>> = Default::default();
             for r in &doc.relationships {
@@ -909,6 +1018,15 @@ pub fn filter_document(mut doc: Document, membership: &Membership, any: bool) ->
     // An entity stays when its membership matches the side asked for (`any`: inside, or
     // not `any`: outside).
     let keep = |key: String, metadata: &Map<String, Value>| {
+        if let Membership::Tracks {
+            separations,
+            order,
+            track,
+            ..
+        } = membership
+        {
+            return entity_tracks(separations, order, &key, metadata).contains(track);
+        }
         let inside = match (&related, membership) {
             (Some(set), _) => set.contains(&key),
             (None, Membership::Tags(tags)) => has_any_tag(metadata, tags),

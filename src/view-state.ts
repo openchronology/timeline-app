@@ -8,10 +8,12 @@
  */
 import { Q } from './core.js';
 import type { EntityRef } from './relationships.js';
+import { validateSeparations } from './tags.js';
+import type { SeparationTrack } from './tags.js';
 
-/** Groups of tags (each a separation, #538 era), or an entity's relationships. */
+/** Separations by tags, some perhaps disjoining (#549), or an entity's relationships. */
 export type StoredSeparation =
-  { groups: string[][] } | { related: EntityRef; depth: 'direct' | 'all'; label: string };
+  { tracks: SeparationTrack[] } | { related: EntityRef; depth: 'direct' | 'all'; label: string };
 export interface ViewState {
   /** The view's bounds, as exact rationals. */
   left?: string;
@@ -38,16 +40,23 @@ function separationOf(value: unknown): StoredSeparation | undefined {
     const tags = list.filter((t): t is string => typeof t === 'string' && !!t && t.length <= TEXT);
     return tags.length && tags.length === list.length && tags.length <= TAGS ? tags : null;
   };
-  // One group, as tabs kept it before there could be several.
+  // One group, as tabs kept it before there could be several; groups, before disjoins.
   if (Array.isArray(v.tags)) {
     const tags = group(v.tags);
-    return tags ? { groups: [tags] } : undefined;
+    return tags ? { tracks: [{ tags }] } : undefined;
   }
   if (Array.isArray(v.groups)) {
     const groups = v.groups.map(group);
     return groups.length && groups.length <= 7 && groups.every((g) => g !== null)
-      ? { groups: groups as string[][] }
+      ? { tracks: (groups as string[][]).map((tags) => ({ tags })) }
       : undefined;
+  }
+  if (Array.isArray(v.tracks)) {
+    try {
+      return { tracks: validateSeparations(v.tracks) };
+    } catch {
+      return undefined;
+    }
   }
   const related = v.related as Record<string, unknown> | null | undefined;
   if (

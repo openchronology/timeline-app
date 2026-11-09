@@ -3413,6 +3413,86 @@ dialog button {
   color: var(--muted);
   font-size: 12px;
 }
+/* A separation's disjoins and unions (#549): one list of cards, scrolling past a few. */
+.separation-joins {
+  display: grid;
+  gap: 6px;
+  justify-items: start;
+}
+.separation-join-list {
+  display: grid;
+  gap: 6px;
+  width: 100%;
+  max-height: 168px;
+  overflow-y: auto;
+  margin: 0;
+  padding: 2px;
+  list-style: none;
+}
+.separation-join {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 8px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  background: var(--paper);
+  font-size: 13px;
+}
+.separation-join-label {
+  flex-shrink: 0;
+  padding: 1px 8px;
+  border-radius: 999px;
+  font-size: 12px;
+  font-weight: 600;
+  background: var(--hover);
+}
+.separation-join-union .separation-join-label {
+  border: 1px solid var(--line-strong);
+}
+.separation-join-text {
+  flex: 1;
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+.separation-join-edit {
+  min-height: 0;
+  height: 26px;
+  padding: 0 10px;
+}
+.separation-join-none {
+  margin: 0;
+  color: var(--muted);
+  font-size: 13px;
+}
+.separation-join-remove {
+  flex-shrink: 0;
+  min-height: 0;
+  width: 26px;
+  height: 26px;
+  padding: 0;
+  border-radius: 50%;
+}
+.join-kind {
+  margin: 0 0 4px;
+}
+.join-kind .checkbox-label {
+  font-size: 13px;
+}
+.join-track {
+  display: grid;
+  gap: 4px;
+}
+#join-dialog [role='tabpanel'] {
+  margin-top: 10px;
+}
+/* Where a separation disjoins or unites (#549): the timeline it leaves arcs away to its
+   track, or its track arcs back into the one it joins, drawn as the axes are. */
+.separation-fork-line {
+  stroke: var(--timeline-measure-soft, var(--stage-measure-soft));
+  stroke-width: 1.5;
+  fill: none;
+}
 .tag-picker-empty {
   padding: 6px 8px;
   color: var(--muted);

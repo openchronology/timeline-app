@@ -154,6 +154,101 @@ export async function checkTags(page, restore) {
       () => document.getElementById('separation-heading').textContent === 'Separated by tags',
     );
     assert.equal(await page.locator('#separate-count').textContent(), '1');
+    // A separation that disjoins (#549): war from the main timeline at 60. Battle (10) and
+    // the siege (from 50) stay below with the market; the treaty (90) forks away above.
+    await page.locator('#separate-button').click();
+    await editing.locator('.separation-item').first().waitFor();
+    assert.equal(await editing.locator('.separation-join-none').count(), 1);
+    // Disjoins and unions are added and edited in a dialog of their own.
+    const join = page.locator('#join-dialog');
+    const saveJoin = async () => {
+      await page.locator('#join-submit').click();
+      await join.waitFor({ state: 'hidden' });
+    };
+    const separate = async (label) => {
+      await page.locator('#separate-submit').click();
+      await editing.waitFor({ state: 'hidden' });
+      await page.waitForFunction(
+        (label) => document.getElementById('separation-tags').textContent.includes(label),
+        label,
+      );
+      await page.evaluate(() => new Promise(requestAnimationFrame));
+    };
+    await editing.locator('.separation-join-add').first().click();
+    await join.waitFor({ state: 'visible' });
+    assert.equal(await join.locator('input[value="disjoins"]').isChecked(), true);
+    assert.equal(await page.locator('#join-track').inputValue(), 'main');
+    assert.equal(await page.locator('#join-at-tab').getAttribute('aria-selected'), 'true');
+    await page.locator('#join-time').fill('60');
+    await saveJoin();
+    assert.deepEqual(await editing.locator('.separation-join-label').allTextContents(), [
+      'Disjoin',
+    ]);
+    assert.match(
+      await editing.locator('.separation-join-text').first().textContent(),
+      /^From the main timeline · at 60/,
+    );
+    await separate('(from');
+    assert((await top('Treaty')) < (await top('Market')), 'the treaty forked away');
+    assert(Math.abs((await top('Battle')) - (await top('Market'))) < 40, 'the battle had not');
+    assert.equal(await page.locator('.separation-fork-line').count(), 1);
+    // Its track is empty before then: no axis there, nor ticks.
+    assert(
+      (await page.locator('.axis-tick .tick-notch[hidden]').count()) > 0,
+      'the separated track has no ticks before its disjoin',
+    );
+    // At a moment, followed (#549): the treaty itself (90), so only it and later forks away.
+    await page.locator('#separate-button').click();
+    await editing.locator('.separation-join-edit').first().click();
+    await join.waitFor({ state: 'visible' });
+    await page.locator('#join-moment-tab').click();
+    await page.locator('#moment-picker').waitFor({ state: 'visible' });
+    await page.locator('#moment-picker-results button').filter({ hasText: 'Treaty' }).click();
+    await page.locator('#moment-picker').waitFor({ state: 'hidden' });
+    assert.equal(await page.locator('#join-moment-choose').textContent(), 'Treaty');
+    await saveJoin();
+    assert.match(await editing.locator('.separation-join-text').first().textContent(), /at Treaty/);
+    await separate('(a moment)');
+    assert((await top('Treaty')) < (await top('Market')), 'the treaty forks at itself');
+    assert(Math.abs((await top('Battle')) - (await top('Market'))) < 40);
+    // At its first moment: the battle (10), the earliest with war, so everything war forks.
+    await page.locator('#separate-button').click();
+    await editing.locator('.separation-join-edit').first().click();
+    await join.waitFor({ state: 'visible' });
+    assert.equal(await page.locator('#join-bound-tab').textContent(), 'Earliest moment');
+    await page.locator('#join-bound-tab').click();
+    await saveJoin();
+    await separate('first moment');
+    assert((await top('Battle')) < (await top('Market')), 'the battle forks with its first');
+    // A union (#549): back into the main timeline at 70, so the treaty (90) is there again,
+    // and the track curves back into it. Both share the separation's list.
+    await page.locator('#separate-button').click();
+    await editing.locator('.separation-join-add').first().click();
+    await join.waitFor({ state: 'visible' });
+    await join.locator('input[value="unions"]').check();
+    assert.equal(await page.locator('#join-track-label').textContent(), 'Into');
+    assert.equal(await page.locator('#join-track').inputValue(), 'main');
+    await page.locator('#join-time').fill('70');
+    await saveJoin();
+    assert.deepEqual(await editing.locator('.separation-join-label').allTextContents(), [
+      'Disjoin',
+      'Union',
+    ]);
+    await separate('into main');
+    assert((await top('Battle')) < (await top('Market')), 'the battle is still separate');
+    assert(Math.abs((await top('Treaty')) - (await top('Market'))) < 40, 'the treaty united');
+    assert.equal(await page.locator('.separation-fork-line').count(), 2);
+    // At its last moment: the treaty, the latest with war, which then unites with itself.
+    await page.locator('#separate-button').click();
+    await editing.locator('.separation-join-edit').nth(1).click();
+    await join.waitFor({ state: 'visible' });
+    assert.equal(await join.locator('input[value="unions"]').isChecked(), true);
+    assert.equal(await page.locator('#join-bound-tab').textContent(), 'Latest moment');
+    await page.locator('#join-bound-tab').click();
+    await saveJoin();
+    await separate('last moment');
+    assert(Math.abs((await top('Treaty')) - (await top('Market'))) < 40, 'unites at the treaty');
+    assert((await top('Battle')) < (await top('Market')));
     // Rejoining all from the dialog shows the whole timeline, and the count goes.
     await page.locator('#separate-button').click();
     await page.locator('#separate-clear').click();

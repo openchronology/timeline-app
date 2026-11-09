@@ -16,6 +16,26 @@ Each chosen tag shows as a chip, whose **×** removes it. **+ Add a separation**
 
 Each separation's events (those carrying any of its tags) move into a track of their own, in the order listed. Everything else, which carries none of them, stays in the last track. An event carrying tags of two separations appears in both.
 
+### Disjoining and uniting
+
+A separation can **disjoin** and **unite** at times, rather than being its own timeline from start to end. Under its tags, one list shows its disjoins and unions as cards, each labelled **Disjoin** or **Union**; it scrolls when there are many. **+ Add a disjoin or union** opens a dialog for a new one, and a card's **Edit** opens the same dialog for it. **×** removes one.
+
+In the dialog, choose **Disjoin** or **Union**, the track, and when, on one of three tabs: **Exact time**, **A moment**, or **Earliest moment** (a disjoin) / **Latest moment** (a union).
+
+A disjoin names the track it disjoins **from**: the main timeline, or another separation. A union names the track it unites **into**, in the same way. A separation has at most one of each for each track. Several are useful when separations meet: separation A can disjoin from separation B at one time and from the main timeline at another.
+
+Each is at one of these times:
+
+- **an exact time**: typed as the timeline displays times, or chosen in its date picker;
+- **a moment**: chosen in the moment picker, and followed as that moment moves;
+- **the earliest moment** (a disjoin) or **the latest moment** (a union) carrying the separation's tags, followed as moments are added, moved or removed.
+
+Until that moment exists, the disjoin or union waits.
+
+Before a disjoin, the separation's events stay in the track it disjoins from. From then on they are in its own track, which begins there, with a curve from the other track's axis to its own. From a union on, they are in the track it unites into, and the separation's track ends there, with a curve back into that track. When several unions have passed, the latest applies.
+
+Disjoining from another separation follows that one first: if it has not disjoined yet either, the events are still on the main timeline. Separations can disjoin from later ones in the list, but not from each other in a circle. A union into a separation that has itself united follows on. A moment counts by its time, and a duration by its start. The bar names each separation's disjoins and unions, such as `war (from main at 1914; into main at 1918)`.
+
 The button stays in the toolbar while separated, with how many separations are shown. It reopens the list to change them, or to **Rejoin all**. The view keeps its position, and both tracks pan and zoom together, using the same layout as comparisons. A duration that follows a moment on the other side keeps that moment's time. Relationships are still drawn: links within a track arc over it, and links between the tracks cross the gap from one event to the other ([relationships](relationships.md#arcs-between-tracks)). The tracks are read-only; **Rejoin** returns to the whole timeline. Separation never changes or saves the timeline. To move the separated events for good, **Shift or scale these…** in the bar returns to the whole timeline and [shifts or scales](time-mapping.md) the events carrying any separated tag.
 
 Each track has its own summaries, so nearby moments and collapsed durations group within their own side. Server and desktop timelines show the saved version while separated; unsaved edits are kept and reappear when you rejoin. Complete in-memory timelines, such as browser drafts and offline HTML, include unsaved edits.
@@ -28,6 +48,24 @@ The default view is one of the timeline's settings, like its title and tags, so 
 
 ```json
 { "view": { "separation": { "tags": ["war", "trade"] } } }
+```
+
+Separations that disjoin or unite are `separations`, each its tags, `disjoins` and `unions`. A disjoin has `from` and a union `into`: null for the main timeline, or another separation's index. Each has one time: `at` (an exact time), `moment` (a moment's ID), or `first: true` for a disjoin, `last: true` for a union:
+
+```json
+{
+  "view": {
+    "separation": {
+      "separations": [
+        {
+          "tags": ["war"],
+          "disjoins": [{ "from": null, "at": "1914/1" }],
+          "unions": [{ "into": null, "last": true }]
+        }
+      ]
+    }
+  }
+}
 ```
 
 Several separations are `groups`, two to seven of them, each a list of tags:

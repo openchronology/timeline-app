@@ -16,10 +16,31 @@ test('a stored view is read back whole', () => {
   // A tab's one separation by tags is read back as one group of them (#548).
   assert.deepEqual(readViewState(JSON.stringify(state)), {
     ...state,
-    separation: { groups: [['deploy', 'incident']] },
+    separation: { tracks: [{ tags: ['deploy', 'incident'] }] },
   });
   const several = { separation: { groups: [['deploy'], ['incident', 'ops']] } };
-  assert.deepEqual(readViewState(JSON.stringify(several)), several);
+  assert.deepEqual(readViewState(JSON.stringify(several)), {
+    separation: { tracks: [{ tags: ['deploy'] }, { tags: ['incident', 'ops'] }] },
+  });
+  // Separations that disjoin (#549) are kept with their times, normalized.
+  const forked = {
+    separation: {
+      tracks: [{ tags: ['deploy'] }, { tags: ['ops'], disjoins: [{ from: 0, at: '10/4' }] }],
+    },
+  };
+  assert.deepEqual(readViewState(JSON.stringify(forked)), {
+    separation: {
+      tracks: [{ tags: ['deploy'] }, { tags: ['ops'], disjoins: [{ from: 0, at: '5/2' }] }],
+    },
+  });
+  assert.deepEqual(
+    readViewState(
+      JSON.stringify({
+        separation: { tracks: [{ tags: ['x'], disjoins: [{ from: 0, at: '1' }] }] },
+      }),
+    ),
+    {},
+  );
   assert.deepEqual(readViewState(JSON.stringify({ separation: { groups: [['ok'], []] } })), {});
   const related = { related: { duration: 'd1' }, depth: 'all', label: 'Release' };
   assert.deepEqual(readViewState(JSON.stringify({ separation: related })), {

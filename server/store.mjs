@@ -2086,6 +2086,9 @@ export class PostgresStore {
     return plan;
   }
   async #planView(c, t, filter) {
+    // A track of several separations (#549) is built as asked: its membership depends on
+    // each entity's time too.
+    if ('separations' in filter) return { filter, key: viewFilterKey(filter) };
     const rows = (await indexReader(c, t))('oc_entity_search', '$1', { scan: true });
     if ('related' in filter) {
       const kind = 'moment' in filter.related ? 'moment' : 'duration';

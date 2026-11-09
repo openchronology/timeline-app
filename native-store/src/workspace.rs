@@ -103,7 +103,15 @@ pub struct ViewFilter {
     #[serde(default)]
     pub tags: Vec<String>,
     /// "any": the entities on the inside (tagged, or related); "none": everything else.
+    #[serde(default)]
     pub mode: String,
+    /// One track of several separations, some disjoining at a time (#549): the separations
+    /// (`[{tags, disjoin?: {at, from}}]`, as src/tags.ts validateSeparations has them) and the
+    /// track (an index, or null for everything else).
+    #[serde(default)]
+    pub separations: Option<Vec<Value>>,
+    #[serde(default)]
+    pub track: Option<usize>,
     /// Relationship separations: the entity and how far to follow links.
     #[serde(default)]
     pub related: Option<Value>,
@@ -169,6 +177,8 @@ pub struct Query {
 }
 /// A private temporary directory, removed with the last snapshot that uses it.
 struct Directory(PathBuf);
+/// Disjoins or unions as read (#549): each one's track and its time, when known.
+type PendingJoins = Vec<(Option<usize>, Option<String>)>;
 impl Drop for Directory {
     fn drop(&mut self) {
         let _ = std::fs::remove_dir_all(&self.0);
@@ -329,10 +339,12 @@ impl Snapshot {
     /// The derived snapshot for one side of a tag separation. The baseline is immutable, so a
     /// view stays valid for the baseline's lifetime; the two most recent are kept.
     fn view(&self, filter: &ViewFilter) -> Result<std::sync::Arc<Snapshot>, String> {
-        if !matches!(filter.mode.as_str(), "any" | "none") {
+        if filter.separations.is_none() && !matches!(filter.mode.as_str(), "any" | "none") {
             return Err("A separation filter needs a mode".into());
         }
-        let membership = if let Some(entity) = &filter.related {
+        let membership = if let Some(separations) = &filter.separations {
+            self.tracks(separations, filter.track)?
+        } else if let Some(entity) = &filter.related {
             let (kind, id) = super::entity_ref(entity)?;
             let direct = match filter.depth.as_deref() {
                 Some("direct") => true,
@@ -357,6 +369,7 @@ impl Snapshot {
             super::Membership::Tags(tags)
         };
         let key = match &membership {
+            super::Membership::Tracks { key, .. } => key.clone(),
             super::Membership::Tags(tags) => format!("{}:{}", filter.mode, tags.join(",")),
             super::Membership::Related { start, direct } => format!(
                 "{}:related:{}:{}",
@@ -385,6 +398,180 @@ impl Snapshot {
             views.remove(0);
         }
         Ok(view)
+    }
+    /// Several separations' membership for one track (#549). Each disjoin and union has the
+    /// set of entities at or after its time, read from the time indexes (a moment's time, a
+    /// duration's start), so the filter compares no times itself.
+    fn tracks(
+        &self,
+        separations: &[Value],
+        track: Option<usize>,
+    ) -> Result<super::Membership, String> {
+        if separations.is_empty()
+            || separations.len() > 7
+            || track.is_some_and(|t| t >= separations.len())
+        {
+            return Err(
+                "Separations are one to seven, and a track is one of them or the rest".into(),
+            );
+        }
+        let count = separations.len();
+        let db = Connection::open(&self.path, false)?;
+        let mut list = Vec::new();
+        // Each disjoin's and union's resolved time, for the view's key: a moved moment is a
+        // new view.
+        let mut keyed: Vec<(usize, &str, Option<usize>, Option<String>)> = Vec::new();
+        // A time: exact, a moment's, or the first or last moment's with the tags.
+        let resolve = |d: &Value, tags: &[String], bound: &str| -> Result<Option<String>, String> {
+            if let Some(at) = d.get("at").and_then(Value::as_str) {
+                if at.len() > 65536 {
+                    return Err("A disjoin's or union's time exceeds the query budget".into());
+                }
+                return Ok(Some(db.scalar("SELECT q(?1)", &[at])?));
+            }
+            if let Some(moment) = d.get("moment").and_then(Value::as_str) {
+                return Ok(db
+                    .query("SELECT q(time) FROM events WHERE id=?1", &[moment])?
+                    .first()
+                    .and_then(|r| r[0].clone()));
+            }
+            if d.get(bound) == Some(&Value::Bool(true)) {
+                let wanted = serde_json::to_string(tags).map_err(|e| e.to_string())?;
+                let direction = if bound == "first" { "ASC" } else { "DESC" };
+                return Ok(db
+                    .query(
+                        &format!("SELECT q(e.time) FROM events e WHERE EXISTS(SELECT 1 FROM json_each(e.metadata,'$.tags') t WHERE t.value IN (SELECT value FROM json_each(?1))) ORDER BY e.time COLLATE RATIONAL_V1 {direction} LIMIT 1"),
+                        &[&wanted],
+                    )?
+                    .first()
+                    .and_then(|r| r[0].clone()));
+            }
+            Err(format!(
+                "A disjoin or union is at a time, a moment, or the {bound} moment"
+            ))
+        };
+        // The entities at or after a time; none while it is not known (it waits).
+        let after = |time: &Option<String>| -> Result<std::collections::HashSet<String>, String> {
+            let mut set = std::collections::HashSet::new();
+            if let Some(at) = time {
+                for row in db.query(
+                    "SELECT id FROM events WHERE time>=q(?1) COLLATE RATIONAL_V1",
+                    &[at],
+                )? {
+                    if let Some(id) = &row[0] {
+                        set.insert(format!("m:{id}"));
+                    }
+                }
+                for row in db.query(
+                    "SELECT id FROM duration_intervals WHERE q_cmp(start_time,q(?1))>=0",
+                    &[at],
+                )? {
+                    if let Some(id) = &row[0] {
+                        set.insert(format!("d:{id}"));
+                    }
+                }
+            }
+            Ok(set)
+        };
+        let mut sources: Vec<Vec<Option<usize>>> = Vec::new();
+        for (index, s) in separations.iter().enumerate() {
+            let mut tags: Vec<String> = s
+                .get("tags")
+                .and_then(Value::as_array)
+                .ok_or("Each separation needs its tags")?
+                .iter()
+                .filter_map(Value::as_str)
+                .map(|t| t.trim().to_lowercase())
+                .collect();
+            tags.sort();
+            tags.dedup();
+            if tags.is_empty() || tags.len() > 40 {
+                return Err("Each separation needs one to forty tags".into());
+            }
+            // Its disjoins and unions, at most one from or into each track: the main
+            // timeline or another separation.
+            let mut joins = |key: &'static str,
+                             track_key: &str,
+                             bound: &str|
+             -> Result<Option<PendingJoins>, String> {
+                let entries = match s.get(key) {
+                    None | Some(Value::Null) => return Ok(None),
+                    Some(Value::Array(list)) if list.len() <= 8 => list,
+                    _ => return Err(format!("A separation's {key} are a list")),
+                };
+                let mut out: Vec<(Option<usize>, Option<String>)> = Vec::new();
+                for d in entries {
+                    let other = match d.get(track_key) {
+                        Some(Value::Null) | None => None,
+                        Some(v) => Some(
+                            v.as_u64()
+                                .map(|n| n as usize)
+                                .filter(|n| *n < count && *n != index)
+                                .ok_or("A disjoin or union names the main timeline or another separation")?,
+                        ),
+                    };
+                    if out.iter().any(|(t, _)| *t == other) {
+                        return Err(format!("A separation's {key} name each track at most once"));
+                    }
+                    let time = resolve(d, &tags, bound)?;
+                    keyed.push((index, key, other, time.clone()));
+                    out.push((other, time));
+                }
+                Ok(Some(out))
+            };
+            let disjoins = joins("disjoins", "from", "first")?;
+            let mut unions = joins("unions", "into", "last")?.unwrap_or_default();
+            sources.push(disjoins.iter().flatten().map(|(from, _)| *from).collect());
+            // Unions earliest first, so the latest passed is the last that has an entity;
+            // those not known yet first (they have none).
+            let mut sorted: Vec<(Option<usize>, Option<String>)> = Vec::new();
+            for union in unions.drain(..) {
+                let mut at = sorted.len();
+                if let Some(time) = &union.1 {
+                    for (k, (_, other)) in sorted.iter().enumerate() {
+                        if let Some(other) = other {
+                            if db.scalar("SELECT q_cmp(q(?1),q(?2))", &[time, other])? == "-1" {
+                                at = k;
+                                break;
+                            }
+                        }
+                    }
+                } else {
+                    at = 0;
+                }
+                sorted.insert(at, union);
+            }
+            let disjoins = match disjoins {
+                None => None,
+                Some(list) => Some(
+                    list.iter()
+                        .map(|(from, time)| Ok((*from, after(time)?)))
+                        .collect::<Result<Vec<_>, String>>()?,
+                ),
+            };
+            let unions = sorted
+                .iter()
+                .map(|(into, time)| Ok((*into, after(time)?)))
+                .collect::<Result<Vec<_>, String>>()?;
+            list.push((tags, disjoins, unions));
+        }
+        let order = super::separation_order(&sources)
+            .ok_or("Separations cannot disjoin from each other in a circle")?;
+        let key = format!(
+            "tracks:{}:{}",
+            track.map_or("rest".to_string(), |t| t.to_string()),
+            serde_json::to_string(&(
+                list.iter().map(|(tags, _, _)| tags).collect::<Vec<_>>(),
+                &keyed
+            ))
+            .map_err(|e| e.to_string())?
+        );
+        Ok(super::Membership::Tracks {
+            separations: list,
+            order,
+            track,
+            key,
+        })
     }
     /// The arcs touching [lower, upper] at least `threshold` long, from this snapshot's arc
     /// index (see `edge_window`): a separation's arcs, which are the whole timeline's (#415).
@@ -2435,6 +2622,110 @@ mod duration_tests {
         let mut invalid = doc.clone();
         invalid.durations[1].start = json!({"ongoing": true});
         assert!(Snapshot::from_document(&invalid).is_err());
+    }
+    #[test]
+    fn separations_disjoin_at_their_time() {
+        // Battles at 0..9 tagged war, a market tagged trade at 3/2, and a war-and-trade fair at 8.
+        let events: Vec<Value> = (0..10)
+            .map(|i| json!({"id":format!("e{i}"),"time":format!("{i}/1"),"metadata":{"tags":["war"]}}))
+            .chain([
+                json!({"id":"m","time":"3/2","metadata":{"tags":["trade"]}}),
+                json!({"id":"fair","time":"17/2","metadata":{"tags":["trade","war"]}}),
+            ])
+            .collect();
+        let doc: Document = serde_json::from_value(json!({"format":"openchronology","version":1,"title":"Disjoin","description":"","events":events,"durations":[{"id":"siege","start":"7/1","end":"8/1","metadata":{"tags":["war"]}}]})).unwrap();
+        let snapshot = Snapshot::from_document(&doc).unwrap();
+        let ids = |separations: Value, track: Value| {
+            let q: Query = serde_json::from_value(json!({"kind":"overview","lower":"-1/1","upper":"20/1","threshold":"0/1","filter":{"separations":separations,"track":track}})).unwrap();
+            let frame = snapshot.query(&q).unwrap();
+            let mut found: Vec<String> = frame["groups"]
+                .as_array()
+                .unwrap()
+                .iter()
+                .filter_map(|g| g["id"].as_str().map(String::from))
+                .chain(
+                    frame["durations"]
+                        .as_array()
+                        .unwrap()
+                        .iter()
+                        .map(|d| d["id"].as_str().unwrap().to_string()),
+                )
+                .collect();
+            found.sort();
+            found
+        };
+        // War disjoins from the main timeline at 5: from then on its own; before, the rest's.
+        let at = json!([{"tags":["war"],"disjoins":[{"from":null,"at":"5/1"}]}]);
+        assert_eq!(
+            ids(at.clone(), json!(0)),
+            vec!["e5", "e6", "e7", "e8", "e9", "fair", "siege"]
+        );
+        assert_eq!(
+            ids(at, Value::Null),
+            vec!["e0", "e1", "e2", "e3", "e4", "m"]
+        );
+        // At a moment's time (e6), and at the first moment with its tags (e0, so throughout).
+        let moment = json!([{"tags":["war"],"disjoins":[{"from":null,"moment":"e6"}]}]);
+        assert_eq!(
+            ids(moment, json!(0)),
+            vec!["e6", "e7", "e8", "e9", "fair", "siege"]
+        );
+        let first = json!([{"tags":["trade"],"disjoins":[{"from":null,"first":true}]}]);
+        assert_eq!(ids(first, json!(0)), vec!["fair", "m"]);
+        // From two sources: trade takes from the main timeline at 1 and from war's track at 9,
+        // so the fair (8.5, in war's track then) stays with war.
+        let two = json!([
+            {"tags":["war"]},
+            {"tags":["trade"],"disjoins":[{"from":null,"at":"1/1"},{"from":0,"at":"9/1"}]}
+        ]);
+        assert_eq!(ids(two.clone(), json!(1)), vec!["m"]);
+        assert!(ids(two, json!(0)).contains(&"fair".to_string()));
+        // From a later separation: war (first) disjoins from trade at 9, so the fair (8.5) stays
+        // with trade, and from the main timeline at 5.
+        let later = json!([
+            {"tags":["war"],"disjoins":[{"from":1,"at":"9/1"},{"from":null,"at":"5/1"}]},
+            {"tags":["trade"]}
+        ]);
+        assert_eq!(ids(later.clone(), json!(1)), vec!["fair", "m"]);
+        assert_eq!(
+            ids(later, json!(0)),
+            vec!["e5", "e6", "e7", "e8", "e9", "siege"]
+        );
+        // Unions: war back into the main timeline at 5; at its last moment (e9);
+        // into trade at 7, which itself unites into the main timeline at 9.
+        let back = json!([{"tags":["war"],"unions":[{"into":null,"at":"5/1"}]}]);
+        assert_eq!(ids(back, json!(0)), vec!["e0", "e1", "e2", "e3", "e4"]);
+        let last = json!([{"tags":["war"],"unions":[{"into":null,"last":true}]}]);
+        assert_eq!(
+            ids(last, json!(0)),
+            vec!["e0", "e1", "e2", "e3", "e4", "e5", "e6", "e7", "e8", "fair", "siege"]
+        );
+        let into = json!([
+            {"tags":["war"],"unions":[{"into":1,"at":"7/1"}]},
+            {"tags":["trade"],"unions":[{"into":null,"at":"9/1"}]}
+        ]);
+        assert_eq!(
+            ids(into.clone(), json!(1)),
+            vec!["e7", "e8", "fair", "m", "siege"]
+        );
+        assert_eq!(ids(into, Value::Null), vec!["e9"]);
+        // The latest union passed applies, whatever their order.
+        let latest = json!([{"tags":["war"],"unions":[{"into":null,"at":"8/1"},{"into":1,"at":"2/1"}]},{"tags":["trade"]}]);
+        assert_eq!(
+            ids(latest.clone(), json!(1)),
+            vec!["e2", "e3", "e4", "e5", "e6", "e7", "fair", "m", "siege"]
+        );
+        assert!(ids(latest, Value::Null).contains(&"e8".to_string()));
+        // A disjoin from itself, in a circle, or twice from one track, is refused.
+        for bad in [
+            json!([{"tags":["war"],"disjoins":[{"from":0,"at":"5/1"}]}]),
+            json!([{"tags":["war"],"disjoins":[{"from":1,"at":"5/1"}]},{"tags":["trade"],"disjoins":[{"from":0,"at":"5/1"}]}]),
+            json!([{"tags":["war"],"disjoins":[{"from":null,"at":"5/1"},{"from":null,"at":"6/1"}]}]),
+            json!([{"tags":["war"],"unions":[{"into":null,"first":true}]}]),
+        ] {
+            let q: Query = serde_json::from_value(json!({"kind":"overview","lower":"0/1","upper":"1/1","threshold":"0/1","filter":{"separations":bad,"track":0}})).unwrap();
+            assert!(snapshot.query(&q).is_err());
+        }
     }
     #[test]
     fn files_from_before_ongoing_durations_take_one_when_saved() {

@@ -205,8 +205,41 @@ try {
     filter: { tags: ['war'], mode: 'any' },
   });
   assert.equal(fresh.events[0].id, 'm0');
+  // Separations that disjoin and unite (#549), from a later one and at moments, read the
+  // same tracks as the browser.
+  const separations = [
+    {
+      tags: ['war'],
+      disjoins: [
+        { from: 1, at: '250/1' },
+        { from: null, moment: 'm7' },
+      ],
+      unions: [{ into: null, last: true }],
+    },
+    { tags: ['trade'], unions: [{ into: 0, at: '700/1' }] },
+    { tags: ['art'], disjoins: [{ from: null, first: true }] },
+  ];
+  for (const track of [0, 1, 2, null]) {
+    const filter = { separations, track };
+    const index = new TimelineIndex(filterDocument(doc, filter));
+    const viewport = new Viewport(Q.from(-100n), Q.from(1200n));
+    assert.deepEqual(
+      shape(
+        await store.query(timeline.id, user, {
+          kind: 'overview',
+          lower: viewport.left.toString(),
+          upper: viewport.right.toString(),
+          threshold: viewport.threshold(1000, 4).toString(),
+          filter,
+        }),
+      ),
+      shape(index.frame(viewport, 1000, 4)),
+      `separation track ${track}`,
+    );
+    compared++;
+  }
   console.log(
-    `PASS PostgreSQL tag views: ${compared} random views of six separations match the browser index; pages, tag counts, caching and invalidation on save; filters naming what a timeline lacks build nothing new, and builds pass a limit and wait their turn.`,
+    `PASS PostgreSQL tag views: ${compared} random views of six separations match the browser index; pages, tag counts, caching and invalidation on save; tracks that disjoin and unite; filters naming what a timeline lacks build nothing new, and builds pass a limit and wait their turn.`,
   );
 } finally {
   if (timeline) await pool.query('DELETE FROM oc_timelines WHERE id=$1', [timeline.id]);
