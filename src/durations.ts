@@ -6,6 +6,7 @@ import { contentLabels, CONTENT_LABELS_KEY } from './content-labels.js';
 import type { PointEvent, Metadata } from './core.js';
 import { normalizeEntityTags } from './tags.js';
 import { entryLimitText, withinEntryLimit } from './entry-limit.js';
+import { clip } from './clip.js';
 /**
  * An endpoint is an exact time, an anchor that follows a moment's time, or (an end only) the
  * current time, while the duration is ongoing (#537).
@@ -691,9 +692,9 @@ function overviewString(value: string): boolean {
  */
 export function durationOverview(metadata: Metadata): Metadata {
   const result: Metadata = {};
-  if (typeof metadata.title === 'string') result.title = metadata.title.slice(0, 512);
+  if (typeof metadata.title === 'string') result.title = clip(metadata.title, 512);
   if (typeof metadata.description === 'string')
-    result.description = metadata.description.slice(0, 2000);
+    result.description = clip(metadata.description, 2000);
   let size = JSON.stringify(result).length;
   for (const [key, value] of Object.entries(metadata))
     if (['title', 'description', 'tags', CONTENT_LABELS_KEY].includes(key)) continue;

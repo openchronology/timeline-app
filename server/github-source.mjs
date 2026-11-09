@@ -8,6 +8,7 @@
  */
 import { createHash, createHmac, timingSafeEqual } from 'node:crypto';
 import { readFileSync } from 'node:fs';
+import { clip } from '../dist/core.mjs';
 import {
   branchMoment,
   deliveryMoments,
@@ -28,16 +29,7 @@ import {
 /** The User-Agent GitHub requires of API clients: the project, never a person. */
 export const USER_AGENT =
   'OpenChronology-github-source/1.0 (https://github.com/openchronology/timeline-app)';
-/**
- * The first `limit` UTF-16 units of `text`, never ending in half of a surrogate pair: an emoji cut
- * in two is not valid Unicode, and PostgreSQL refuses to store it as JSON.
- */
-export function clip(text, limit) {
-  const s = String(text);
-  if (s.length <= limit) return s;
-  const code = s.charCodeAt(limit - 1);
-  return s.slice(0, code >= 0xd800 && code <= 0xdbff ? limit - 1 : limit);
-}
+export { clip };
 /** The most characters of an issue's text a duration keeps as its notes. */
 export const NOTES_LIMIT = 4000;
 const ID = /^[A-Za-z0-9_.:-]{1,128}$/;

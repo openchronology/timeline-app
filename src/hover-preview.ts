@@ -2,6 +2,7 @@
 // The card shown on hovering a moment: its image, title and text, built by the editor from the
 // moment's plugin fields.
 import { imageSource } from './image-assets.js';
+import { clip } from './clip.js';
 import {
   pluginFocus,
   pluginMarker,
@@ -149,9 +150,7 @@ export function createHoverPreview(
         ? entry.metadata.title
         : entry.untitled;
     const description =
-      typeof entry.metadata.description === 'string'
-        ? entry.metadata.description.slice(0, 600)
-        : '';
+      typeof entry.metadata.description === 'string' ? clip(entry.metadata.description, 600) : '';
     notes.replaceChildren();
     notes.classList.remove('markdown-view');
     if (pluginRichText(entry.plugins)) renderMarkdown(notes, description);
