@@ -4,6 +4,7 @@ import assert from 'node:assert/strict';
 import { separateBy } from './tags-browser.mjs';
 import { readFile } from 'node:fs/promises';
 import { closeMomentDetails } from './moment-dialog-browser.mjs';
+import { DEFAULT_PRESENTATION } from '../dist/core.mjs';
 /** Relationships are linked from an entity's details, drawn as arcs and used to separate. */
 export async function checkRelationships(page, restore) {
   const imported = async (doc) => {
@@ -271,6 +272,73 @@ export async function checkRelationships(page, restore) {
     await page.locator('#separation-rejoin').click();
     await page.locator('#separation-settings').waitFor({ state: 'hidden' });
     await page.waitForFunction(() => document.querySelectorAll('.edge-arc').length === 2);
+
+    // A duration whose metadata is in another order than its details write it (an importer's
+    // or the API's, with url before tags), opened and separated by its relationships: nothing
+    // was edited, so there is nothing to undo or save.
+    await imported({
+      format: 'openchronology',
+      version: 1,
+      title: 'Relationship metadata order',
+      description: '',
+      events: [{ id: 'm', time: '10/1', metadata: { title: 'Mark' } }],
+      durations: [
+        {
+          id: 'span',
+          start: '20/1',
+          end: '40/1',
+          metadata: {
+            title: 'Span',
+            description: 'Notes',
+            url: 'https://example.org/span',
+            tags: ['work'],
+          },
+        },
+      ],
+      relationships: [{ a: { duration: 'span' }, b: { moment: 'm' } }],
+    });
+    await page.locator('#left-bound').fill('0');
+    await page.locator('#right-bound').fill('60');
+    await page.locator('#apply-bounds').click();
+    assert.equal(await page.locator('#undo-button').isDisabled(), true);
+    await page.locator('.duration-band', { hasText: 'Span' }).click({ force: true });
+    await page.locator('#duration-dialog').waitFor({ state: 'visible' });
+    await page
+      .locator('#duration-related')
+      .getByRole('button', { name: 'Separate related' })
+      .click();
+    await page.locator('#separation-settings').waitFor({ state: 'visible' });
+    assert.equal(await page.locator('#undo-button').isDisabled(), true, 'nothing was edited');
+    await closeMomentDetails(page);
+    assert.equal(await page.locator('#undo-button').isDisabled(), true, 'nor once closed');
+    await page.locator('#separation-rejoin').click();
+    await page.locator('#separation-settings').waitFor({ state: 'hidden' });
+    // An ongoing duration (#537) among what a moment is related to ends now, not at its start.
+    const opened = Math.floor(Date.now() / 1000) - 7200;
+    await imported({
+      format: 'openchronology',
+      version: 1,
+      title: 'Related ongoing work',
+      description: '',
+      presentation: { ...DEFAULT_PRESENTATION, mode: 'gregorian' },
+      events: [{ id: 'opened', time: String(opened), metadata: { title: 'Opened' } }],
+      durations: [
+        {
+          id: 'work',
+          start: { moment: 'opened' },
+          end: { ongoing: true },
+          metadata: { title: 'Open work' },
+        },
+      ],
+      relationships: [{ a: { duration: 'work' }, b: { moment: 'opened' } }],
+    });
+    await page.locator('#fit-button').click();
+    await page.getByRole('button', { name: 'Opened', exact: true }).first().click({ force: true });
+    const entry = related.locator('.related-entity', { hasText: 'Open work' });
+    await entry.waitFor();
+    const [from, to] = (await entry.textContent()).split(' · ')[1].split(' → ');
+    assert.notEqual(to, from, 'it ends now, two hours after it began');
+    await closeMomentDetails(page);
 
     // An arc whose endpoints are far off screen keeps its place as the view pans: only the part
     // over the stage is drawn, so no coordinate is millions of pixels away (which browsers draw

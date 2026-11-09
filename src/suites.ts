@@ -4,6 +4,7 @@
  * history class or a causal analysis uses. A suite carries its plugins' full definitions, so
  * it installs the same offline, on the desktop and from any server, custom plugins included.
  */
+import { clip } from './clip.js';
 import {
   validatePluginManifest,
   MOMENT_STACKS,
@@ -65,7 +66,7 @@ export function validatePluginSuite(value: unknown): PluginSuite {
     id: s.id,
     version: s.version as number,
     name: text(s.name, 100, 'name'),
-    description: typeof s.description === 'string' ? s.description.slice(0, 2000) : '',
+    description: typeof s.description === 'string' ? clip(s.description, 2000) : '',
     plugins,
   };
   if (new TextEncoder().encode(JSON.stringify(suite)).length > SUITE_BYTES)

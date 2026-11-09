@@ -1,7 +1,7 @@
 // Copyright (c) 2026 Athan Clark. SPDX-License-Identifier: GPL-3.0-only
 // Tags (docs/tags.md) and separations: validating timeline and entity tags, splitting a timeline
 // into what carries chosen tags (or relates to a chosen entity) and the rest, and tag counts.
-import { durationWindow, resolveDuration } from './durations.js';
+import { durationWindow, isOngoing, resolveDuration } from './durations.js';
 import {
   adjacency,
   arcFromBand,
@@ -378,7 +378,9 @@ export function filterDocument(document: TimelineDocument, filter: ViewFilter): 
       durations.push({
         id: duration.id,
         start: band.startTime,
-        end: band.endTime,
+        // An ongoing end stays "now" (#537), resolved when a window is read, not frozen at
+        // the start it resolves to here.
+        end: isOngoing(duration.end) ? duration.end : band.endTime,
         metadata: duration.metadata,
       });
   }

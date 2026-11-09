@@ -115,8 +115,24 @@ try {
     client.release();
   }
   assert.equal((await search('harbor')).total, '3');
+  // A duration's notes preview (2,000 characters, kept in its band's JSON) ending right inside
+  // an emoji still saves: half a surrogate pair is not valid Unicode, which PostgreSQL refused.
+  const current = (await store.access(timeline.id, user)).revision;
+  const emoji = await store.save(timeline.id, user, current, {
+    ...doc,
+    durations: [
+      ...(doc.durations ?? []),
+      {
+        id: 'emoji',
+        start: '99/1',
+        end: '100/1',
+        metadata: { title: 'Long', description: 'x'.repeat(1999) + '🤖 harbor' },
+      },
+    ],
+  });
+  assert.ok(emoji.revision > current);
   console.log(
-    'PASS PostgreSQL search: ranked prefix matching over moments, stacks and durations, pages, rebuild on save and backfill.',
+    'PASS PostgreSQL search: ranked prefix matching over moments, stacks and durations, pages, rebuild on save and backfill; text cut whole around an emoji.',
   );
 } finally {
   if (timeline) await pool.query('DELETE FROM oc_timelines WHERE id=$1', [timeline.id]);

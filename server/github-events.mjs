@@ -12,6 +12,7 @@
 import { createHash } from 'node:crypto';
 import {
   USER_AGENT,
+  clip,
   entityId,
   itemId,
   itemKey,
@@ -116,9 +117,10 @@ export function eventMoment(repository, item, { verb, subject, time, person, tag
     ),
     time: seconds(time),
     metadata: {
-      title: `${what}: ${item.merge_request ? '!' : '#'}${item.number} ${item.title ?? ''}`
-        .trim()
-        .slice(0, 300),
+      title: clip(
+        `${what}: ${item.merge_request ? '!' : '#'}${item.number} ${item.title ?? ''}`.trim(),
+        300,
+      ),
       ...(item.html_url ? { url: item.html_url } : {}),
       tags: [
         ...new Set(
@@ -659,7 +661,7 @@ export function releaseMoment(repository, release) {
     id: entityId(repository, 'release', String(release.id)),
     time: seconds(release.published_at),
     metadata: {
-      title: `Released ${release.tag_name}${name}`.slice(0, 300),
+      title: clip(`Released ${release.tag_name}${name}`, 300),
       ...(release.html_url ? { url: release.html_url } : {}),
       tags: [
         ...new Set(
@@ -701,11 +703,11 @@ export function milestoneChanges(repository, milestone) {
         ? seconds(milestone.closed_at)
         : { ongoing: true },
     metadata: {
-      title: `Milestone ${milestone.title}`.slice(0, 300),
+      title: clip(`Milestone ${milestone.title}`, 300),
       ...(description || milestone.html_url
         ? {
             description:
-              description.slice(0, 4000) +
+              clip(description, 4000) +
               (milestone.html_url ? (description ? '\n\n' : '') + milestone.html_url : ''),
           }
         : {}),
@@ -718,7 +720,7 @@ export function milestoneChanges(repository, milestone) {
         id: entityId(repository, 'milestone', String(milestone.number), 'due'),
         time: seconds(milestone.due_on),
         metadata: {
-          title: `Due: milestone ${milestone.title}`.slice(0, 300),
+          title: clip(`Due: milestone ${milestone.title}`, 300),
           ...(milestone.html_url ? { url: milestone.html_url } : {}),
           tags: [...new Set([...tags.slice(0, 4), 'due'].map(lowerTag))],
         },
@@ -754,9 +756,10 @@ export function columnStint(repository, item, { project, column, start, end }) {
     start: seconds(start),
     end: end ? seconds(end) : { ongoing: true },
     metadata: {
-      title: `${item.merge_request ? '!' : '#'}${item.number} in ${column}${
-        project ? ` (${project})` : ''
-      }`.slice(0, 300),
+      title: clip(
+        `${item.merge_request ? '!' : '#'}${item.number} in ${column}${project ? ` (${project})` : ''}`,
+        300,
+      ),
       ...(item.html_url ? { url: item.html_url } : {}),
       tags: [
         ...new Set(
@@ -874,11 +877,10 @@ export function commitMoment(repository, commit, branch) {
     id: entityId(repository, 'commit', commit.sha),
     time: seconds(commit.time),
     metadata: {
-      title: (first.trim() || commit.sha.slice(0, 12)).slice(0, 300),
+      title: clip(first.trim() || commit.sha.slice(0, 12), 300),
       ...(body || commit.url
         ? {
-            description:
-              body.slice(0, 4000) + (commit.url ? (body ? '\n\n' : '') + commit.url : ''),
+            description: clip(body, 4000) + (commit.url ? (body ? '\n\n' : '') + commit.url : ''),
           }
         : {}),
       ...(commit.url ? { url: commit.url } : {}),
@@ -915,7 +917,7 @@ export function branchMoment(repository, branch, { verb, time, person }) {
     id: entityId(repository, 'branch', slug(branch), slug(verb), seconds(time)),
     time: seconds(time),
     metadata: {
-      title: `${what} ${branch}`.slice(0, 300),
+      title: clip(`${what} ${branch}`, 300),
       tags: [
         ...new Set(
           [
@@ -936,7 +938,7 @@ export function forkMoment(repository, fork) {
     id: entityId(repository, 'fork', slug(fork.full_name)),
     time: seconds(fork.created_at),
     metadata: {
-      title: `Forked to ${fork.full_name}`.slice(0, 300),
+      title: clip(`Forked to ${fork.full_name}`, 300),
       ...(fork.html_url ? { url: fork.html_url } : {}),
       tags: [
         ...new Set(
