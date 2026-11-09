@@ -29,7 +29,7 @@ export const TOUR_STEPS: readonly TourStep[] = [
   },
   {
     selectors: ['#separate-button'],
-    title: 'Separate by tags',
+    title: 'Separate',
     text: 'Tag moments (war, trade…) in their details, then pull those with some tags into a track of their own.',
   },
   {
@@ -51,7 +51,7 @@ export const TOUR_STEPS: readonly TourStep[] = [
     // On a phone, the controls above wait in Tools, and the tour shows it instead of them.
     selectors: ['#view-tools-button'],
     title: 'Tools',
-    text: 'On a small screen, Search, Separate by tags, Time display, Plugins, Compare, the text size and Help are here.',
+    text: 'On a small screen, Search, Separate, Time display, Plugins, Compare, the text size and Help are here.',
   },
   {
     selectors: ['.window-bounds'],

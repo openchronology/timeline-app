@@ -64,7 +64,7 @@ export async function checkMobileToolbars(page) {
     await first.setViewportSize({ width: 390, height: 844 });
     await first.route('**/app.js', (route) => route.abort());
     await first.goto(page.url());
-    for (const name of ['Separate by tags', 'Plugins', 'Import', 'Export', 'Help'])
+    for (const name of ['Separate', 'Plugins', 'Import', 'Export', 'Help'])
       assert.equal(
         await first.getByRole('button', { name, exact: true }).isVisible(),
         false,
@@ -99,7 +99,7 @@ export async function checkMobileToolbars(page) {
     // On a wide screen, neither menu shows, and every control is in its row.
     assert.equal(await tools.button.isVisible(), false);
     assert.equal(await file.button.isVisible(), false);
-    assert(await phone.getByRole('button', { name: 'Separate by tags' }).isVisible());
+    assert(await phone.getByRole('button', { name: 'Separate', exact: true }).isVisible());
 
     for (const scheme of ['light', 'dark']) {
       await phone.emulateMedia({ colorScheme: scheme });
@@ -177,7 +177,7 @@ export async function checkMobileToolbars(page) {
     assert.equal(await tools.open(), false);
     await tools.button.click();
     assert(await tools.open());
-    assert(await tools.panel.getByRole('button', { name: 'Separate by tags' }).isVisible());
+    assert(await tools.panel.getByRole('button', { name: 'Separate', exact: true }).isVisible());
     await tools.button.click();
     assert.equal(await tools.open(), false);
     await tools.button.click();
@@ -214,10 +214,10 @@ export async function checkMobileToolbars(page) {
     await phone.keyboard.press('Escape');
     assert.equal(await tools.open(), false);
 
-    // Its actions run, and close it: Time display and Separate by tags open their dialogs.
+    // Its actions run, and close it: Time display and Separate open their dialogs.
     for (const [name, dialog] of [
       ['Time display', '#presentation-dialog'],
-      ['Separate by tags', '#separate-dialog'],
+      ['Separate', '#separate-dialog'],
     ]) {
       await tools.button.click();
       await tools.panel.getByRole('button', { name, exact: true }).click();
@@ -317,7 +317,7 @@ export async function checkMobileToolbars(page) {
     await phone.setViewportSize({ width: 1280, height: 900 });
     await phone.waitForFunction(() => document.getElementById('view-tools-button').hidden);
     assert.deepEqual(await order(phone), wide);
-    assert(await phone.getByRole('button', { name: 'Separate by tags' }).isVisible());
+    assert(await phone.getByRole('button', { name: 'Separate', exact: true }).isVisible());
     assert.deepEqual(errors, []);
   } finally {
     await phone.close();

@@ -116,7 +116,7 @@ Type the bounds the way the timeline's display writes times. To see and type the
 
 ### On a phone
 
-On a narrow screen the toolbars keep one row each. Above the title are **View mode** (for those who can edit), the main action, such as **Save to server**, and **File**, which holds **Import**, **Export**, **Import .och** and **Export .och ↗**. Above the timeline are **−**, **＋**, **Fit all**, full screen (the corners icon), **＋ Event** and **Tools**. The search bar stays beneath them, the width of the screen. **Tools** holds the rest: **Separate by tags**, **Time display**, **Plugins**, **Compare**, **Center axis**, **Help**, the text size (**A−** and **A＋**), **Follow latest moments**, **Group within**, and **Clear selection** once a time is selected. A menu closes when you choose an action, tap outside it or press Escape. In full screen the timeline takes all of the screen but that one row.
+On a narrow screen the toolbars keep one row each. Above the title are **View mode** (for those who can edit), the main action, such as **Save to server**, and **File**, which holds **Import**, **Export**, **Import .och** and **Export .och ↗**. Above the timeline are **−**, **＋**, **Fit all**, full screen (the corners icon), **＋ Event** and **Tools**. The search bar stays beneath them, the width of the screen. **Tools** holds the rest: **Separate**, **Time display**, **Plugins**, **Compare**, **Center axis**, **Help**, the text size (**A−** and **A＋**), **Follow latest moments**, **Group within**, and **Clear selection** once a time is selected. A menu closes when you choose an action, tap outside it or press Escape. In full screen the timeline takes all of the screen but that one row.
 
 ### What markers show
 
@@ -210,7 +210,7 @@ Arcs stay while separated, and a link between the tracks crosses from one to the
 
 Tags are short labels on events, such as `war` or `trade`. Each can carry up to 40.
 
-**Separate by tags** lists the timeline's tags and how often each is used. Choose some (or type others under **Other tags**) and select **Separate**. Everything carrying any of them moves into a track above; everything else stays below. Both tracks pan and zoom together, and both are read-only. Separating never changes or saves the timeline. **Rejoin** brings it back together. See [separating by tags](tags.md#separating-by-tags).
+**Separate** lists the timeline's tags and how often each is used. Choose some (or type others under **Other tags**) and select **Separate**. Everything carrying any of them moves into a track above; everything else stays below. Both tracks pan and zoom together, and both are read-only. Separating never changes or saves the timeline. **Rejoin** brings it back together. See [separating by tags](tags.md#separating-by-tags).
 
 To have a timeline open separated, for everyone who reads it, separate it and select **Make this the default view**, then rejoin and save. **Clear default view** undoes it. See [a default view](tags.md#a-default-view).
 

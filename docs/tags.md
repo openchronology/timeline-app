@@ -6,7 +6,7 @@ Events (moments and durations) can carry tags: short labels you choose, such as 
 
 ## Separating by tags
 
-**Separate by tags** in the timeline toolbar opens a list of separations. In each, **Add tags** opens a picker:
+**Separate** in the timeline toolbar opens a list of separations. In each, **Add tags** opens a picker:
 
 - it lists the timeline's tags with how many events use each, the most used first;
 - its search box narrows the list, or names a tag no event has yet (**Add "…"**);
@@ -49,7 +49,7 @@ Tracks follow what is in view, as moments do:
 
 ## A default view
 
-Someone who can edit a timeline can make a separation its default view: separate it, by tags or by **Separate related** or **Separate all connected**, and select **Make this the default view** in the bar above the tracks. Everyone then opens it that way: readers, embeds, shared links, imported files, desktop files and browser drafts. The bar says "This is the timeline's default view", and **Rejoin** still returns to the whole timeline. **Clear default view**, in the bar or in the **Separate by tags** dialog (which also says what the timeline opens separated by), makes it open whole again.
+Someone who can edit a timeline can make a separation its default view: separate it, by tags or by **Separate related** or **Separate all connected**, and select **Make this the default view** in the bar above the tracks. Everyone then opens it that way: readers, embeds, shared links, imported files, desktop files and browser drafts. The bar says "This is the timeline's default view", and **Rejoin** still returns to the whole timeline. **Clear default view**, in the bar or in the **Separate** dialog (which also says what the timeline opens separated by), makes it open whole again.
 
 To keep several ways of showing a timeline, save them as [views](views.md): a default view can be one of them, and then follows it as it changes.
 
