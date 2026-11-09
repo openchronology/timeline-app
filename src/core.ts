@@ -162,6 +162,10 @@ export {
   viewFilterKey,
   validateSeparations,
   separationTracks,
+  resolveSeparations,
+  boundMomentTime,
+  disjoinTime,
+  separationOrder,
 } from './tags.js';
 export {
   timeMapping,
@@ -171,7 +175,15 @@ export {
   unchanged as unchangedMapping,
 } from './time-map.js';
 export type { TimeMapping, TimeMappingInput } from './time-map.js';
-export type { ViewFilter, SeparationTrack } from './tags.js';
+export type {
+  ViewFilter,
+  SeparationTrack,
+  Disjoin,
+  DisjoinTime,
+  Union,
+  UnionTime,
+  ResolvedSeparation,
+} from './tags.js';
 export { Q, RationalMap };
 export type Metadata = { [key: string]: unknown; title?: string; description?: string };
 export interface PointEvent {

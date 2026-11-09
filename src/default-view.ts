@@ -30,11 +30,11 @@ export const separationGroups = (s: ViewSeparation | null | undefined): string[]
   viewSeparations(s).map((t) => t.tags);
 /**
  * Tag separations as a default view keeps them: `{tags}` for one, `{groups}` for several, and
- * `{separations}` when any disjoins.
+ * `{separations}` when any disjoins or unites.
  */
 export function tagSeparation(tracks: SeparationTrack[] | string[][]): ViewSeparation {
   const list: SeparationTrack[] = tracks.map((t) => (Array.isArray(t) ? { tags: [...t] } : t));
-  if (list.some((t) => t.disjoin))
+  if (list.some((t) => t.disjoins?.length || t.unions?.length))
     return { separations: list.map((t) => ({ ...t, tags: [...t.tags] })) };
   return list.length === 1 ? { tags: [...list[0].tags] } : { groups: list.map((t) => [...t.tags]) };
 }
@@ -61,7 +61,7 @@ export function validateTimelineView(value: unknown): TimelineView {
   }
   if (object(s) && 'separations' in s) {
     if (Object.keys(s).length !== 1)
-      throw new Error('A default separation with disjoins has only its separations.');
+      throw new Error('A default separation with disjoins or unions has only its separations.');
     return { separation: { separations: validateSeparations(s.separations) } };
   }
   if (object(s) && 'groups' in s) {
@@ -101,13 +101,19 @@ export function sameSeparation(a: ViewSeparation | null, b: ViewSeparation | nul
       refKey(a.related) === refKey(b.related) &&
       a.depth === b.depth
     );
-  // Tag separations: the same tags (in any order) and disjoin for each; without disjoins, the
+  // Tag separations: the same tags (in any order), disjoins and unions for each; without them, the
   // groups in any order.
   const key = (s: ViewSeparation) => {
     const tracks = viewSeparations(s).map((t) =>
-      JSON.stringify({ tags: [...t.tags].sort(), disjoin: t.disjoin ?? null }),
+      JSON.stringify({
+        tags: [...t.tags].sort(),
+        disjoins: t.disjoins ?? [],
+        unions: t.unions ?? [],
+      }),
     );
-    return viewSeparations(s).some((t) => t.disjoin) ? tracks.join('|') : tracks.sort().join('|');
+    return viewSeparations(s).some((t) => t.disjoins?.length || t.unions?.length)
+      ? tracks.join('|')
+      : tracks.sort().join('|');
   };
   return key(a) === key(b);
 }

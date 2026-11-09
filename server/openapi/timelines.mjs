@@ -399,7 +399,7 @@ export const schemas = {
         type: 'object',
         title: 'Separations that disjoin',
         description:
-          'One track of several separations (#549): `track` is a separation’s index, or null for everything else. An entity is on a separation’s track from its disjoin on; before it, on the track it disjoins from.',
+          'One track of several separations (#549): `track` is a separation’s index, or null for everything else. An entity is on a separation’s track from its disjoin on (before it, on the track it disjoins from), and until its union (from it, on the track it unites into).',
         required: ['separations', 'track'],
         properties: {
           separations: ref('SeparationTracks'),
@@ -413,7 +413,7 @@ export const schemas = {
     minItems: 1,
     maxItems: 7,
     description:
-      'Separations, each its tags and, optionally, when it disjoins: at an exact time, from the main timeline (`from` null) or an earlier separation (its index). Before then its events stay in the track it disjoins from.',
+      'Separations, each its tags and, optionally, its disjoins and unions (#549). A disjoin names the track it takes the separation’s events from (`from`: null for the main timeline, or another separation’s index) and when; before then they stay there. A union names the track they go to (`into`) and when; from then on they are there (the latest union passed applies), and the separation’s track ends. Each is at an exact time (`at`), at a moment’s (`moment`, followed as it moves), or at the first (disjoins, `first`) or last (unions, `last`) moment with the separation’s tags. Separations may disjoin from later ones, but not in a circle.',
     items: {
       type: 'object',
       required: ['tags'],
@@ -425,13 +425,38 @@ export const schemas = {
           maxItems: 40,
           items: { type: 'string', minLength: 1, maxLength: 128 },
         },
-        disjoin: {
-          type: 'object',
-          required: ['at', 'from'],
-          additionalProperties: false,
-          properties: {
-            at: { type: 'string', description: 'An exact rational time.' },
-            from: { type: ['integer', 'null'], minimum: 0 },
+        disjoins: {
+          type: 'array',
+          maxItems: 8,
+          description: 'At most one from each track.',
+          items: {
+            type: 'object',
+            required: ['from'],
+            additionalProperties: false,
+            properties: {
+              from: { type: ['integer', 'null'], minimum: 0, maximum: 6 },
+              at: { type: 'string', description: 'An exact rational time.' },
+              moment: { type: 'string', description: 'A moment’s ID: at its time.' },
+              first: { const: true, description: 'At the first moment with the tags.' },
+            },
+            oneOf: [{ required: ['at'] }, { required: ['moment'] }, { required: ['first'] }],
+          },
+        },
+        unions: {
+          type: 'array',
+          maxItems: 8,
+          description: 'At most one into each track.',
+          items: {
+            type: 'object',
+            required: ['into'],
+            additionalProperties: false,
+            properties: {
+              into: { type: ['integer', 'null'], minimum: 0, maximum: 6 },
+              at: { type: 'string', description: 'An exact rational time.' },
+              moment: { type: 'string', description: 'A moment’s ID: at its time.' },
+              last: { const: true, description: 'At the last moment with the tags.' },
+            },
+            oneOf: [{ required: ['at'] }, { required: ['moment'] }, { required: ['last'] }],
           },
         },
       },

@@ -3413,28 +3413,48 @@ dialog button {
   color: var(--muted);
   font-size: 12px;
 }
-.separation-disjoin {
+.separation-disjoins,
+.separation-unions {
+  display: grid;
+  gap: 6px;
+  justify-items: start;
+}
+.separation-disjoin-none,
+.separation-union-none {
+  margin: 0;
+  color: var(--muted);
+  font-size: 13px;
+}
+.separation-disjoin,
+.separation-union {
   display: flex;
   flex-wrap: wrap;
   align-items: center;
-  gap: 8px;
+  gap: 6px;
   font-size: 13px;
 }
-.separation-disjoin label {
-  display: flex;
-  flex-direction: row;
-  align-items: center;
-  gap: 6px;
-  font-weight: 500;
-}
-.separation-disjoin select {
+.separation-disjoin select,
+.separation-union select {
   width: auto;
 }
-.separation-disjoin-time {
-  width: 14em;
+.separation-disjoin-time,
+.separation-union-time {
+  width: 12em;
 }
-/* Where a separation disjoins (#549): the timeline it leaves arcs away to its track, drawn
-   as the axes are. */
+.separation-disjoin-note,
+.separation-union-note {
+  color: var(--muted);
+}
+.separation-disjoin-remove,
+.separation-union-remove {
+  min-height: 0;
+  width: 26px;
+  height: 26px;
+  padding: 0;
+  border-radius: 50%;
+}
+/* Where a separation disjoins or unites (#549): the timeline it leaves arcs away to its
+   track, or its track arcs back into the one it joins, drawn as the axes are. */
 .separation-fork-line {
   stroke: var(--timeline-measure-soft, var(--stage-measure-soft));
   stroke-width: 1.5;

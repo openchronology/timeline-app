@@ -70,53 +70,189 @@ export type ViewFilter =
   /** One track of several separations, some disjoining at a time (`null`: the main track). */
   | { separations: SeparationTrack[]; track: number | null };
 /**
+ * When a disjoin happens: at an exact time, at a moment's time (following it as it moves), or
+ * at the first moment carrying the separation's tags (following them as they come and go).
+ */
+export type DisjoinTime = { at: string } | { moment: string } | { first: true };
+/**
+ * A disjoin (#549): from the main timeline (`from` null) or another separation (its index),
+ * at a time. An event leaves that track for this separation's from then on.
+ */
+export type Disjoin = { from: number | null } & DisjoinTime;
+/** When a union happens: at an exact time, at a moment's, or at the separation's last moment. */
+export type UnionTime = { at: string } | { moment: string } | { last: true };
+/**
+ * A union, a disjoin's complement (#549): into the main timeline (`into` null) or another
+ * separation, at a time. From then on the separation's events go there, and its track ends.
+ */
+export type Union = { into: number | null } & UnionTime;
+/**
  * One of several separations (#548): the events with any of its tags, in a track of their own.
- * With `disjoin`, only from `at` on: before it, they stay in the track they disjoin from, the
- * main timeline's (`from` null) or an earlier separation's (its index), and the separation
- * forks away at `at` (#549).
+ * With disjoins, only from each one's time on, and only from its track: before it, an event
+ * stays where it would otherwise be (the main timeline, or another separation it matches).
+ * With unions, until them: an event at or after one goes to its target (the latest passed).
  */
 export interface SeparationTrack {
   tags: string[];
-  disjoin?: { at: string; from: number | null };
+  disjoins?: Disjoin[];
+  unions?: Union[];
 }
 /** The most separations shown together: each is a track, and a comparison has eight. */
 const SEPARATIONS = 7;
+const ID = /^[A-Za-z0-9_.:-]{1,128}$/;
+/** A disjoin's or union's time: exact, a moment's, or the separation's first or last moment. */
+function validateWhen(
+  d: Record<string, unknown>,
+  bound: 'first' | 'last',
+): { at: string } | { moment: string } | { first: true } | { last: true } {
+  const kinds = ['at', 'moment', bound].filter((k) => d[k] !== undefined);
+  if (kinds.length !== 1)
+    throw new Error(`A disjoin or union is at a time, a moment, or the ${bound} moment.`);
+  if (d.at !== undefined) {
+    if (typeof d.at !== 'string')
+      throw new Error('A disjoin’s or union’s time must be an exact rational.');
+    try {
+      return { at: Q.parse(d.at).toString() };
+    } catch {
+      throw new Error('A disjoin’s or union’s time must be an exact rational.');
+    }
+  }
+  if (d.moment !== undefined) {
+    if (typeof d.moment !== 'string' || !ID.test(d.moment))
+      throw new Error('A disjoin or union names a moment by its ID.');
+    return { moment: d.moment };
+  }
+  if (d[bound] !== true) throw new Error(`A ${bound} moment is written \`"${bound}": true\`.`);
+  return bound === 'first' ? { first: true } : { last: true };
+}
 /**
- * Validates separations: one to seven, each with events' tags, and a disjoin, when it has one,
- * at an exact time from the main timeline or an earlier separation (so they never disjoin
- * from each other in a circle).
+ * The order separations are resolved in: each after the separations it disjoins from, so an
+ * event's place in them is known first. Throws when disjoins form a circle.
+ */
+export function separationOrder(
+  separations: readonly { disjoins?: readonly { from: number | null }[] }[],
+): number[] {
+  const order: number[] = [],
+    state = new Map<number, 'visiting' | 'done'>();
+  const visit = (i: number) => {
+    if (state.get(i) === 'done') return;
+    if (state.get(i) === 'visiting')
+      throw new Error('Separations cannot disjoin from each other in a circle.');
+    state.set(i, 'visiting');
+    for (const d of separations[i].disjoins ?? []) if (d.from !== null) visit(d.from);
+    state.set(i, 'done');
+    order.push(i);
+  };
+  separations.forEach((_, i) => visit(i));
+  return order;
+}
+/**
+ * Validates separations: one to seven, each with events' tags, disjoins (at most one from each
+ * track) and unions (at most one into each), naming the main timeline or another separation,
+ * each at an exact time, a moment, or the separation's first (disjoins) or last (unions) moment.
+ * Disjoins may not form a circle.
  */
 export function validateSeparations(value: unknown): SeparationTrack[] {
   if (!Array.isArray(value) || !value.length || value.length > SEPARATIONS)
     throw new Error(`Show one to ${SEPARATIONS} separations.`);
-  return value.map((raw, index) => {
+  const count = value.length;
+  const track = (v: unknown, index: number) => {
+    if (v === null) return null;
+    if (Number.isInteger(v) && (v as number) >= 0 && (v as number) < count && v !== index)
+      return v as number;
+    throw new Error('A disjoin or union names the main timeline or another separation.');
+  };
+  const separations = value.map((raw, index): SeparationTrack => {
     const s = raw as Record<string, unknown> | null;
     if (!s || typeof s !== 'object' || Array.isArray(s))
-      throw new Error('A separation is its tags, and when it disjoins.');
+      throw new Error('A separation is its tags, and when it disjoins and unites.');
     const tags = validateEntityTags(s.tags);
     if (!tags.length) throw new Error('Each separation needs a tag.');
-    if (s.disjoin === undefined || s.disjoin === null) return { tags };
-    const d = s.disjoin as Record<string, unknown>;
-    if (
-      !d ||
-      typeof d !== 'object' ||
-      typeof d.at !== 'string' ||
-      !(
-        d.from === null ||
-        (Number.isInteger(d.from) && (d.from as number) >= 0 && (d.from as number) < index)
-      )
-    )
-      throw new Error(
-        'A separation disjoins at a time, from the main timeline or an earlier separation.',
-      );
-    let at: string;
-    try {
-      at = Q.parse(d.at).toString();
-    } catch {
-      throw new Error('A disjoin’s time must be an exact rational.');
-    }
-    return { tags, disjoin: { at, from: d.from as number | null } };
+    const list = (key: 'disjoins' | 'unions') => {
+      const v = s[key];
+      if (v === undefined || v === null) return [];
+      if (!Array.isArray(v) || v.length > SEPARATIONS + 1)
+        throw new Error(`A separation's ${key} are a list, one for each track at most.`);
+      return v as Record<string, unknown>[];
+    };
+    const sources = new Set<number | null>(),
+      targets = new Set<number | null>();
+    const disjoins = list('disjoins').map((d): Disjoin => {
+      if (!d || typeof d !== 'object') throw new Error('A disjoin is its source and time.');
+      const from = track(d.from, index);
+      if (sources.has(from)) throw new Error('A separation disjoins from each track at most once.');
+      sources.add(from);
+      return { from, ...(validateWhen(d, 'first') as DisjoinTime) };
+    });
+    const unions = list('unions').map((u): Union => {
+      if (!u || typeof u !== 'object') throw new Error('A union is its target and time.');
+      const into = track(u.into, index);
+      if (targets.has(into)) throw new Error('A separation unites into each track at most once.');
+      targets.add(into);
+      return { into, ...(validateWhen(u, 'last') as UnionTime) };
+    });
+    return {
+      tags,
+      ...(disjoins.length ? { disjoins } : {}),
+      ...(unions.length ? { unions } : {}),
+    };
   });
+  separationOrder(separations);
+  return separations;
+}
+/**
+ * A disjoin's or union's time, resolved: its exact time, its moment's (`momentTime`), or the
+ * first or last moment's with any of the separation's tags (`boundTime`); null when there is
+ * none (a moment since deleted, or no moment with the tags yet), and it then waits.
+ */
+export function disjoinTime(
+  when: DisjoinTime | UnionTime,
+  tags: readonly string[],
+  momentTime: (id: string) => string | undefined,
+  boundTime: (tags: readonly string[], which: 'first' | 'last') => string | undefined,
+): Rational | null {
+  const time =
+    'at' in when
+      ? when.at
+      : 'moment' in when
+        ? momentTime(when.moment)
+        : boundTime(tags, 'first' in when ? 'first' : 'last');
+  return time === undefined ? null : Q.parse(time);
+}
+/** The earliest or latest moment with any of `tags` in a document, by its time. */
+export function boundMomentTime(document: Pick<TimelineDocument, 'events'>) {
+  return (tags: readonly string[], which: 'first' | 'last'): string | undefined => {
+    let found: Rational | null = null;
+    for (const e of document.events)
+      if (entityTags(e.metadata).some((t) => tags.includes(t))) {
+        const time = Q.parse(e.time);
+        if (!found || time.compare(found) * (which === 'first' ? 1 : -1) < 0) found = time;
+      }
+    return found?.toString();
+  };
+}
+/** Separations with each disjoin's and union's time resolved (null: not yet). */
+export type ResolvedSeparation = {
+  tags: string[];
+  disjoins?: { from: number | null; at: Rational | null }[];
+  unions?: { into: number | null; at: Rational | null }[];
+};
+/** Resolves separations' disjoins and unions against a document's moments. */
+export function resolveSeparations(
+  separations: SeparationTrack[],
+  document: Pick<TimelineDocument, 'events'>,
+): ResolvedSeparation[] {
+  const times = new Map(document.events.map((e) => [e.id, e.time]));
+  const bound = boundMomentTime(document);
+  const when = (w: DisjoinTime | UnionTime, tags: string[]) =>
+    disjoinTime(w, tags, (id) => times.get(id), bound);
+  return separations.map((s) => ({
+    tags: s.tags,
+    ...(s.disjoins
+      ? { disjoins: s.disjoins.map((d) => ({ from: d.from, at: when(d, s.tags) })) }
+      : {}),
+    ...(s.unions ? { unions: s.unions.map((u) => ({ into: u.into, at: when(u, s.tags) })) } : {}),
+  }));
 }
 /** Stable cache key for a filter. */
 export function viewFilterKey(filter: ViewFilter): string {
@@ -129,27 +265,53 @@ export function viewFilterKey(filter: ViewFilter): string {
   return filter.mode + ':' + [...validateEntityTags(filter.tags)].sort().join(',');
 }
 /**
- * Which tracks an entity with `tags` at `time` is on, among `separations`: for each separation
- * it matches, that separation's track, or before it disjoins, the track it disjoins from
- * (followed back); the main track (`null`) when it matches none.
+ * Which tracks an entity with `tags` at `time` is on, among `separations`, taken each after
+ * those it disjoins from: a separation it matches without disjoins takes it, beside the tracks
+ * it is already on; one with disjoins takes it from a track it is on (the main timeline when on
+ * none) once that track's disjoin has come, and it leaves that track. Where a separation that
+ * takes it has united (its latest union at or before `time`), it goes to that union's target
+ * instead, followed on. The main track (`null`) when nothing takes it.
  */
 export function separationTracks(
-  separations: SeparationTrack[],
+  separations: ResolvedSeparation[],
   tags: readonly string[],
   time: Rational | null,
 ): Set<number | null> {
-  const ats = separations.map((s) => (s.disjoin ? Q.parse(s.disjoin.at) : null));
-  const trackOf = (i: number): number | null => {
-    const s = separations[i];
-    if (!s.disjoin || !time || time.compare(ats[i]!) >= 0) return i;
-    return s.disjoin.from === null ? null : trackOf(s.disjoin.from);
+  const passed = (at: Rational | null) => !!at && !!time && time.compare(at) >= 0;
+  // Where an event taken by separation `i` is: there, or where its latest passed union goes.
+  const unite = (i: number): number | null => {
+    const seen = new Set<number>();
+    let current: number | null = i;
+    while (current !== null && !seen.has(current)) {
+      seen.add(current);
+      const latest: { into: number | null; at: Rational | null } | undefined = (
+        separations[current].unions ?? []
+      )
+        .filter((u) => passed(u.at))
+        .sort((a, b) => b.at!.compare(a.at!))[0];
+      if (!latest) return current;
+      current = latest.into;
+    }
+    return current;
   };
-  const tracks = new Set<number | null>();
-  separations.forEach((s, i) => {
-    if (s.tags.some((tag) => tags.includes(tag))) tracks.add(trackOf(i));
-  });
-  if (!tracks.size) tracks.add(null);
-  return tracks;
+  let on = new Set<number | null>();
+  for (const i of separationOrder(separations)) {
+    const s = separations[i];
+    if (!s.tags.some((tag) => tags.includes(tag))) continue;
+    if (!s.disjoins) {
+      on.add(unite(i));
+      continue;
+    }
+    const home = on.size ? on : new Set<number | null>([null]);
+    const leaving = s.disjoins.filter((d) => home.has(d.from) && passed(d.at)).map((d) => d.from);
+    if (!leaving.length) {
+      on = home;
+      continue;
+    }
+    on = new Set([...home].filter((track) => !leaving.includes(track)));
+    on.add(unite(i));
+  }
+  return on.size ? on : new Set([null]);
 }
 /**
  * One side of a separation. Durations are resolved to fixed endpoints first, because the
@@ -190,12 +352,15 @@ export function filterDocument(document: TimelineDocument, filter: ViewFilter): 
  * on the side of `document` that `filter` selects.
  */
 export function filterMembership(
-  document: Pick<TimelineDocument, 'relationships'>,
+  document: Pick<TimelineDocument, 'relationships' | 'events'>,
   filter: ViewFilter,
 ): (key: string, metadata: Metadata, time?: string) => boolean {
   // Several separations: on this track when it is one of the entity's, at its time.
   if ('separations' in filter) {
-    const separations = validateSeparations(filter.separations);
+    const separations = resolveSeparations(
+      validateSeparations(filter.separations),
+      document as Pick<TimelineDocument, 'events'>,
+    );
     return (_key, metadata, time) =>
       separationTracks(separations, entityTags(metadata), time ? Q.parse(time) : null).has(
         filter.track,

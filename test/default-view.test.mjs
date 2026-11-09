@@ -131,11 +131,18 @@ test('several separations are a default view of groups of tags (#548)', () => {
 
 test('a default view keeps separations that disjoin (#549)', () => {
   const separations = [
-    { tags: ['war'], disjoin: { at: '10/2', from: null } },
-    { tags: ['siege'], disjoin: { at: '7', from: 0 } },
+    { tags: ['war'], disjoins: [{ from: null, at: '10/2' }] },
+    {
+      tags: ['siege'],
+      disjoins: [
+        { from: 0, moment: 'm1' },
+        { from: null, first: true },
+      ],
+    },
   ];
   const view = validateTimelineView({ separation: { separations } });
-  assert.deepEqual(view.separation.separations[0].disjoin, { at: '5/1', from: null });
+  assert.deepEqual(view.separation.separations[0].disjoins, [{ from: null, at: '5/1' }]);
+  assert.deepEqual(view.separation.separations[1].disjoins, separations[1].disjoins);
   // Kept as {separations} only when one disjoins; otherwise as before.
   assert.deepEqual(tagSeparation([{ tags: ['war'] }]), { tags: ['war'] });
   assert.deepEqual(tagSeparation(view.separation.separations), view.separation);
@@ -146,8 +153,8 @@ test('a default view keeps separations that disjoin (#549)', () => {
   assert.throws(
     () =>
       validateTimelineView({
-        separation: { separations: [{ tags: ['war'], disjoin: { at: '1', from: 3 } }] },
+        separation: { separations: [{ tags: ['war'], disjoins: [{ from: 3, at: '1' }] }] },
       }),
-    /earlier separation/,
+    /another separation/,
   );
 });

@@ -158,7 +158,9 @@ export async function checkTags(page, restore) {
     // the siege (from 50) stay below with the market; the treaty (90) forks away above.
     await page.locator('#separate-button').click();
     await editing.locator('.separation-item').first().waitFor();
-    await editing.locator('.separation-disjoin-from').first().selectOption('main');
+    assert.equal(await editing.locator('.separation-disjoin-none').count(), 1);
+    await editing.locator('.separation-disjoin-add').first().click();
+    assert.equal(await editing.locator('.separation-disjoin-from').first().inputValue(), 'main');
     await editing.locator('.separation-disjoin-time').first().fill('60');
     await page.locator('#separate-submit').click();
     await editing.waitFor({ state: 'hidden' });
@@ -174,6 +176,61 @@ export async function checkTags(page, restore) {
       (await page.locator('.axis-tick .tick-notch[hidden]').count()) > 0,
       'the separated track has no ticks before its disjoin',
     );
+    // At a moment, followed (#549): the treaty itself (90), so only it and later forks away.
+    await page.locator('#separate-button').click();
+    await editing.locator('.separation-disjoin-kind').first().selectOption('moment');
+    await page.locator('#moment-picker').waitFor({ state: 'visible' });
+    await page.locator('#moment-picker-results button').filter({ hasText: 'Treaty' }).click();
+    await page.locator('#moment-picker').waitFor({ state: 'hidden' });
+    assert.equal(
+      await editing.locator('.separation-disjoin-moment').first().textContent(),
+      'Treaty',
+    );
+    await page.locator('#separate-submit').click();
+    await editing.waitFor({ state: 'hidden' });
+    await page.waitForFunction(() =>
+      document.getElementById('separation-tags').textContent.includes('(a moment)'),
+    );
+    await page.evaluate(() => new Promise(requestAnimationFrame));
+    assert((await top('Treaty')) < (await top('Market')), 'the treaty forks at itself');
+    assert(Math.abs((await top('Battle')) - (await top('Market'))) < 40);
+    // At its first moment: the battle (10), the earliest with war, so everything war forks.
+    await page.locator('#separate-button').click();
+    await editing.locator('.separation-disjoin-kind').first().selectOption('first');
+    await page.locator('#separate-submit').click();
+    await editing.waitFor({ state: 'hidden' });
+    await page.waitForFunction(() =>
+      document.getElementById('separation-tags').textContent.includes('first moment'),
+    );
+    await page.evaluate(() => new Promise(requestAnimationFrame));
+    assert((await top('Battle')) < (await top('Market')), 'the battle forks with its first');
+    // A union (#549): back into the main timeline at 70, so the treaty (90) is there again,
+    // and the track curves back into it.
+    await page.locator('#separate-button').click();
+    assert.equal(await editing.locator('.separation-union-none').count(), 1);
+    await editing.locator('.separation-union-add').first().click();
+    assert.equal(await editing.locator('.separation-union-into').first().inputValue(), 'main');
+    await editing.locator('.separation-union-time').first().fill('70');
+    await page.locator('#separate-submit').click();
+    await editing.waitFor({ state: 'hidden' });
+    await page.waitForFunction(() =>
+      document.getElementById('separation-tags').textContent.includes('into main'),
+    );
+    await page.evaluate(() => new Promise(requestAnimationFrame));
+    assert((await top('Battle')) < (await top('Market')), 'the battle is still separate');
+    assert(Math.abs((await top('Treaty')) - (await top('Market'))) < 40, 'the treaty united');
+    assert.equal(await page.locator('.separation-fork-line').count(), 2);
+    // At its last moment: the treaty, the latest with war, which then unites with itself.
+    await page.locator('#separate-button').click();
+    await editing.locator('.separation-union-kind').first().selectOption('last');
+    await page.locator('#separate-submit').click();
+    await editing.waitFor({ state: 'hidden' });
+    await page.waitForFunction(() =>
+      document.getElementById('separation-tags').textContent.includes('last moment'),
+    );
+    await page.evaluate(() => new Promise(requestAnimationFrame));
+    assert(Math.abs((await top('Treaty')) - (await top('Market'))) < 40, 'unites at the treaty');
+    assert((await top('Battle')) < (await top('Market')));
     // Rejoining all from the dialog shows the whole timeline, and the count goes.
     await page.locator('#separate-button').click();
     await page.locator('#separate-clear').click();

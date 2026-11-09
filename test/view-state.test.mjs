@@ -25,17 +25,19 @@ test('a stored view is read back whole', () => {
   // Separations that disjoin (#549) are kept with their times, normalized.
   const forked = {
     separation: {
-      tracks: [{ tags: ['deploy'] }, { tags: ['ops'], disjoin: { at: '10/4', from: 0 } }],
+      tracks: [{ tags: ['deploy'] }, { tags: ['ops'], disjoins: [{ from: 0, at: '10/4' }] }],
     },
   };
   assert.deepEqual(readViewState(JSON.stringify(forked)), {
     separation: {
-      tracks: [{ tags: ['deploy'] }, { tags: ['ops'], disjoin: { at: '5/2', from: 0 } }],
+      tracks: [{ tags: ['deploy'] }, { tags: ['ops'], disjoins: [{ from: 0, at: '5/2' }] }],
     },
   });
   assert.deepEqual(
     readViewState(
-      JSON.stringify({ separation: { tracks: [{ tags: ['x'], disjoin: { at: '1', from: 0 } }] } }),
+      JSON.stringify({
+        separation: { tracks: [{ tags: ['x'], disjoins: [{ from: 0, at: '1' }] }] },
+      }),
     ),
     {},
   );
