@@ -61,6 +61,17 @@ try {
   const entry = (id) => related.related.find((r) => r.id === id);
   assert.ok(Math.abs(lastOf(entry('issue')) - now()) <= 5, 'Related to: it ends now.');
   assert.equal(entry('done').last, opened - 3600 + '/1');
+  // A separated window (a side built by filterDocument) draws it to now as well.
+  const side = await store.query(timeline.id, user, {
+    kind: 'overview',
+    lower: String(opened - 10000),
+    upper: String(now() + 10000),
+    threshold: '0/1',
+    filter: { related: { moment: 'opened' }, depth: 'direct', mode: 'any' },
+  });
+  const separated = side.durations.find((b) => b.id === 'issue');
+  assert.ok(separated, 'The ongoing duration is on its separated side.');
+  assert.ok(Math.abs(lastOf(separated) - now()) <= 5, 'It ends now there too.');
 
   // A window around it draws it to now, longest first, with the counts the browser gives.
   const window = {
