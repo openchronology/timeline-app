@@ -1008,13 +1008,19 @@ let scaledFor = 1;
  * frame read it once per marker (#68). Until first observed, it is read directly.
  */
 let stageSize: { width: number; height: number } | null = null;
+/** Whether the stage's next resize is fitStageToTracks growing or shrinking it. */
+let tracksRefit = false;
 new ResizeObserver(() => {
   const next = { width: stage.clientWidth, height: stage.clientHeight };
   if (stageSize && next.width === stageSize.width && next.height === stageSize.height) return;
   // A stage that grows or shrinks (full screen, a resized window) does so about its centre,
-  // so the timeline keeps its place from the centre rather than from the top.
-  if (stageSize) verticalOffset += (next.height - stageSize.height) / 2;
+  // so the timeline keeps its place from the centre rather than from the top. One grown to
+  // fit tracks starts them afresh, centred or from the top.
+  const refit = tracksRefit;
+  tracksRefit = false;
+  if (stageSize && !refit) verticalOffset += (next.height - stageSize.height) / 2;
   stageSize = next;
+  if (refit) verticalOffset = centeredOffset();
   requestRender();
 }).observe(stage);
 const stageWidth = () => stageSize?.width ?? stage.clientWidth,
@@ -1460,6 +1466,34 @@ function comparisonRows() {
   }
   return { rows, total };
 }
+/**
+ * Separated or compared tracks (#556) are drawn at the reader's text size, so the stage grows
+ * to show them all, up to the window's height less room for the toolbar; taller ones pan.
+ * Phones keep their stage, which already takes most of the screen, and full screen its own.
+ */
+function fitStageToTracks() {
+  const tracks = !!comparison && !comparison.combined && !compactScreen.matches;
+  const height = tracks
+    ? `${Math.round(
+        Math.max(
+          STAGE_HEIGHT,
+          Math.min(window.innerHeight - 140, comparisonRows().total * uiScale + 48),
+        ),
+      )}px`
+    : '';
+  if (
+    stage.classList.contains('stage-tracks') === tracks &&
+    stage.style.getPropertyValue('--stage-tracks-height') === height
+  )
+    return;
+  tracksRefit = true;
+  stage.classList.toggle('stage-tracks', tracks);
+  if (height) stage.style.setProperty('--stage-tracks-height', height);
+  else stage.style.removeProperty('--stage-tracks-height');
+}
+/** The stage's height without tracks (styles.css, .timeline-stage). */
+const STAGE_HEIGHT = 365;
+window.addEventListener('resize', () => fitStageToTracks());
 function renderAxis() {
   const axis = el('axis');
   const rowPlan = comparisonRows();
@@ -2386,6 +2420,7 @@ function stopComparison(restore = true) {
   comparisonController?.abort();
   comparison.dispose();
   comparison = null;
+  fitStageToTracks();
   liveTransitionPending = false;
   frameRequest++;
   selectionRequest++;
@@ -4946,12 +4981,10 @@ function fit() {
   cancelZoomAnimation();
   if (comparison) {
     viewport = comparison.fit();
-    uiScale = comparison.combined
-      ? baseScale()
-      : Math.min(
-          baseScale(),
-          Math.max(0.25, (stage.clientHeight - 48) / (comparison.tracks.length * 340)),
-        );
+    // Tracks keep the reader's text size (#556): the stage grows to show them, up to the
+    // window, and pans for the rest.
+    uiScale = baseScale();
+    fitStageToTracks();
     verticalOffset = centeredOffset();
     requestRender();
     return;
@@ -8580,12 +8613,8 @@ el<HTMLInputElement>('compare-combined').onchange = () => {
   el('group-details').hidden = true;
   el<HTMLDialogElement>('inspector').close();
   comparison.combined = input('compare-combined').checked;
-  uiScale = comparison.combined
-    ? baseScale()
-    : Math.min(
-        baseScale(),
-        Math.max(0.25, (stage.clientHeight - 48) / (comparison.tracks.length * 340)),
-      );
+  uiScale = baseScale();
+  fitStageToTracks();
   verticalOffset = centeredOffset();
   requestRender();
 };

@@ -140,6 +140,21 @@ export async function checkTags(page, restore) {
     assert.equal(await page.locator('#separate-count').textContent(), '2');
     assert.equal(await page.locator('#comparison-tracks > *').count(), 3);
     assert((await top('Battle')) < (await top('Market')), 'war above ports');
+    // Three tracks at the reader's text size (#556), not shrunk to fit: the stage grows to
+    // show them, up to the window, and returns to its own height on rejoining.
+    const stage = page.locator('#timeline-stage');
+    const stageState = () =>
+      stage.evaluate((s) => ({ scale: Number(s.dataset.uiScale), height: s.clientHeight }));
+    await page.waitForFunction(() => document.getElementById('timeline-stage').clientHeight > 365);
+    const grown = await stageState();
+    assert.equal(grown.scale, 1, 'the text keeps its size');
+    assert.ok(grown.height <= (await page.evaluate(() => innerHeight)) - 140, 'within the window');
+    await page.locator('#separation-rejoin').click();
+    await page.waitForFunction(
+      () => document.getElementById('timeline-stage').clientHeight === 365,
+    );
+    await separateBy(page, ['war'], ['ports']);
+    await page.locator('#separation-settings').waitFor({ state: 'visible' });
     await page.locator('#separate-button').click();
     const editing = page.locator('#separate-dialog');
     assert.deepEqual(await editing.locator('.separation-item .tag-chip').allTextContents(), [
