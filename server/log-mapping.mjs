@@ -6,7 +6,7 @@
  * importing the same log again overwrites its moments instead of adding them twice.
  */
 import { createHash } from 'node:crypto';
-import { Q, validateTags, validateDocument } from '../dist/core.mjs';
+import { Q, clip, validateTags, validateDocument } from '../dist/core.mjs';
 import { SEVERITIES } from './syslog.mjs';
 import { epochSeconds, severityOf, typed, TYPES } from './log-formats.mjs';
 
@@ -279,7 +279,7 @@ export function compileMapping(format, config = {}) {
       const stored = Object.fromEntries(Object.entries(entry.fields).filter(([, v]) => !empty(v)));
       const meta = {
         title: heading,
-        ...(body && body !== heading ? { description: body.slice(0, NOTES_LENGTH) } : {}),
+        ...(body && body !== heading ? { description: clip(body, NOTES_LENGTH) } : {}),
         ...(tagList.length ? { tags: validateTags(tagList.slice(0, 40)) } : {}),
         ...(definition.keepFields === false
           ? {}

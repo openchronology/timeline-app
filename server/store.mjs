@@ -34,6 +34,7 @@ import {
   SLUG_RULE,
   TIMELINE_UUID,
   DURATION_COUNT_CAP,
+  clip,
 } from '../dist/core.mjs';
 import { randomUUID } from 'node:crypto';
 import { pluginCompiler } from './plugin-sandbox.mjs';
@@ -2433,7 +2434,7 @@ export class PostgresStore {
           ...(r.event_id
             ? {
                 id: r.event_id,
-                title: (r.title ?? '').slice(0, 512),
+                title: clip(r.title ?? '', 512),
                 ...((query.plugins ?? t.plugins)?.some((p) => p.enabled)
                   ? { metadata: overviewMetadata(query.plugins ?? t.plugins, r.metadata ?? {}) }
                   : {}),
@@ -3199,11 +3200,11 @@ function eventSearchText(document, bands, tree) {
   for (const duration of starts.map(({ band }) => byId.get(band.id)).filter(Boolean))
     for (const key of ['title', 'description']) {
       if (typeof duration.metadata[key] === 'string') {
-        const part = duration.metadata[key].slice(0, 4096);
+        const part = clip(duration.metadata[key], 4096);
         text.push(part);
         length += part.length;
       }
-      if (length >= 1048576) return text.join(' ').slice(0, 1048576);
+      if (length >= 1048576) return clip(text.join(' '), 1048576);
     }
   const events = [...tree.nodes]
     .sort((a, b) => a.id - b.id)
@@ -3218,11 +3219,11 @@ function eventSearchText(document, bands, tree) {
     for (const m of metadata)
       for (const key of ['title', 'description']) {
         if (typeof m[key] === 'string') {
-          const part = m[key].slice(0, 4096);
+          const part = clip(m[key], 4096);
           text.push(part);
           length += part.length;
         }
-        if (length >= 1048576) return text.join(' ').slice(0, 1048576);
+        if (length >= 1048576) return clip(text.join(' '), 1048576);
       }
   }
   return text.join(' ');

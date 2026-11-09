@@ -6,6 +6,7 @@
  */
 import { exactSeconds, isoTime, parseZone, wallToUtc } from './log-time.mjs';
 import { compileRoutes as compileLogRoutes } from './log-routes.mjs';
+import { clip } from '../dist/core.mjs';
 
 export const FACILITIES = [
   'kern',
@@ -238,7 +239,7 @@ export function syslogMoment(entry, id) {
           ? firstLine.slice(0, TITLE_LENGTH - 1) + '…'
           : firstLine) || `${entry.app ?? 'syslog'} ${entry.severity}`,
       ...(text !== firstLine || firstLine.length > TITLE_LENGTH
-        ? { description: text.slice(0, NOTES_LENGTH) }
+        ? { description: clip(text, NOTES_LENGTH) }
         : {}),
       tags: [
         'syslog',
