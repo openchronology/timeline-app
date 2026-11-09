@@ -125,6 +125,11 @@ export class HttpError extends Error {
  * builds may wait for a turn. Each build reads a whole timeline into memory and writes its
  * index again, holding a connection throughout; beyond these, a build is refused (503).
  */
+/**
+ * A tag of the search index (`raw`) as tags are stored now (src/tags.ts tagText): rows indexed
+ * before commas in tags became semicolons still hold the commas.
+ */
+const STORED_TAG = `lower(btrim(regexp_replace(raw, '\\s*,', ';', 'g')))`;
 const VIEW_BUILDS = 2,
   VIEW_QUEUE = 16;
 /** How many separations' plans (PostgresStore.#viewPlan) the store keeps. */
@@ -2127,7 +2132,8 @@ export class PostgresStore {
       if (found.length) return { filter, key: viewFilterKey(filter) };
     } else {
       const { rows: found } = await c.query(
-        `SELECT DISTINCT tag FROM ${rows} s,unnest(s.tags) AS tag WHERE tag=ANY($2::text[])`,
+        `SELECT DISTINCT tag FROM (SELECT ${STORED_TAG} AS tag FROM ${rows} s,unnest(s.tags) AS raw) t
+          WHERE tag=ANY($2::text[])`,
         [t.id, filter.tags],
       );
       if (found.length) {
@@ -2558,9 +2564,9 @@ export class PostgresStore {
           // Entities with the same tags are counted together, then each tag of those: the
           // inner GROUP BY collapses the search rows to one per distinct tag set, so unnest
           // runs per set, not per entity. The 200 commonest, ties by tag in "C" order.
-          `SELECT tag,sum(g.n)::bigint AS count FROM (SELECT s.tags,count(*) AS n
-            FROM ${index('oc_entity_search', '$1', { scan: true })} s GROUP BY s.tags) g,unnest(g.tags) AS tag
-          GROUP BY tag ORDER BY sum(g.n) DESC,tag COLLATE "C" LIMIT 200`,
+          `SELECT tag,sum(n)::bigint AS count FROM (SELECT ${STORED_TAG} AS tag,g.n FROM (SELECT s.tags,count(*) AS n
+            FROM ${index('oc_entity_search', '$1', { scan: true })} s GROUP BY s.tags) g,unnest(g.tags) AS raw) t
+          GROUP BY tag ORDER BY sum(n) DESC,tag COLLATE "C" LIMIT 200`,
           [id],
         );
         return {

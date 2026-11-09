@@ -299,7 +299,8 @@ export const schemas = {
             minItems: 1,
             maxItems: 40,
             items: { type: 'string', minLength: 1, maxLength: 128 },
-            description: 'Normalized like entity tags: trimmed, lowercased, without commas.',
+            description:
+              'Normalized like entity tags: trimmed, lowercased, a comma inside a tag a semicolon.',
           },
         },
       },
@@ -528,7 +529,8 @@ export const schemas = {
         type: 'array',
         items: { type: 'string', minLength: 1, maxLength: 64 },
         maxItems: 40,
-        description: 'The timeline’s tags: lowercased, without commas or control characters.',
+        description:
+          'The timeline’s tags: lowercased, without control characters, a comma inside a tag a semicolon.',
       },
       image: ref('TimelineImage'),
       view: ref('TimelineView'),

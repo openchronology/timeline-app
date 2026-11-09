@@ -1112,7 +1112,7 @@ test('chart series: moments with any of their tags, each a curve beneath the tot
     [],
     Array(9).fill(one),
     [{ ...one, tags: [] }],
-    [{ ...one, tags: ['a,b'] }],
+    [{ ...one, tags: ['a\u0007b'] }],
     [{ ...one, color: 'red' }],
     [{ ...one, label: '' }],
     [{ ...one, setting: 'missing' }],

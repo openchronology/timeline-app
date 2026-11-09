@@ -24,18 +24,24 @@ export const TIMELINE_TAG_LENGTH = 64;
  * `gitlab:git.example.com/group/subgroup/project!1234` (#538).
  */
 export const ENTITY_TAG_LENGTH = 128;
+/** A tag as stored: NFC, trimmed, lowercased, a comma inside it a semicolon (validateTags). */
+export const tagText = (tag: string) =>
+  tag.normalize('NFC').replace(/\s*,/g, ';').trim().toLowerCase();
 /**
  * Normalizes a list of tags: trimmed, lowercased, deduplicated, at most 40, each 1 to `length`
- * characters without commas or control characters. A timeline's own tags by default; events'
- * tags, and the tags that select events, with ENTITY_TAG_LENGTH (validateEntityTags).
+ * characters without control characters. A comma inside a tag becomes a semicolon, since tags
+ * are entered and listed separated by commas: a tag saved through the API as `a, b` is `a; b`
+ * everywhere, events and the separations that select them alike. A timeline's own tags by
+ * default; events' tags, and the tags that select events, with ENTITY_TAG_LENGTH
+ * (validateEntityTags).
  */
 export function validateTags(value: unknown, length = TIMELINE_TAG_LENGTH): string[] {
   if (!Array.isArray(value) || value.length > 40) throw new Error('Use at most 40 tags.');
   const tags = value.map((tag) => {
     if (typeof tag !== 'string') throw new Error('Tags must be text.');
-    const normalized = tag.normalize('NFC').trim().toLowerCase();
-    if (!normalized || normalized.length > length || /[\x00-\x1f\x7f,]/.test(normalized))
-      throw new Error(`Tags must be 1–${length} characters without commas or control characters.`);
+    const normalized = tagText(tag);
+    if (!normalized || normalized.length > length || /[\x00-\x1f\x7f]/.test(normalized))
+      throw new Error(`Tags must be 1–${length} characters without control characters.`);
     return normalized;
   });
   return [...new Set(tags)];
@@ -53,10 +59,19 @@ export function normalizeEntityTags(value: unknown): unknown {
     return value;
   }
 }
-/** An entity's tags: `metadata.tags`, normalized like timeline tags. */
+/**
+ * An entity's tags: `metadata.tags`, normalized like timeline tags. Tags saved before commas
+ * became semicolons (validateTags) read as they are saved now, so separations select them.
+ */
 export function entityTags(metadata: Metadata): string[] {
   return Array.isArray(metadata.tags)
-    ? metadata.tags.filter((tag): tag is string => typeof tag === 'string')
+    ? [
+        ...new Set(
+          metadata.tags
+            .filter((tag): tag is string => typeof tag === 'string')
+            .map((tag) => (tag.includes(',') ? tagText(tag) : tag)),
+        ),
+      ]
     : [];
 }
 /**
