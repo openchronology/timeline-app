@@ -9,6 +9,7 @@ import {
   anchorOf,
   durationOverview,
   fixMissingAnchors,
+  isOngoing,
   resolveDuration,
   collapses,
   coalesceGroups,
@@ -656,9 +657,11 @@ export class RemoteWorkspace extends TimelineIndex {
     const result: DurationBand[] = [];
     for (const band of bands) {
       if (this.durationChanges.has(band.id)) continue;
+      // An ongoing band ends where the server resolved it (its "now", #537), not at its start.
       const moved = resolveDuration(
         band,
         (moment) => this.changes.get(moment)?.after?.time ?? savedTime(band, moment),
+        isOngoing(band.end) ? Q.parse(band.last) : undefined,
       );
       result.push(moved ? { ...moved, sourceKey: band.sourceKey } : band);
     }
