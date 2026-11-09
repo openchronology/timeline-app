@@ -38,6 +38,10 @@ try {
       },
       { id: 'done', start: String(opened - 10800), end: String(opened - 3600), metadata: {} },
     ],
+    relationships: [
+      { a: { duration: 'issue' }, b: { moment: 'opened' } },
+      { a: { duration: 'done' }, b: { moment: 'opened' } },
+    ],
   };
   timeline = await store.create(user, doc);
   // The definition keeps the ongoing end; its band ends now.
@@ -46,6 +50,17 @@ try {
   assert.equal(looked.band.first, opened + '/1');
   const lastOf = (band) => Number(Q.parse(band.last).floor().numerator);
   assert.ok(Math.abs(lastOf(looked.band) - now()) <= 5, 'The band ends at the server’s clock.');
+  // So does its entry among what a moment is related to, where its search row ends at its
+  // start; a duration that has ended keeps its end.
+  const related = await store.query(timeline.id, user, {
+    kind: 'related',
+    entity: { kind: 'moment', id: 'opened' },
+    after: null,
+    limit: 25,
+  });
+  const entry = (id) => related.related.find((r) => r.id === id);
+  assert.ok(Math.abs(lastOf(entry('issue')) - now()) <= 5, 'Related to: it ends now.');
+  assert.equal(entry('done').last, opened - 3600 + '/1');
 
   // A window around it draws it to now, longest first, with the counts the browser gives.
   const window = {
@@ -144,7 +159,7 @@ try {
   assert.equal(before.durations.length, 0, 'It reaches past that span, to now.');
 
   // A sparse save closes it, and another opens it again.
-  const settings = { ...doc, events: [], durations: undefined };
+  const settings = { ...doc, events: [], durations: undefined, relationships: undefined };
   const closedAt = String(opened + 60);
   timeline = await store.save(timeline.id, user, timeline.revision, undefined, {
     settings,
