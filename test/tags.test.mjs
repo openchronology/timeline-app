@@ -16,6 +16,9 @@ import {
   validateTags,
   validateSeparations,
   separationTracks,
+  tagSeparation,
+  viewSeparations,
+  sameSeparation,
 } from '../dist/core.mjs';
 const doc = () => ({
   format: 'openchronology',
@@ -208,7 +211,17 @@ test('separations disjoin from each source at a time, a moment, or their first m
   assert.deepEqual(ids(two, 0), ['d', 'fair', 'w1', 'w6']);
   assert.deepEqual(ids(two, null), ['x']);
   // Without disjoins, a separation is its own throughout.
-  assert.deepEqual([...separationTracks([{ tags: ['war'] }], ['war'], Q.from(0n))], [0]);
+  assert.deepEqual(
+    [
+      ...separationTracks(
+        [{ matches: (_key, tags) => tags.includes('war') }],
+        'm:a',
+        ['war'],
+        Q.from(0n),
+      ),
+    ],
+    [0],
+  );
   // Validation.
   assert.deepEqual(
     validateSeparations([{ tags: ['War'], disjoins: [{ from: null, at: '10/2' }] }]),
@@ -343,4 +356,71 @@ test('separations disjoin from later ones, and unite at a time, a moment, or the
     ],
   ])
     assert.throws(() => validateSeparations(bad), error);
+});
+
+test('separations by an entity’s relationships, beside separations by tags (#552)', () => {
+  const doc = validateDocument({
+    format: 'openchronology',
+    version: 1,
+    title: 'Related',
+    description: '',
+    events: [
+      { id: 'w1', time: '1/1', metadata: { tags: ['war'] } },
+      { id: 'm', time: '2/1', metadata: {} },
+      { id: 'fair', time: '7/1', metadata: { tags: ['war'] } },
+      { id: 'far', time: '9/1', metadata: {} },
+      { id: 'x', time: '3/1', metadata: {} },
+    ],
+    relationships: [
+      { a: { moment: 'w1' }, b: { moment: 'm' } },
+      { a: { moment: 'm' }, b: { moment: 'fair' } },
+      { a: { moment: 'fair' }, b: { moment: 'far' } },
+    ],
+  });
+  const ids = (separations, track) =>
+    filterDocument(doc, { separations: validateSeparations(separations), track })
+      .events.map((e) => e.id)
+      .sort();
+  const related = { related: { moment: 'm' }, depth: 'direct' };
+  assert.deepEqual(ids([related], 0), ['fair', 'm', 'w1']);
+  assert.deepEqual(ids([{ ...related, depth: 'all' }], 0), ['fair', 'far', 'm', 'w1']);
+  assert.deepEqual(ids([related], null), ['far', 'x']);
+  // Beside tags: an event in both is on both tracks; with a disjoin from war's track at the
+  // set's first moment (w1), war's members move.
+  assert.deepEqual(ids([{ tags: ['war'] }, related], 0), ['fair', 'w1']);
+  assert.deepEqual(ids([{ tags: ['war'] }, related], 1), ['fair', 'm', 'w1']);
+  const moving = [{ tags: ['war'] }, { ...related, disjoins: [{ from: 0, first: true }] }];
+  assert.deepEqual(ids(moving, 0), []);
+  assert.deepEqual(ids(moving, 1), ['fair', 'w1']);
+  assert.deepEqual(ids(moving, null), ['far', 'm', 'x']);
+  // At its last moment (the fair), the set unites back.
+  assert.deepEqual(ids([{ ...related, unions: [{ into: null, last: true }] }], 0), ['m', 'w1']);
+  // An entity no longer on the timeline takes nothing.
+  assert.deepEqual(ids([{ related: { moment: 'gone' }, depth: 'all' }], 0), []);
+  for (const [bad, error] of [
+    [[{ related: { moment: 'm' } }], /direct or all/],
+    [[{ related: { moment: 'm' }, depth: 'all', tags: ['war'] }], /not both/],
+    [[{ related: { moment: 'a b' }, depth: 'all' }], /./],
+  ])
+    assert.throws(() => validateSeparations(bad), error);
+  // Default views keep them; one alone is the older {related, depth}.
+  assert.deepEqual(tagSeparation([related]), { related: { moment: 'm' }, depth: 'direct' });
+  assert.deepEqual(tagSeparation([{ tags: ['war'] }, related]), {
+    separations: [{ tags: ['war'] }, related],
+  });
+  assert.deepEqual(viewSeparations({ related: { moment: 'm' }, depth: 'all' }), [
+    { related: { moment: 'm' }, depth: 'all' },
+  ]);
+  assert(
+    sameSeparation(
+      { separations: [related, { tags: ['b', 'a'] }] },
+      { separations: [{ tags: ['a', 'b'] }, related] },
+    ),
+  );
+  assert(
+    !sameSeparation(
+      { separations: [related, { tags: ['a'] }] },
+      { related: { moment: 'm' }, depth: 'all' },
+    ),
+  );
 });

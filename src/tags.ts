@@ -87,16 +87,19 @@ export type UnionTime = { at: string } | { moment: string } | { last: true };
  */
 export type Union = { into: number | null } & UnionTime;
 /**
- * One of several separations (#548): the events with any of its tags, in a track of their own.
- * With disjoins, only from each one's time on, and only from its track: before it, an event
- * stays where it would otherwise be (the main timeline, or another separation it matches).
- * With unions, until them: an event at or after one goes to its target (the latest passed).
+ * One of several separations (#548): the events with any of its tags, or (#552) an entity and
+ * the entities related to it (`direct`) or connected to it through relationships (`all`), in a
+ * track of their own. With disjoins, only from each one's time on, and only from its track:
+ * before it, an event stays where it would otherwise be (the main timeline, or another
+ * separation it matches). With unions, until them: an event at or after one goes to its
+ * target (the latest passed).
  */
-export interface SeparationTrack {
-  tags: string[];
+export type SeparationTrack = (
+  { tags: string[] } | { related: EntityRef; depth: 'direct' | 'all' }
+) & {
   disjoins?: Disjoin[];
   unions?: Union[];
-}
+};
 /** The most separations shown together: each is a track, and a comparison has eight. */
 const SEPARATIONS = 7;
 const ID = /^[A-Za-z0-9_.:-]{1,128}$/;
@@ -166,8 +169,19 @@ export function validateSeparations(value: unknown): SeparationTrack[] {
     const s = raw as Record<string, unknown> | null;
     if (!s || typeof s !== 'object' || Array.isArray(s))
       throw new Error('A separation is its tags, and when it disjoins and unites.');
-    const tags = validateEntityTags(s.tags);
-    if (!tags.length) throw new Error('Each separation needs a tag.');
+    let by: { tags: string[] } | { related: EntityRef; depth: 'direct' | 'all' };
+    if (s.related !== undefined) {
+      // An entity and its relationships (#552), in place of tags.
+      if (s.tags !== undefined)
+        throw new Error('A separation is by tags or by an entity’s relationships, not both.');
+      if (s.depth !== 'direct' && s.depth !== 'all')
+        throw new Error('A separation by relationships is direct or all.');
+      by = { related: validateRef(s.related), depth: s.depth };
+    } else {
+      const tags = validateEntityTags(s.tags);
+      if (!tags.length) throw new Error('Each separation needs a tag.');
+      by = { tags };
+    }
     const list = (key: 'disjoins' | 'unions') => {
       const v = s[key];
       if (v === undefined || v === null) return [];
@@ -192,7 +206,7 @@ export function validateSeparations(value: unknown): SeparationTrack[] {
       return { into, ...(validateWhen(u, 'last') as UnionTime) };
     });
     return {
-      tags,
+      ...by,
       ...(disjoins.length ? { disjoins } : {}),
       ...(unions.length ? { unions } : {}),
     };
@@ -202,57 +216,87 @@ export function validateSeparations(value: unknown): SeparationTrack[] {
 }
 /**
  * A disjoin's or union's time, resolved: its exact time, its moment's (`momentTime`), or the
- * first or last moment's with any of the separation's tags (`boundTime`); null when there is
- * none (a moment since deleted, or no moment with the tags yet), and it then waits.
+ * first or last of the separation's moments (`boundTime`); null when there is none (a moment
+ * since deleted, or none of the separation's yet), and it then waits.
  */
 export function disjoinTime(
   when: DisjoinTime | UnionTime,
-  tags: readonly string[],
   momentTime: (id: string) => string | undefined,
-  boundTime: (tags: readonly string[], which: 'first' | 'last') => string | undefined,
+  boundTime: (which: 'first' | 'last') => string | undefined,
 ): Rational | null {
   const time =
     'at' in when
       ? when.at
       : 'moment' in when
         ? momentTime(when.moment)
-        : boundTime(tags, 'first' in when ? 'first' : 'last');
+        : boundTime('first' in when ? 'first' : 'last');
   return time === undefined ? null : Q.parse(time);
 }
-/** The earliest or latest moment with any of `tags` in a document, by its time. */
+/** Whether an entity (its reference key, `m:<id>` or `d:<id>`, and its tags) is a separation's. */
+export type SeparationMatch = (key: string, tags: readonly string[]) => boolean;
+/**
+ * Which entities a separation takes, in a document: those with any of its tags, or its entity
+ * and those related to it (directly, or through any chain of relationships).
+ */
+export function separationMatch(
+  separation: SeparationTrack,
+  document: Pick<TimelineDocument, 'relationships'>,
+): SeparationMatch {
+  if ('tags' in separation) {
+    const tags = separation.tags;
+    return (_key, entity) => entity.some((t) => tags.includes(t));
+  }
+  const start = refKey(separation.related);
+  const set = reachable(
+    adjacency(validateRelationships(document.relationships, null)),
+    start,
+    separation.depth === 'direct' ? 1 : Infinity,
+  );
+  set.add(start);
+  return (key) => set.has(key);
+}
+/** The earliest or latest moment a separation takes in a document, by its time. */
 export function boundMomentTime(document: Pick<TimelineDocument, 'events'>) {
-  return (tags: readonly string[], which: 'first' | 'last'): string | undefined => {
+  return (matches: SeparationMatch, which: 'first' | 'last'): string | undefined => {
     let found: Rational | null = null;
     for (const e of document.events)
-      if (entityTags(e.metadata).some((t) => tags.includes(t))) {
+      if (matches('m:' + e.id, entityTags(e.metadata))) {
         const time = Q.parse(e.time);
         if (!found || time.compare(found) * (which === 'first' ? 1 : -1) < 0) found = time;
       }
     return found?.toString();
   };
 }
-/** Separations with each disjoin's and union's time resolved (null: not yet). */
+/**
+ * Separations with each disjoin's and union's time resolved (null: not yet), and which
+ * entities each takes (`matches`; left out where only the times are needed, for drawing).
+ */
 export type ResolvedSeparation = {
-  tags: string[];
+  matches?: SeparationMatch;
   disjoins?: { from: number | null; at: Rational | null }[];
   unions?: { into: number | null; at: Rational | null }[];
 };
-/** Resolves separations' disjoins and unions against a document's moments. */
+/** Resolves separations' entities, disjoins and unions against a document. */
 export function resolveSeparations(
   separations: SeparationTrack[],
-  document: Pick<TimelineDocument, 'events'>,
+  document: Pick<TimelineDocument, 'events' | 'relationships'>,
 ): ResolvedSeparation[] {
   const times = new Map(document.events.map((e) => [e.id, e.time]));
   const bound = boundMomentTime(document);
-  const when = (w: DisjoinTime | UnionTime, tags: string[]) =>
-    disjoinTime(w, tags, (id) => times.get(id), bound);
-  return separations.map((s) => ({
-    tags: s.tags,
-    ...(s.disjoins
-      ? { disjoins: s.disjoins.map((d) => ({ from: d.from, at: when(d, s.tags) })) }
-      : {}),
-    ...(s.unions ? { unions: s.unions.map((u) => ({ into: u.into, at: when(u, s.tags) })) } : {}),
-  }));
+  return separations.map((s) => {
+    const matches = separationMatch(s, document);
+    const when = (w: DisjoinTime | UnionTime) =>
+      disjoinTime(
+        w,
+        (id) => times.get(id),
+        (which) => bound(matches, which),
+      );
+    return {
+      matches,
+      ...(s.disjoins ? { disjoins: s.disjoins.map((d) => ({ from: d.from, at: when(d) })) } : {}),
+      ...(s.unions ? { unions: s.unions.map((u) => ({ into: u.into, at: when(u) })) } : {}),
+    };
+  });
 }
 /** Stable cache key for a filter. */
 export function viewFilterKey(filter: ViewFilter): string {
@@ -260,12 +304,14 @@ export function viewFilterKey(filter: ViewFilter): string {
     return `${filter.mode}:related:${filter.depth}:${refKey(validateRef(filter.related))}`;
   if ('separations' in filter)
     return `tracks:${filter.track === null ? 'rest' : filter.track}:${JSON.stringify(
-      validateSeparations(filter.separations).map((s) => ({ ...s, tags: [...s.tags].sort() })),
+      validateSeparations(filter.separations).map((s) =>
+        'tags' in s ? { ...s, tags: [...s.tags].sort() } : s,
+      ),
     )}`;
   return filter.mode + ':' + [...validateEntityTags(filter.tags)].sort().join(',');
 }
 /**
- * Which tracks an entity with `tags` at `time` is on, among `separations`, taken each after
+ * Which tracks an entity (`key`, with `tags`) at `time` is on, among `separations`, taken each after
  * those it disjoins from: a separation it matches without disjoins takes it, beside the tracks
  * it is already on; one with disjoins takes it from a track it is on (the main timeline when on
  * none) once that track's disjoin has come, and it leaves that track. Where a separation that
@@ -274,6 +320,7 @@ export function viewFilterKey(filter: ViewFilter): string {
  */
 export function separationTracks(
   separations: ResolvedSeparation[],
+  key: string,
   tags: readonly string[],
   time: Rational | null,
 ): Set<number | null> {
@@ -297,7 +344,7 @@ export function separationTracks(
   let on = new Set<number | null>();
   for (const i of separationOrder(separations)) {
     const s = separations[i];
-    if (!s.tags.some((tag) => tags.includes(tag))) continue;
+    if (!s.matches?.(key, tags)) continue;
     if (!s.disjoins) {
       on.add(unite(i));
       continue;
@@ -357,12 +404,9 @@ export function filterMembership(
 ): (key: string, metadata: Metadata, time?: string) => boolean {
   // Several separations: on this track when it is one of the entity's, at its time.
   if ('separations' in filter) {
-    const separations = resolveSeparations(
-      validateSeparations(filter.separations),
-      document as Pick<TimelineDocument, 'events'>,
-    );
-    return (_key, metadata, time) =>
-      separationTracks(separations, entityTags(metadata), time ? Q.parse(time) : null).has(
+    const separations = resolveSeparations(validateSeparations(filter.separations), document);
+    return (key, metadata, time) =>
+      separationTracks(separations, key, entityTags(metadata), time ? Q.parse(time) : null).has(
         filter.track,
       );
   }

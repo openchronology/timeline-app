@@ -177,6 +177,45 @@ pub struct Query {
 }
 /// A private temporary directory, removed with the last snapshot that uses it.
 struct Directory(PathBuf);
+/// An entity's related set (#552): itself and the entities linked to it (`direct`), or every
+/// entity reachable through links, by reference key, from the file's `relationships` table.
+fn related_set(
+    db: &Connection,
+    start: &str,
+    direct: bool,
+) -> Result<std::collections::HashSet<String>, String> {
+    let mut graph: std::collections::HashMap<String, Vec<String>> = Default::default();
+    let key = |kind: &Option<String>, id: &Option<String>| {
+        format!(
+            "{}:{}",
+            if kind.as_deref() == Some("moment") {
+                "m"
+            } else {
+                "d"
+            },
+            id.as_deref().unwrap_or_default()
+        )
+    };
+    for row in db.query("SELECT a_kind,a_id,b_kind,b_id FROM relationships", &[])? {
+        let (a, b) = (key(&row[0], &row[1]), key(&row[2], &row[3]));
+        graph.entry(a.clone()).or_default().push(b.clone());
+        graph.entry(b).or_default().push(a);
+    }
+    let mut found = std::collections::HashSet::from([start.to_string()]);
+    let mut frontier = vec![start.to_string()];
+    while !frontier.is_empty() {
+        let mut next = Vec::new();
+        for node in frontier {
+            for neighbour in graph.get(&node).into_iter().flatten() {
+                if found.insert(neighbour.clone()) {
+                    next.push(neighbour.clone());
+                }
+            }
+        }
+        frontier = if direct { Vec::new() } else { next };
+    }
+    Ok(found)
+}
 /// Disjoins or unions as read (#549): each one's track and its time, when known.
 type PendingJoins = Vec<(Option<usize>, Option<String>)>;
 impl Drop for Directory {
@@ -421,8 +460,11 @@ impl Snapshot {
         // Each disjoin's and union's resolved time, for the view's key: a moved moment is a
         // new view.
         let mut keyed: Vec<(usize, &str, Option<usize>, Option<String>)> = Vec::new();
-        // A time: exact, a moment's, or the first or last moment's with the tags.
-        let resolve = |d: &Value, tags: &[String], bound: &str| -> Result<Option<String>, String> {
+        // A time: exact, a moment's, or the first or last of the separation's moments.
+        let resolve = |d: &Value,
+                       matches: &super::SeparationMatch,
+                       bound: &str|
+         -> Result<Option<String>, String> {
             if let Some(at) = d.get("at").and_then(Value::as_str) {
                 if at.len() > 65536 {
                     return Err("A disjoin's or union's time exceeds the query budget".into());
@@ -436,13 +478,25 @@ impl Snapshot {
                     .and_then(|r| r[0].clone()));
             }
             if d.get(bound) == Some(&Value::Bool(true)) {
-                let wanted = serde_json::to_string(tags).map_err(|e| e.to_string())?;
                 let direction = if bound == "first" { "ASC" } else { "DESC" };
+                let (sql, wanted) = match matches {
+                    super::SeparationMatch::Tags(tags) => (
+                        format!("SELECT q(e.time) FROM events e WHERE EXISTS(SELECT 1 FROM json_each(e.metadata,'$.tags') t WHERE t.value IN (SELECT value FROM json_each(?1))) ORDER BY e.time COLLATE RATIONAL_V1 {direction} LIMIT 1"),
+                        serde_json::to_string(tags).map_err(|e| e.to_string())?,
+                    ),
+                    // An entity's set (#552): its moments, by ID.
+                    super::SeparationMatch::Members(set) => (
+                        format!("SELECT q(e.time) FROM events e WHERE e.id IN (SELECT value FROM json_each(?1)) ORDER BY e.time COLLATE RATIONAL_V1 {direction} LIMIT 1"),
+                        serde_json::to_string(
+                            &set.iter()
+                                .filter_map(|k| k.strip_prefix("m:"))
+                                .collect::<Vec<_>>(),
+                        )
+                        .map_err(|e| e.to_string())?,
+                    ),
+                };
                 return Ok(db
-                    .query(
-                        &format!("SELECT q(e.time) FROM events e WHERE EXISTS(SELECT 1 FROM json_each(e.metadata,'$.tags') t WHERE t.value IN (SELECT value FROM json_each(?1))) ORDER BY e.time COLLATE RATIONAL_V1 {direction} LIMIT 1"),
-                        &[&wanted],
-                    )?
+                    .query(&sql, &[&wanted])?
                     .first()
                     .and_then(|r| r[0].clone()));
             }
@@ -474,20 +528,40 @@ impl Snapshot {
             Ok(set)
         };
         let mut sources: Vec<Vec<Option<usize>>> = Vec::new();
+        let mut specs: Vec<Value> = Vec::new();
         for (index, s) in separations.iter().enumerate() {
-            let mut tags: Vec<String> = s
-                .get("tags")
-                .and_then(Value::as_array)
-                .ok_or("Each separation needs its tags")?
-                .iter()
-                .filter_map(Value::as_str)
-                .map(|t| t.trim().to_lowercase())
-                .collect();
-            tags.sort();
-            tags.dedup();
-            if tags.is_empty() || tags.len() > 40 {
-                return Err("Each separation needs one to forty tags".into());
-            }
+            // By tags, or by an entity's relationships (#552): its related (direct) or
+            // connected (all) set, with itself.
+            let (matches, spec) = if let Some(entity) = s.get("related") {
+                let (kind, id) = super::entity_ref(entity)?;
+                let direct = match s.get("depth").and_then(Value::as_str) {
+                    Some("direct") => true,
+                    Some("all") => false,
+                    _ => return Err("A separation by relationships is direct or all".into()),
+                };
+                let start = format!("{}:{}", if kind == "moment" { "m" } else { "d" }, id);
+                (
+                    super::SeparationMatch::Members(related_set(&db, &start, direct)?),
+                    json!({"related": start, "direct": direct}),
+                )
+            } else {
+                let mut tags: Vec<String> = s
+                    .get("tags")
+                    .and_then(Value::as_array)
+                    .ok_or("Each separation needs its tags")?
+                    .iter()
+                    .filter_map(Value::as_str)
+                    .map(|t| t.trim().to_lowercase())
+                    .collect();
+                tags.sort();
+                tags.dedup();
+                if tags.is_empty() || tags.len() > 40 {
+                    return Err("Each separation needs one to forty tags".into());
+                }
+                let spec = json!(tags);
+                (super::SeparationMatch::Tags(tags), spec)
+            };
+            specs.push(spec);
             // Its disjoins and unions, at most one from or into each track: the main
             // timeline or another separation.
             let mut joins = |key: &'static str,
@@ -513,7 +587,7 @@ impl Snapshot {
                     if out.iter().any(|(t, _)| *t == other) {
                         return Err(format!("A separation's {key} name each track at most once"));
                     }
-                    let time = resolve(d, &tags, bound)?;
+                    let time = resolve(d, &matches, bound)?;
                     keyed.push((index, key, other, time.clone()));
                     out.push((other, time));
                 }
@@ -553,18 +627,14 @@ impl Snapshot {
                 .iter()
                 .map(|(into, time)| Ok((*into, after(time)?)))
                 .collect::<Result<Vec<_>, String>>()?;
-            list.push((tags, disjoins, unions));
+            list.push((matches, disjoins, unions));
         }
         let order = super::separation_order(&sources)
             .ok_or("Separations cannot disjoin from each other in a circle")?;
         let key = format!(
             "tracks:{}:{}",
             track.map_or("rest".to_string(), |t| t.to_string()),
-            serde_json::to_string(&(
-                list.iter().map(|(tags, _, _)| tags).collect::<Vec<_>>(),
-                &keyed
-            ))
-            .map_err(|e| e.to_string())?
+            serde_json::to_string(&(&specs, &keyed)).map_err(|e| e.to_string())?
         );
         Ok(super::Membership::Tracks {
             separations: list,
@@ -2633,7 +2703,7 @@ mod duration_tests {
                 json!({"id":"fair","time":"17/2","metadata":{"tags":["trade","war"]}}),
             ])
             .collect();
-        let doc: Document = serde_json::from_value(json!({"format":"openchronology","version":1,"title":"Disjoin","description":"","events":events,"durations":[{"id":"siege","start":"7/1","end":"8/1","metadata":{"tags":["war"]}}]})).unwrap();
+        let doc: Document = serde_json::from_value(json!({"format":"openchronology","version":1,"title":"Disjoin","description":"","events":events,"durations":[{"id":"siege","start":"7/1","end":"8/1","metadata":{"tags":["war"]}}],"relationships":[{"a":{"moment":"e1"},"b":{"moment":"m"}},{"a":{"moment":"m"},"b":{"moment":"fair"}},{"a":{"moment":"fair"},"b":{"moment":"e9"}}]})).unwrap();
         let snapshot = Snapshot::from_document(&doc).unwrap();
         let ids = |separations: Value, track: Value| {
             let q: Query = serde_json::from_value(json!({"kind":"overview","lower":"-1/1","upper":"20/1","threshold":"0/1","filter":{"separations":separations,"track":track}})).unwrap();
@@ -2716,6 +2786,21 @@ mod duration_tests {
             vec!["e2", "e3", "e4", "e5", "e6", "e7", "fair", "m", "siege"]
         );
         assert!(ids(latest, Value::Null).contains(&"e8".to_string()));
+        // By an entity's relationships (#552): the market and what is related to it, or
+        // connected through the fair to e9 too.
+        let related = json!([{"related":{"moment":"m"},"depth":"direct"}]);
+        assert_eq!(ids(related, json!(0)), vec!["e1", "fair", "m"]);
+        let connected = json!([{"related":{"moment":"m"},"depth":"all"}]);
+        assert_eq!(ids(connected, json!(0)), vec!["e1", "e9", "fair", "m"]);
+        // Mixed with tags: the market's set disjoins from war's track at its first moment
+        // (e1), so war's members move; the market itself, never on war's track, stays below.
+        let mixed = json!([
+            {"tags":["war"]},
+            {"related":{"moment":"m"},"depth":"direct","disjoins":[{"from":0,"first":true}]}
+        ]);
+        assert_eq!(ids(mixed.clone(), json!(1)), vec!["e1", "fair"]);
+        assert!(!ids(mixed.clone(), json!(0)).contains(&"e1".to_string()));
+        assert!(ids(mixed, Value::Null).contains(&"m".to_string()));
         // A disjoin from itself, in a circle, or twice from one track, is refused.
         for bad in [
             json!([{"tags":["war"],"disjoins":[{"from":0,"at":"5/1"}]}]),

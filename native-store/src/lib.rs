@@ -860,9 +860,16 @@ fn has_any_tag(metadata: &Map<String, Value>, tags: &[String]) -> bool {
 /// A disjoin or a union (#549): the track it leaves or joins (`None`: the main timeline) and
 /// the entities at or after its time.
 pub type Join = (Option<usize>, HashSet<String>);
-/// One of several separations (#549): its tags; when it disjoins, its disjoins; and its unions,
-/// earliest first.
-pub type SeparationTrack = (Vec<String>, Option<Vec<Join>>, Vec<Join>);
+/// Which entities a separation takes: those with any of its tags, or (#552) an entity and its
+/// related or connected set, by reference key ("m:<id>", "d:<id>").
+#[derive(Clone, Debug)]
+pub enum SeparationMatch {
+    Tags(Vec<String>),
+    Members(HashSet<String>),
+}
+/// One of several separations (#549): which entities it takes; when it disjoins, its
+/// disjoins; and its unions, earliest first.
+pub type SeparationTrack = (SeparationMatch, Option<Vec<Join>>, Vec<Join>);
 /// What puts an entity on the upper side of a separation.
 pub enum Membership {
     /// Any of these (normalized) tags.
@@ -944,8 +951,12 @@ fn entity_tracks(
     // disjoin has come, and it leaves that track.
     let mut on: HashSet<Option<usize>> = HashSet::new();
     for &i in order {
-        let (tags, disjoins, _) = &separations[i];
-        if !has_any_tag(metadata, tags) {
+        let (matches, disjoins, _) = &separations[i];
+        let takes = match matches {
+            SeparationMatch::Tags(tags) => has_any_tag(metadata, tags),
+            SeparationMatch::Members(set) => set.contains(key),
+        };
+        if !takes {
             continue;
         }
         let Some(disjoins) = disjoins else {

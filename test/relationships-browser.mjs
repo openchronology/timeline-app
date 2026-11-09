@@ -200,6 +200,60 @@ export async function checkRelationships(page, restore) {
       near(crossing.ends[0], crossing.bravo) && near(crossing.ends[1], crossing.charlie),
       JSON.stringify(crossing),
     );
+    // Beside another (#552): Charlie's related set as a second separation, from its details.
+    const details = async (name) => {
+      await closeMomentDetails(page);
+      await page.locator(`.event-marker[aria-label="${name}"]`).first().click({ force: true });
+      await page.waitForFunction(
+        (name) => document.getElementById('event-title').value === name,
+        name,
+      );
+    };
+    const heading = (text) =>
+      page.waitForFunction(
+        (text) => document.getElementById('separation-heading').textContent === text,
+        text,
+      );
+    await details('Charlie');
+    await related.getByRole('button', { name: 'Separate related' }).click();
+    await heading('2 separations');
+    assert.equal(
+      await page.locator('#separation-tags').textContent(),
+      'related to “Alpha” · related to “Charlie”',
+    );
+    // The Separate dialog lists them, read-only, beside one by tags added there.
+    await page.locator('#separate-button').click();
+    const dialog = page.locator('#separate-dialog');
+    await dialog.waitFor({ state: 'visible' });
+    assert.deepEqual(await dialog.locator('.separation-related').allTextContents(), [
+      'Related to “Alpha”',
+      'Related to “Charlie”',
+    ]);
+    assert.equal(
+      await dialog.locator('.separation-item').first().locator('.tag-picker').count(),
+      0,
+    );
+    await dialog.locator('#separate-add').click();
+    const added = dialog.locator('.separation-item').nth(2);
+    await added.locator('.tag-picker-search').fill('anything');
+    await added.locator('.tag-picker-search').press('Enter');
+    await page.locator('#separate-submit').click();
+    await dialog.waitFor({ state: 'hidden' });
+    await heading('3 separations');
+    // Changed and stopped from the entity's details only.
+    await details('Alpha');
+    await related.getByRole('button', { name: 'Separate all connected instead' }).click();
+    await page.waitForFunction(() =>
+      document.getElementById('separation-tags').textContent.startsWith('connected to “Alpha”'),
+    );
+    await details('Alpha');
+    await related.getByRole('button', { name: 'Stop separating' }).click();
+    await heading('2 separations');
+    assert.equal(
+      await page.locator('#separation-tags').textContent(),
+      'related to “Charlie” · anything',
+    );
+    await closeMomentDetails(page);
     await page.locator('#separation-rejoin').click();
     await page.locator('#separation-settings').waitFor({ state: 'hidden' });
     await separateBy(page, ['anything']);
@@ -278,9 +332,10 @@ export async function checkRelationships(page, restore) {
     // axis, in every frame.
     for (const y of heights) assert(Math.abs(y - (192 - 150)) < 0.5, `arc height ${heights}`);
     console.log(
-      'PASS relationships: linking by search, transitive count, arcs, navigation, unlink and undo, separation by connections with arcs within and between tracks, arcs far off screen.',
+      'PASS relationships: linking by search, transitive count, arcs, navigation, unlink and undo, separation by connections with arcs within and between tracks, beside other separations and changed from the details (#552), arcs far off screen.',
     );
   } finally {
+    await closeMomentDetails(page);
     if (await page.locator('#separation-settings').isVisible())
       await page.locator('#separation-rejoin').click();
     await imported(restore);

@@ -1,7 +1,7 @@
 // Copyright (c) 2026 Athan Clark. SPDX-License-Identifier: GPL-3.0-only
 /**
  * A server timeline's view kept across reloads of the page (#128): its bounds, grouping
- * distance, tag or relationship separation and whether it follows the latest events. Kept in
+ * distance, separations (by tags or relationships) and whether it follows the latest events. Kept in
  * the tab's session storage, like the page itself: a reload shows the same view, a new tab
  * or a shared link starts from the whole timeline. Stored text is read back as untrusted:
  * anything malformed is dropped rather than shown.
@@ -12,8 +12,11 @@ import { validateSeparations } from './tags.js';
 import type { SeparationTrack } from './tags.js';
 
 /** Separations by tags, some perhaps disjoining (#549), or an entity's relationships. */
-export type StoredSeparation =
-  { tracks: SeparationTrack[] } | { related: EntityRef; depth: 'direct' | 'all'; label: string };
+/**
+ * Separations, by tags or an entity's relationships (#552), with the titles of those entities
+ * by reference key (`m:<id>`, `d:<id>`) for the bar's label.
+ */
+export type StoredSeparation = { tracks: SeparationTrack[]; titles?: Record<string, string> };
 export interface ViewState {
   /** The view's bounds, as exact rationals. */
   left?: string;
@@ -53,7 +56,18 @@ function separationOf(value: unknown): StoredSeparation | undefined {
   }
   if (Array.isArray(v.tracks)) {
     try {
-      return { tracks: validateSeparations(v.tracks) };
+      const tracks = validateSeparations(v.tracks);
+      const titles: Record<string, string> = {};
+      if (v.titles && typeof v.titles === 'object' && !Array.isArray(v.titles))
+        for (const [key, title] of Object.entries(v.titles))
+          if (
+            /^[md]:/.test(key) &&
+            key.length <= 200 &&
+            typeof title === 'string' &&
+            title.length <= TEXT
+          )
+            titles[key] = title;
+      return { tracks, ...(Object.keys(titles).length ? { titles } : {}) };
     } catch {
       return undefined;
     }
@@ -71,10 +85,11 @@ function separationOf(value: unknown): StoredSeparation | undefined {
   if (keys.length !== 1 || (keys[0] !== 'moment' && keys[0] !== 'duration')) return undefined;
   const id = related[keys[0]];
   if (typeof id !== 'string' || !id || id.length > 200) return undefined;
+  // One entity's relationships, as tabs kept it before they were a kind of separation.
+  const ref = (keys[0] === 'moment' ? { moment: id } : { duration: id }) as EntityRef;
   return {
-    related: (keys[0] === 'moment' ? { moment: id } : { duration: id }) as EntityRef,
-    depth: v.depth,
-    label: v.label,
+    tracks: [{ related: ref, depth: v.depth }],
+    titles: { [(keys[0] === 'moment' ? 'm:' : 'd:') + id]: v.label },
   };
 }
 /** The valid parts of stored text; nothing for text that is not a stored view. */

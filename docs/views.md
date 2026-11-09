@@ -94,7 +94,7 @@ A view's `separation` is one of:
 
 Tags are lowercased and trimmed, at most 128 characters, one to forty per separation.
 
-Each of `separations` is `{"tags": [...], "disjoins": [...], "unions": [...]}`. Both lists are optional, with at most one entry for each track:
+Each of `separations` is `{"tags": [...], "disjoins": [...], "unions": [...]}`, or, in place of `tags`, an entity's relationships: `{"related": {"moment": "<id>"}, "depth": "direct" | "all", ...}` (the entity and those linked to it, or everything connected to it). Both lists are optional, with at most one entry for each track:
 
 - **A disjoin** is `{"from": <track>, ...time}`. Before its time, the separation's events stay in track `from`. From its time on, they are in the separation's own track.
 - **A union** is `{"into": <track>, ...time}`. From its time on, the separation's events are in track `into`, and the separation's track ends. If several unions have passed, the latest applies.
@@ -102,7 +102,7 @@ Each of `separations` is `{"tags": [...], "disjoins": [...], "unions": [...]}`. 
 - **A time** is one of:
   - `"at": "<exact time>"`: an exact rational time in the timeline's coordinates, such as `"1914/1"`. The `first` and `last` of `GET /api/timelines/{id}` show the range.
   - `"moment": "<id>"`: at that moment's time, following it as it moves.
-  - `"first": true` (disjoins) or `"last": true` (unions): the earliest or latest moment carrying the separation's tags.
+  - `"first": true` (disjoins) or `"last": true` (unions): the earliest or latest of the separation's moments (carrying its tags, or in its entity's set).
 
 A moment counts by its time, and a duration by its start.
 

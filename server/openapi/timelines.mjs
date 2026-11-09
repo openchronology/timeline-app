@@ -434,12 +434,18 @@ export const schemas = {
     minItems: 1,
     maxItems: 7,
     description:
-      'Separations, each its tags and, optionally, its disjoins and unions (#549). A disjoin names the track it takes the separation’s events from (`from`: null for the main timeline, or another separation’s index) and when; before then they stay there. A union names the track they go to (`into`) and when; from then on they are there (the latest union passed applies), and the separation’s track ends. Each is at an exact time (`at`), at a moment’s (`moment`, followed as it moves), or at the first (disjoins, `first`) or last (unions, `last`) moment with the separation’s tags. Separations may disjoin from later ones, but not in a circle.',
+      'Separations, each its tags or an entity’s relationships (`related` and `depth`, #552), and optionally its disjoins and unions (#549). A disjoin names the track it takes the separation’s events from (`from`: null for the main timeline, or another separation’s index) and when; before then they stay there. A union names the track they go to (`into`) and when; from then on they are there (the latest union passed applies), and the separation’s track ends. Each is at an exact time (`at`), at a moment’s (`moment`, followed as it moves), or at the first (disjoins, `first`) or last (unions, `last`) moment with the separation’s tags. Separations may disjoin from later ones, but not in a circle.',
     items: {
       type: 'object',
-      required: ['tags'],
+      oneOf: [{ required: ['tags'] }, { required: ['related', 'depth'] }],
       additionalProperties: false,
       properties: {
+        related: {
+          ...ref('EntityRef'),
+          description:
+            'In place of tags (#552): this entity and those related to it (`direct`) or connected to it through relationships (`all`).',
+        },
+        depth: { enum: ['direct', 'all'] },
         tags: {
           type: 'array',
           minItems: 1,
