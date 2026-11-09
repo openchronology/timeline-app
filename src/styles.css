@@ -3413,6 +3413,40 @@ dialog button {
   color: var(--muted);
   font-size: 12px;
 }
+.separation-disjoin {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  font-size: 13px;
+}
+.separation-disjoin label {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  gap: 6px;
+  font-weight: 500;
+}
+.separation-disjoin select {
+  width: auto;
+}
+.separation-disjoin-time {
+  width: 14em;
+}
+/* Where a separation disjoins (#549): shaded before, and a fork from its source's axis. */
+.separation-before {
+  fill: var(--workspace);
+  opacity: 0.75;
+}
+.separation-fork-line {
+  stroke: var(--focus);
+  stroke-width: 2;
+  stroke-dasharray: 5 4;
+  fill: none;
+}
+.separation-fork-point {
+  fill: var(--focus);
+}
 .tag-picker-empty {
   padding: 6px 8px;
   color: var(--muted);

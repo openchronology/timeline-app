@@ -69,6 +69,7 @@ import {
   validateDuration,
   validateRef,
   validateEntityTags,
+  validateSeparations,
   validateTimelineImage,
 } from '../dist/core.mjs';
 const uuid = /^[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}$/i;
@@ -234,6 +235,24 @@ function viewFilter(value) {
     if (!['direct', 'all'].includes(value.depth) || !['any', 'none'].includes(value.mode))
       throw new HttpError(400, 'A relationship filter needs a depth and a mode.');
     return { related, depth: value.depth, mode: value.mode };
+  }
+  // One track of several separations, some disjoining at a time (#549).
+  if (value.separations !== undefined) {
+    let separations;
+    try {
+      separations = validateSeparations(value.separations);
+    } catch (error) {
+      throw new HttpError(400, error.message);
+    }
+    if (!(
+      value.track === null ||
+      (Number.isInteger(value.track) && value.track >= 0 && value.track < separations.length)
+    ))
+      throw new HttpError(
+        400,
+        'A separation track is one of its separations, or null for the rest.',
+      );
+    return { separations, track: value.track };
   }
   let tags;
   try {

@@ -853,12 +853,50 @@ fn has_any_tag(metadata: &Map<String, Value>, tags: &[String]) -> bool {
                 .any(|t| t.as_str().is_some_and(|t| tags.iter().any(|w| w == t)))
         })
 }
+/// One of several separations (#549): its tags, and when it disjoins, the separation it
+/// disjoins from (`None`: the main timeline) and the entities at or after its time.
+pub type SeparationTrack = (Vec<String>, Option<(Option<usize>, HashSet<String>)>);
 /// What puts an entity on the upper side of a separation.
 pub enum Membership {
     /// Any of these (normalized) tags.
     Tags(Vec<String>),
     /// This entity ("m:<id>" or "d:<id>") and its relations: direct, or all reachable.
     Related { start: String, direct: bool },
+    /// One track (`None`: the rest) of several separations, each its tags and, when it
+    /// disjoins, the separation it disjoins from (`None`: the main timeline) and the entities at
+    /// or after its time (#549). `key` names the view.
+    Tracks {
+        separations: Vec<SeparationTrack>,
+        track: Option<usize>,
+        key: String,
+    },
+}
+/// The tracks an entity is on among several separations (src/tags.ts separationTracks): for
+/// each separation it matches, that one, or before it disjoins the one it disjoins from
+/// (followed back); the rest (`None`) when it matches none.
+fn entity_tracks(
+    separations: &[SeparationTrack],
+    key: &str,
+    metadata: &Map<String, Value>,
+) -> HashSet<Option<usize>> {
+    fn track_of(separations: &[SeparationTrack], i: usize, key: &str) -> Option<usize> {
+        match &separations[i].1 {
+            Some((from, after)) if !after.contains(key) => {
+                from.and_then(|f| track_of(separations, f, key))
+            }
+            _ => Some(i),
+        }
+    }
+    let mut tracks = HashSet::new();
+    for (i, (tags, _)) in separations.iter().enumerate() {
+        if has_any_tag(metadata, tags) {
+            tracks.insert(track_of(separations, i, key));
+        }
+    }
+    if tracks.is_empty() {
+        tracks.insert(None);
+    }
+    tracks
 }
 /// The "m:<id>" or "d:<id>" key of an entity reference, or None if it is invalid.
 fn ref_key(value: &Value) -> Option<String> {
@@ -879,7 +917,7 @@ pub fn filter_document(mut doc: Document, membership: &Membership, any: bool) ->
         .map(|e| (e.id.clone(), e.time.clone()))
         .collect();
     let related: Option<HashSet<String>> = match membership {
-        Membership::Tags(_) => None,
+        Membership::Tags(_) | Membership::Tracks { .. } => None,
         Membership::Related { start, direct } => {
             let mut graph: std::collections::HashMap<String, Vec<String>> = Default::default();
             for r in &doc.relationships {
@@ -909,6 +947,12 @@ pub fn filter_document(mut doc: Document, membership: &Membership, any: bool) ->
     // An entity stays when its membership matches the side asked for (`any`: inside, or
     // not `any`: outside).
     let keep = |key: String, metadata: &Map<String, Value>| {
+        if let Membership::Tracks {
+            separations, track, ..
+        } = membership
+        {
+            return entity_tracks(separations, &key, metadata).contains(track);
+        }
         let inside = match (&related, membership) {
             (Some(set), _) => set.contains(&key),
             (None, Membership::Tags(tags)) => has_any_tag(metadata, tags),

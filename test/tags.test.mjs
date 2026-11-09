@@ -14,6 +14,8 @@ import {
   viewFilterKey,
   validateEntityTags,
   validateTags,
+  validateSeparations,
+  separationTracks,
 } from '../dist/core.mjs';
 const doc = () => ({
   format: 'openchronology',
@@ -147,5 +149,55 @@ test('events may carry tags of up to 128 characters; timelines keep 64 (#538)', 
     () => validateDocument({ ...doc, tags: [long] }),
     /1–64 characters/,
     'a timeline’s own tags stay short',
+  );
+});
+
+test('separations disjoin at a time, from the main timeline or an earlier one (#549)', () => {
+  const doc = validateDocument({
+    format: 'openchronology',
+    version: 1,
+    title: 'Disjoins',
+    description: '',
+    events: [
+      { id: 'w1', time: '1/1', metadata: { tags: ['war'] } },
+      { id: 'w6', time: '6/1', metadata: { tags: ['war'] } },
+      { id: 's2', time: '2/1', metadata: { tags: ['siege'] } },
+      { id: 's8', time: '8/1', metadata: { tags: ['siege'] } },
+      { id: 's4', time: '4/1', metadata: { tags: ['siege'] } },
+      { id: 't', time: '3/1', metadata: { tags: ['trade'] } },
+    ],
+    durations: [{ id: 'd', start: '7/1', end: '9/1', metadata: { tags: ['war'] } }],
+  });
+  // War forks from the main timeline at 5; siege from war at 3, so before 3 it is wherever
+  // war's events then are: the main timeline.
+  const separations = [
+    { tags: ['war'], disjoin: { at: '5', from: null } },
+    { tags: ['siege'], disjoin: { at: '3', from: 0 } },
+  ];
+  const ids = (track) =>
+    filterDocument(doc, { separations, track })
+      .events.map((e) => e.id)
+      .concat(filterDocument(doc, { separations, track }).durations?.map((d) => d.id) ?? [])
+      .sort();
+  assert.deepEqual(ids(0), ['d', 'w6']);
+  assert.deepEqual(ids(1), ['s4', 's8']);
+  assert.deepEqual(ids(null), ['s2', 't', 'w1']);
+  // Without a disjoin, a separation is its own throughout.
+  assert.deepEqual([...separationTracks([{ tags: ['war'] }], ['war'], Q.from(0n))], [0]);
+  // Validation: times are exact and normalized; a disjoin names an earlier separation.
+  assert.deepEqual(validateSeparations([{ tags: ['War'], disjoin: { at: '10/2', from: null } }]), [
+    { tags: ['war'], disjoin: { at: '5/1', from: null } },
+  ]);
+  assert.throws(
+    () => validateSeparations([{ tags: ['war'], disjoin: { at: '5', from: 0 } }]),
+    /earlier separation/,
+  );
+  assert.throws(
+    () => validateSeparations([{ tags: ['war'], disjoin: { at: 'soon', from: null } }]),
+    /exact rational/,
+  );
+  assert.notEqual(
+    viewFilterKey({ separations, track: 0 }),
+    viewFilterKey({ separations: [{ tags: ['war'] }, { tags: ['siege'] }], track: 0 }),
   );
 });

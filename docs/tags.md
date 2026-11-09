@@ -16,6 +16,23 @@ Each chosen tag shows as a chip, whose **×** removes it. **+ Add a separation**
 
 Each separation's events (those carrying any of its tags) move into a track of their own, in the order listed. Everything else, which carries none of them, stays in the last track. An event carrying tags of two separations appears in both.
 
+### Disjoining at a time
+
+A separation can **disjoin** at a time, rather than being its own timeline throughout. Under its tags, **Disjoins** chooses one of:
+
+- **never: separate throughout** (the default);
+- **from the main timeline at** a time;
+- **from Separation N at** a time, for an earlier separation.
+
+The time is typed as the timeline displays times, or chosen in its date picker.
+
+Before that time, the separation's events stay in the track it disjoins from. From then on they are in its own track, which forks away there:
+
+- the track is shaded before the time;
+- a dashed line runs from the other track's axis to its own.
+
+Disjoining from another separation follows that one back. If it has not disjoined yet either, the events are on the main timeline. A moment counts by its time, and a duration by its start. The bar names each separation's disjoin, such as `war (from 1914)`.
+
 The button stays in the toolbar while separated, with how many separations are shown. It reopens the list to change them, or to **Rejoin all**. The view keeps its position, and both tracks pan and zoom together, using the same layout as comparisons. A duration that follows a moment on the other side keeps that moment's time. Relationships are still drawn: links within a track arc over it, and links between the tracks cross the gap from one event to the other ([relationships](relationships.md#arcs-between-tracks)). The tracks are read-only; **Rejoin** returns to the whole timeline. Separation never changes or saves the timeline. To move the separated events for good, **Shift or scale these…** in the bar returns to the whole timeline and [shifts or scales](time-mapping.md) the events carrying any separated tag.
 
 Each track has its own summaries, so nearby moments and collapsed durations group within their own side. Server and desktop timelines show the saved version while separated; unsaved edits are kept and reappear when you rejoin. Complete in-memory timelines, such as browser drafts and offline HTML, include unsaved edits.
@@ -28,6 +45,18 @@ The default view is one of the timeline's settings, like its title and tags, so 
 
 ```json
 { "view": { "separation": { "tags": ["war", "trade"] } } }
+```
+
+Separations that disjoin are `separations`, each its tags and its `disjoin`: an exact time `at`, `from` null (the main timeline) or an earlier separation's index:
+
+```json
+{
+  "view": {
+    "separation": {
+      "separations": [{ "tags": ["war"], "disjoin": { "at": "1914/1", "from": null } }]
+    }
+  }
+}
 ```
 
 Several separations are `groups`, two to seven of them, each a list of tags:

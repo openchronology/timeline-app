@@ -78,6 +78,7 @@ import {
   validateTimelineView,
   sameSeparation,
   separationGroups,
+  viewSeparations,
   tagSeparation,
   SEPARATION_LIMIT,
   contentLabels,
@@ -160,6 +161,7 @@ import type {
   EntityRef,
   TimeMapping,
   ViewFilter,
+  SeparationTrack,
   Relationship,
   DurationBand,
   SearchPage,
@@ -2877,7 +2879,7 @@ function heading() {
   // Shown while separated too (#548), with how many separations are shown; not while
   // comparing other timelines.
   el('separate-button').hidden = (!!comparison && !separation) || (!model && !remote && !local);
-  const separations = separation ? ('groups' in separation ? separation.groups.length : 1) : 0;
+  const separations = separation ? ('tracks' in separation ? separation.tracks.length : 1) : 0;
   el('separate-count').hidden = !separations;
   text('separate-count', separations ? String(separations) : '');
   el('separate-count').setAttribute(
@@ -6690,8 +6692,8 @@ el('separation-map').onclick = () => {
   requestTimeMap(
     center,
     null,
-    'groups' in separation
-      ? { tags: [...new Set(separation.groups.flat())], mode: 'any' }
+    'tracks' in separation
+      ? { tags: [...new Set(separation.tracks.flatMap((t) => t.tags))], mode: 'any' }
       : { related: separation.related, depth: separation.depth, mode: 'any' },
   );
 };
@@ -9272,7 +9274,7 @@ async function loadTagCounts(): Promise<{ tag: string; count: number }[]> {
  * group's tags), or an entity and its related or connected set (#342).
  */
 type Separation =
-  { groups: string[][] } | { related: EntityRef; depth: 'direct' | 'all'; label: string };
+  { tracks: SeparationTrack[] } | { related: EntityRef; depth: 'direct' | 'all'; label: string };
 /**
  * A timeline's default view as a server or file sent it (#416), or nothing when it has none or
  * it isn't one this version reads: the timeline then opens whole.
@@ -9291,8 +9293,8 @@ function timelineView(): TimelineView | undefined {
 /** The separation shown, as a default view keeps it (without the entity's title). */
 function shownSeparation(): ViewSeparation | null {
   if (!separation) return null;
-  return 'groups' in separation
-    ? tagSeparation(separation.groups)
+  return 'tracks' in separation
+    ? tagSeparation(separation.tracks)
     : { related: separation.related, depth: separation.depth };
 }
 /**
@@ -9329,7 +9331,7 @@ async function openDefaultView(view: TimelineView | undefined) {
   const chosen = view?.separation;
   if (!chosen || comparison) return;
   if (!('related' in chosen)) {
-    startSeparation(separationGroups(chosen));
+    startSeparation(viewSeparations(chosen));
     return;
   }
   const request = documentRequest;
@@ -9346,31 +9348,49 @@ async function openDefaultView(view: TimelineView | undefined) {
  * tags, above a last track of everything else, which has none of them), or by an entity's
  * relationships (one track above the rest). Read-only; nothing is saved.
  */
-function startSeparation(by: string[][] | Separation) {
-  const choice: Separation = Array.isArray(by) ? { groups: by } : by;
+function startSeparation(by: SeparationTrack[] | Separation) {
+  const choice: Separation = Array.isArray(by) ? { tracks: by } : by;
   flushEventEdit();
   flushDurationEdit();
   const presentation = model?.presentation ?? remote?.presentation ?? DEFAULT_PRESENTATION;
   const plugins = installedPlugins();
+  // A separation that disjoins says when (#549).
   const label =
-    'groups' in choice ? choice.groups.map((g) => g.join(', ')).join(' · ') : choice.label;
+    'tracks' in choice
+      ? choice.tracks
+          .map(
+            (t) =>
+              t.tags.join(', ') + (t.disjoin ? ` (from ${presented(Q.parse(t.disjoin.at))})` : ''),
+          )
+          .join(' · ')
+      : choice.label;
+  // Where a separation disjoins, its tracks are the whole plan's (#549): each event's track
+  // depends on its time. Without disjoins, each is a plain tag filter, as before.
+  const disjoins = 'tracks' in choice && choice.tracks.some((t) => t.disjoin);
   type Track = { key: string; title: string; filter: ViewFilter; arcs: boolean };
   // Each separated track asks for the whole timeline's arcs, each end marked with whether it
   // is on that track (#415); arcAxes places every end on the first track that has it, and
   // ends no separated track has on the last. The last track asks for none.
   const tracks: Track[] =
-    'groups' in choice
+    'tracks' in choice
       ? [
-          ...choice.groups.map((tags, i) => ({
-            key: choice.groups.length === 1 ? 'tagged' : `tagged-${i + 1}`,
+          ...choice.tracks.map(({ tags }, i) => ({
+            key: choice.tracks.length === 1 ? 'tagged' : `tagged-${i + 1}`,
             title: `Tagged ${tags.join(', ')}`,
-            filter: { tags, mode: 'any' as const },
+            filter: disjoins
+              ? { separations: choice.tracks, track: i }
+              : { tags, mode: 'any' as const },
             arcs: true,
           })),
           {
             key: 'rest',
             title: 'Everything else',
-            filter: { tags: [...new Set(choice.groups.flat())], mode: 'none' as const },
+            filter: disjoins
+              ? { separations: choice.tracks, track: null }
+              : {
+                  tags: [...new Set(choice.tracks.flatMap((t) => t.tags))],
+                  mode: 'none' as const,
+                },
             arcs: false,
           },
         ]
@@ -9437,7 +9457,7 @@ function startSeparation(by: string[][] | Separation) {
   viewport = before;
   // The bar names what was separated: the tags, or the entity whose relationships were
   // followed (#342).
-  const groups = 'groups' in choice ? choice.groups.length : 0;
+  const groups = 'tracks' in choice ? choice.tracks.length : 0;
   text(
     'separation-heading',
     groups > 1
@@ -9469,7 +9489,12 @@ function startSeparation(by: string[][] | Separation) {
  * removed, and applied together, or all rejoined. `separateDraft` is the dialog's state until
  * it is applied.
  */
-let separateDraft: string[][] = [];
+/**
+ * A separation as the dialog edits it: its tags, and when it disjoins (#549): from the main
+ * timeline (`from` null) or an earlier separation, at `time` as typed (the timeline's display).
+ */
+type SeparateDraft = { tags: string[]; disjoin: { from: number | null; time: string } | null };
+let separateDraft: SeparateDraft[] = [];
 let separateCounts: { tag: string; count: number }[] = [];
 /** Whether the separation by an entity's relationships, if shown, is to be kept. */
 let separateKeepsRelated = false;
@@ -9479,7 +9504,14 @@ function openSeparateDialog() {
   closeTagPicker?.();
   text('separate-error', '');
   separateDraft =
-    separation && 'groups' in separation ? separation.groups.map((g) => [...g]) : [[]];
+    separation && 'tracks' in separation
+      ? separation.tracks.map((t) => ({
+          tags: [...t.tags],
+          disjoin: t.disjoin
+            ? { from: t.disjoin.from, time: presented(Q.parse(t.disjoin.at), 'input') }
+            : null,
+        }))
+      : [{ tags: [], disjoin: null }];
   separateKeepsRelated = !!separation && 'related' in separation;
   separateCounts = [];
   renderSeparateDialog();
@@ -9513,7 +9545,8 @@ function renderSeparateDialog() {
 }
 /** One separation in the dialog: its heading and Remove, its tags as chips, and the picker. */
 function separationItem(index: number): HTMLLIElement {
-  const group = separateDraft[index];
+  const draft = separateDraft[index],
+    group = draft.tags;
   const item = document.createElement('li');
   item.className = 'separation-item';
   const heading = document.createElement('div');
@@ -9528,7 +9561,16 @@ function separationItem(index: number): HTMLLIElement {
   remove.hidden = separateDraft.length === 1 && !group.length;
   remove.onclick = () => {
     separateDraft.splice(index, 1);
-    if (!separateDraft.length) separateDraft.push([]);
+    // Those disjoining from it disjoin from the main timeline; later ones move up.
+    for (const other of separateDraft)
+      if (other.disjoin && other.disjoin.from !== null)
+        other.disjoin.from =
+          other.disjoin.from === index
+            ? null
+            : other.disjoin.from > index
+              ? other.disjoin.from - 1
+              : other.disjoin.from;
+    if (!separateDraft.length) separateDraft.push({ tags: [], disjoin: null });
     renderSeparateDialog();
   };
   heading.append(name, remove);
@@ -9561,6 +9603,7 @@ function separationItem(index: number): HTMLLIElement {
       renderChips();
       remove.hidden = separateDraft.length === 1 && !group.length;
     }),
+    disjoinRow(index),
   );
   return item;
 }
@@ -9714,9 +9757,76 @@ function tagPicker(group: string[], changed: () => void): HTMLElement {
   };
   return picker;
 }
+/**
+ * When a separation disjoins (#549): throughout (its own timeline), or from the main timeline
+ * or an earlier separation at a time, before which its events stay there.
+ */
+function disjoinRow(index: number): HTMLElement {
+  const draft = separateDraft[index];
+  const row = document.createElement('div');
+  row.className = 'separation-disjoin';
+  const label = document.createElement('label');
+  label.textContent = 'Disjoins ';
+  const from = document.createElement('select');
+  from.className = 'separation-disjoin-from';
+  from.setAttribute('aria-label', `When separation ${index + 1} disjoins`);
+  const options: [string, string][] = [
+    ['always', 'never: separate throughout'],
+    ['main', 'from the main timeline at'],
+    ...Array.from({ length: index }, (_, k): [string, string] => [
+      String(k),
+      `from Separation ${k + 1} at`,
+    ]),
+  ];
+  for (const [value, text] of options) {
+    const option = document.createElement('option');
+    option.value = value;
+    option.textContent = text;
+    from.append(option);
+  }
+  from.value = !draft.disjoin
+    ? 'always'
+    : draft.disjoin.from === null
+      ? 'main'
+      : String(draft.disjoin.from);
+  label.append(from);
+  const time = document.createElement('input');
+  time.className = 'separation-disjoin-time';
+  time.spellcheck = false;
+  time.setAttribute('aria-label', `When separation ${index + 1} disjoins, as a time`);
+  time.placeholder = 'Time';
+  time.value = draft.disjoin?.time ?? '';
+  time.hidden = !draft.disjoin;
+  time.oninput = () => {
+    if (draft.disjoin) draft.disjoin.time = time.value;
+  };
+  attachTimeDialog(time, {
+    heading: `Separation ${index + 1} disjoins at`,
+    editable: () => true,
+    read: () => parseInputTime(time.value),
+    fallback: () => viewMiddle(),
+    apply: (at) => {
+      time.value = presented(at, 'input');
+      if (draft.disjoin) draft.disjoin.time = time.value;
+    },
+  });
+  from.onchange = () => {
+    if (from.value === 'always') draft.disjoin = null;
+    else
+      draft.disjoin = {
+        from: from.value === 'main' ? null : Number(from.value),
+        time: draft.disjoin?.time ?? presented(viewMiddle(), 'input'),
+      };
+    time.value = draft.disjoin?.time ?? '';
+    time.hidden = !draft.disjoin;
+    if (draft.disjoin) time.focus();
+  };
+  row.append(label, time);
+  return row;
+}
 el('separate-add').onclick = () => {
   if (separateDraft.length >= SEPARATION_LIMIT) return;
-  separateDraft.push([]);
+  separateDraft.push({ tags: [], disjoin: null });
   renderSeparateDialog();
   el('separate-list').querySelector<HTMLButtonElement>('li:last-child .tag-picker-toggle')?.click();
 };
@@ -9735,10 +9845,28 @@ el('separate-dialog').addEventListener('close', () => closeTagPicker?.());
 el<HTMLFormElement>('separate-form').onsubmit = (event) => {
   event.preventDefault();
   try {
-    const groups = separateDraft
-      .map((group) => validateEntityTags(group))
-      .filter((group) => group.length);
-    if (!groups.length) {
+    // Separations with no tags are dropped; a disjoin from a dropped one is from the main
+    // timeline, and the others' references follow the ones kept.
+    const kept = separateDraft
+      .map((draft, i) => ({ draft, i, tags: validateEntityTags(draft.tags) }))
+      .filter(({ tags }) => tags.length);
+    const position = new Map(kept.map(({ i }, k) => [i, k]));
+    const tracks: SeparationTrack[] = kept.map(({ draft, tags }, k) => {
+      if (!draft.disjoin) return { tags };
+      let at: Q;
+      try {
+        at = parseInputTime(draft.disjoin.time);
+      } catch (error) {
+        throw new Error(
+          `Separation ${k + 1} disjoins at a time this timeline cannot read: ${
+            error instanceof Error ? error.message : String(error)
+          }`,
+        );
+      }
+      const from = draft.disjoin.from === null ? null : (position.get(draft.disjoin.from) ?? null);
+      return { tags, disjoin: { at: at.toString(), from } };
+    });
+    if (!tracks.length) {
       // Nothing chosen: the relationships' separation stays, or the timeline rejoins.
       if (separation && 'related' in separation && separateKeepsRelated) {
         el<HTMLDialogElement>('separate-dialog').close();
@@ -9752,7 +9880,7 @@ el<HTMLFormElement>('separate-form').onsubmit = (event) => {
       return;
     }
     el<HTMLDialogElement>('separate-dialog').close();
-    startSeparation(groups);
+    startSeparation(tracks);
   } catch (error) {
     text('separate-error', error instanceof Error ? error.message : String(error));
   }
@@ -11201,9 +11329,53 @@ function arcAxes(): ((edge: EdgeBand, end: 'a' | 'b') => number) | null {
   }
   return (edge, end) => axis((end === 'a' ? edge.aKey : edge.bKey) ?? edge.sourceKey);
 }
+/**
+ * Where separations disjoin (#549): each such track is shaded before its time, when its
+ * events were still in the track it disjoins from, and a line forks from that track's axis to
+ * its own at the time.
+ */
+function renderSeparationForks(svg: Element) {
+  svg.querySelectorAll('.separation-fork').forEach((node) => node.remove());
+  if (!separation || !('tracks' in separation) || !comparison || comparison.combined) return;
+  const rows = comparisonRows().rows,
+    keys = comparison.tracks.map((t) => t.source.key),
+    right = stageWidth() / uiScale;
+  const axis = (key: string) => 192 + (rows.get(key)?.offset ?? 0);
+  const ns = 'http://www.w3.org/2000/svg';
+  separation.tracks.forEach((track, i) => {
+    if (!track.disjoin || !keys[i]) return;
+    const x = (inset() + viewport.x(Q.parse(track.disjoin.at), width())) / uiScale;
+    const own = axis(keys[i]),
+      from = axis(track.disjoin.from === null ? keys[keys.length - 1] : keys[track.disjoin.from]);
+    if (x > 0) {
+      const shade = document.createElementNS(ns, 'rect');
+      shade.setAttribute('class', 'separation-fork separation-before');
+      shade.setAttribute('x', '0');
+      shade.setAttribute('y', String(own - 150));
+      shade.setAttribute('width', String(Math.min(x, right)));
+      shade.setAttribute('height', '300');
+      svg.prepend(shade);
+    }
+    if (x >= 0 && x <= right) {
+      const line = document.createElementNS(ns, 'path');
+      line.setAttribute('class', 'separation-fork separation-fork-line');
+      line.setAttribute('d', `M${x} ${from} L${x} ${own}`);
+      const dot = document.createElementNS(ns, 'circle');
+      dot.setAttribute('class', 'separation-fork separation-fork-point');
+      dot.setAttribute('cx', String(x));
+      dot.setAttribute('cy', String(from));
+      dot.setAttribute('r', '4');
+      const title = document.createElementNS(ns, 'title');
+      title.textContent = `Separation ${i + 1} disjoins here`;
+      dot.append(title);
+      svg.append(line, dot);
+    }
+  });
+}
 function renderEdgeArcs() {
   const svg = el('edge-arcs');
   svg.querySelector('.edge-limit')?.remove();
+  renderSeparationForks(svg);
   const generation = contentGeneration(),
     shown = new Set<string>(),
     right = stageWidth() / uiScale,

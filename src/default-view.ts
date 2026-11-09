@@ -2,7 +2,8 @@
 // A timeline's default view (#416): how it opens for readers, embeds and shared links. It is a
 // separation, by tags or by an entity's relationships, saved with the timeline's settings (`view`
 // in a document), so exports, saves, forks, merges and saved history keep it like the title.
-import { validateEntityTags } from './tags.js';
+import { validateEntityTags, validateSeparations } from './tags.js';
+import type { SeparationTrack } from './tags.js';
 import { refKey, validateRef } from './relationships.js';
 import type { EntityRef } from './relationships.js';
 
@@ -11,17 +12,31 @@ import type { EntityRef } from './relationships.js';
  * track each, above the rest), or an entity and its related or connected set.
  */
 export type ViewSeparation =
-  { tags: string[] } | { groups: string[][] } | { related: EntityRef; depth: 'direct' | 'all' };
+  | { tags: string[] }
+  | { groups: string[][] }
+  /** Separations of which some disjoin at a time (#549). */
+  | { separations: SeparationTrack[] }
+  | { related: EntityRef; depth: 'direct' | 'all' };
 /** The most tag separations shown at once: each is a track, and a comparison has eight. */
 export const SEPARATION_LIMIT = 7;
-/** A tag separation's groups: one for `{tags}`, each of `{groups}`; none for an entity's. */
-export function separationGroups(s: ViewSeparation | null | undefined): string[][] {
-  if (!s) return [];
-  return 'tags' in s ? [s.tags] : 'groups' in s ? s.groups : [];
+/** A tag separation's separations: one for `{tags}`, each of `{groups}` or `{separations}`. */
+export function viewSeparations(s: ViewSeparation | null | undefined): SeparationTrack[] {
+  if (!s || 'related' in s) return [];
+  if ('separations' in s) return s.separations;
+  return ('tags' in s ? [s.tags] : s.groups).map((tags) => ({ tags }));
 }
-/** Tag separations as a default view keeps them: `{tags}` for one, `{groups}` for several. */
-export function tagSeparation(groups: string[][]): ViewSeparation {
-  return groups.length === 1 ? { tags: [...groups[0]] } : { groups: groups.map((g) => [...g]) };
+/** A tag separation's groups of tags. */
+export const separationGroups = (s: ViewSeparation | null | undefined): string[][] =>
+  viewSeparations(s).map((t) => t.tags);
+/**
+ * Tag separations as a default view keeps them: `{tags}` for one, `{groups}` for several, and
+ * `{separations}` when any disjoins.
+ */
+export function tagSeparation(tracks: SeparationTrack[] | string[][]): ViewSeparation {
+  const list: SeparationTrack[] = tracks.map((t) => (Array.isArray(t) ? { tags: [...t] } : t));
+  if (list.some((t) => t.disjoin))
+    return { separations: list.map((t) => ({ ...t, tags: [...t.tags] })) };
+  return list.length === 1 ? { tags: [...list[0].tags] } : { groups: list.map((t) => [...t.tags]) };
 }
 export interface TimelineView {
   separation: ViewSeparation;
@@ -43,6 +58,11 @@ export function validateTimelineView(value: unknown): TimelineView {
     const tags = validateEntityTags(s.tags);
     if (!tags.length) throw new Error('A default separation needs at least one tag.');
     return { separation: { tags } };
+  }
+  if (object(s) && 'separations' in s) {
+    if (Object.keys(s).length !== 1)
+      throw new Error('A default separation with disjoins has only its separations.');
+    return { separation: { separations: validateSeparations(s.separations) } };
   }
   if (object(s) && 'groups' in s) {
     if (Object.keys(s).length !== 1 || !Array.isArray(s.groups))
@@ -81,11 +101,13 @@ export function sameSeparation(a: ViewSeparation | null, b: ViewSeparation | nul
       refKey(a.related) === refKey(b.related) &&
       a.depth === b.depth
     );
-  // Tag separations: the same groups, each the same tags, in any order.
-  const key = (s: ViewSeparation) =>
-    separationGroups(s)
-      .map((g) => [...g].sort().join(','))
-      .sort()
-      .join('|');
+  // Tag separations: the same tags (in any order) and disjoin for each; without disjoins, the
+  // groups in any order.
+  const key = (s: ViewSeparation) => {
+    const tracks = viewSeparations(s).map((t) =>
+      JSON.stringify({ tags: [...t.tags].sort(), disjoin: t.disjoin ?? null }),
+    );
+    return viewSeparations(s).some((t) => t.disjoin) ? tracks.join('|') : tracks.sort().join('|');
+  };
   return key(a) === key(b);
 }

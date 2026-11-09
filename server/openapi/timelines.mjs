@@ -294,6 +294,12 @@ export const schemas = {
           },
           {
             type: 'object',
+            required: ['separations'],
+            additionalProperties: false,
+            properties: { separations: ref('SeparationTracks') },
+          },
+          {
+            type: 'object',
             required: ['groups'],
             additionalProperties: false,
             properties: {
@@ -389,7 +395,47 @@ export const schemas = {
           mode: { enum: ['any', 'none'] },
         },
       },
+      {
+        type: 'object',
+        title: 'Separations that disjoin',
+        description:
+          'One track of several separations (#549): `track` is a separation’s index, or null for everything else. An entity is on a separation’s track from its disjoin on; before it, on the track it disjoins from.',
+        required: ['separations', 'track'],
+        properties: {
+          separations: ref('SeparationTracks'),
+          track: { type: ['integer', 'null'], minimum: 0, maximum: 6 },
+        },
+      },
     ],
+  },
+  SeparationTracks: {
+    type: 'array',
+    minItems: 1,
+    maxItems: 7,
+    description:
+      'Separations, each its tags and, optionally, when it disjoins: at an exact time, from the main timeline (`from` null) or an earlier separation (its index). Before then its events stay in the track it disjoins from.',
+    items: {
+      type: 'object',
+      required: ['tags'],
+      additionalProperties: false,
+      properties: {
+        tags: {
+          type: 'array',
+          minItems: 1,
+          maxItems: 40,
+          items: { type: 'string', minLength: 1, maxLength: 128 },
+        },
+        disjoin: {
+          type: 'object',
+          required: ['at', 'from'],
+          additionalProperties: false,
+          properties: {
+            at: { type: 'string', description: 'An exact rational time.' },
+            from: { type: ['integer', 'null'], minimum: 0 },
+          },
+        },
+      },
+    },
   },
   TimelineDocument: {
     type: 'object',

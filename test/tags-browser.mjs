@@ -154,6 +154,22 @@ export async function checkTags(page, restore) {
       () => document.getElementById('separation-heading').textContent === 'Separated by tags',
     );
     assert.equal(await page.locator('#separate-count').textContent(), '1');
+    // A separation that disjoins (#549): war from the main timeline at 60. Battle (10) and
+    // the siege (from 50) stay below with the market; the treaty (90) forks away above.
+    await page.locator('#separate-button').click();
+    await editing.locator('.separation-item').first().waitFor();
+    await editing.locator('.separation-disjoin-from').first().selectOption('main');
+    await editing.locator('.separation-disjoin-time').first().fill('60');
+    await page.locator('#separate-submit').click();
+    await editing.waitFor({ state: 'hidden' });
+    await page.waitForFunction(() =>
+      document.getElementById('separation-tags').textContent.includes('(from'),
+    );
+    await page.evaluate(() => new Promise(requestAnimationFrame));
+    assert((await top('Treaty')) < (await top('Market')), 'the treaty forked away');
+    assert(Math.abs((await top('Battle')) - (await top('Market'))) < 40, 'the battle had not');
+    assert.equal(await page.locator('.separation-fork-line').count(), 1);
+    assert.equal(await page.locator('.separation-before').count(), 1);
     // Rejoining all from the dialog shows the whole timeline, and the count goes.
     await page.locator('#separate-button').click();
     await page.locator('#separate-clear').click();

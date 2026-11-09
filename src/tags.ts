@@ -13,7 +13,7 @@ import {
   validateRelationships,
 } from './relationships.js';
 import type { EdgeBand, EntityRef } from './relationships.js';
-import type { Rational } from 'rational-ordered-map';
+import { Rational, Rational as Q } from 'rational-ordered-map';
 import type { Metadata, PointEvent, TimelineDocument } from './core.js';
 import type { Duration } from './durations.js';
 
@@ -66,12 +66,90 @@ export function entityTags(metadata: Metadata): string[] {
 export type ViewFilter =
   | { tags: string[]; mode: 'any' | 'none' }
   /** An entity and its relations (direct, or everything reachable), or everything else. */
-  | { related: EntityRef; depth: 'direct' | 'all'; mode: 'any' | 'none' };
+  | { related: EntityRef; depth: 'direct' | 'all'; mode: 'any' | 'none' }
+  /** One track of several separations, some disjoining at a time (`null`: the main track). */
+  | { separations: SeparationTrack[]; track: number | null };
+/**
+ * One of several separations (#548): the events with any of its tags, in a track of their own.
+ * With `disjoin`, only from `at` on: before it, they stay in the track they disjoin from, the
+ * main timeline's (`from` null) or an earlier separation's (its index), and the separation
+ * forks away at `at` (#549).
+ */
+export interface SeparationTrack {
+  tags: string[];
+  disjoin?: { at: string; from: number | null };
+}
+/** The most separations shown together: each is a track, and a comparison has eight. */
+const SEPARATIONS = 7;
+/**
+ * Validates separations: one to seven, each with events' tags, and a disjoin, when it has one,
+ * at an exact time from the main timeline or an earlier separation (so they never disjoin
+ * from each other in a circle).
+ */
+export function validateSeparations(value: unknown): SeparationTrack[] {
+  if (!Array.isArray(value) || !value.length || value.length > SEPARATIONS)
+    throw new Error(`Show one to ${SEPARATIONS} separations.`);
+  return value.map((raw, index) => {
+    const s = raw as Record<string, unknown> | null;
+    if (!s || typeof s !== 'object' || Array.isArray(s))
+      throw new Error('A separation is its tags, and when it disjoins.');
+    const tags = validateEntityTags(s.tags);
+    if (!tags.length) throw new Error('Each separation needs a tag.');
+    if (s.disjoin === undefined || s.disjoin === null) return { tags };
+    const d = s.disjoin as Record<string, unknown>;
+    if (
+      !d ||
+      typeof d !== 'object' ||
+      typeof d.at !== 'string' ||
+      !(
+        d.from === null ||
+        (Number.isInteger(d.from) && (d.from as number) >= 0 && (d.from as number) < index)
+      )
+    )
+      throw new Error(
+        'A separation disjoins at a time, from the main timeline or an earlier separation.',
+      );
+    let at: string;
+    try {
+      at = Q.parse(d.at).toString();
+    } catch {
+      throw new Error('A disjoin’s time must be an exact rational.');
+    }
+    return { tags, disjoin: { at, from: d.from as number | null } };
+  });
+}
 /** Stable cache key for a filter. */
 export function viewFilterKey(filter: ViewFilter): string {
   if ('related' in filter)
     return `${filter.mode}:related:${filter.depth}:${refKey(validateRef(filter.related))}`;
+  if ('separations' in filter)
+    return `tracks:${filter.track === null ? 'rest' : filter.track}:${JSON.stringify(
+      validateSeparations(filter.separations).map((s) => ({ ...s, tags: [...s.tags].sort() })),
+    )}`;
   return filter.mode + ':' + [...validateEntityTags(filter.tags)].sort().join(',');
+}
+/**
+ * Which tracks an entity with `tags` at `time` is on, among `separations`: for each separation
+ * it matches, that separation's track, or before it disjoins, the track it disjoins from
+ * (followed back); the main track (`null`) when it matches none.
+ */
+export function separationTracks(
+  separations: SeparationTrack[],
+  tags: readonly string[],
+  time: Rational | null,
+): Set<number | null> {
+  const ats = separations.map((s) => (s.disjoin ? Q.parse(s.disjoin.at) : null));
+  const trackOf = (i: number): number | null => {
+    const s = separations[i];
+    if (!s.disjoin || !time || time.compare(ats[i]!) >= 0) return i;
+    return s.disjoin.from === null ? null : trackOf(s.disjoin.from);
+  };
+  const tracks = new Set<number | null>();
+  separations.forEach((s, i) => {
+    if (s.tags.some((tag) => tags.includes(tag))) tracks.add(trackOf(i));
+  });
+  if (!tracks.size) tracks.add(null);
+  return tracks;
 }
 /**
  * One side of a separation. Durations are resolved to fixed endpoints first, because the
@@ -80,11 +158,13 @@ export function viewFilterKey(filter: ViewFilter): string {
 export function filterDocument(document: TimelineDocument, filter: ViewFilter): TimelineDocument {
   const keep = filterMembership(document, filter);
   const times = new Map(document.events.map((e) => [e.id, e.time]));
-  const events: PointEvent[] = document.events.filter((e) => keep('m:' + e.id, e.metadata));
+  // An entity's time decides its track where a separation disjoins: a moment's, and a
+  // duration's start.
+  const events: PointEvent[] = document.events.filter((e) => keep('m:' + e.id, e.metadata, e.time));
   const durations: Duration[] = [];
   for (const duration of document.durations ?? []) {
-    if (!keep('d:' + duration.id, duration.metadata)) continue;
     const band = resolveDuration(duration, (id) => times.get(id));
+    if (!keep('d:' + duration.id, duration.metadata, band?.startTime)) continue;
     if (band)
       durations.push({
         id: duration.id,
@@ -112,7 +192,15 @@ export function filterDocument(document: TimelineDocument, filter: ViewFilter): 
 export function filterMembership(
   document: Pick<TimelineDocument, 'relationships'>,
   filter: ViewFilter,
-): (key: string, metadata: Metadata) => boolean {
+): (key: string, metadata: Metadata, time?: string) => boolean {
+  // Several separations: on this track when it is one of the entity's, at its time.
+  if ('separations' in filter) {
+    const separations = validateSeparations(filter.separations);
+    return (_key, metadata, time) =>
+      separationTracks(separations, entityTags(metadata), time ? Q.parse(time) : null).has(
+        filter.track,
+      );
+  }
   // Membership on the "any" side, by reference key.
   let inside: (key: string, metadata: Metadata) => boolean;
   if ('related' in filter) {
@@ -146,7 +234,7 @@ export function separationArcs(document: TimelineDocument, filter: ViewFilter) {
   const moments = new Map(document.events.map((e) => [e.id, e.time]));
   const times = entityTimes(document.events, document.durations ?? [], (id) => moments.get(id));
   const tree = edgeTree(document.relationships ?? [], (key) => times.get(key));
-  const inside = (key: string) => keep(key, metadata.get(key) ?? {});
+  const inside = (key: string) => keep(key, metadata.get(key) ?? {}, times.get(key));
   return (
     lower: Rational,
     upper: Rational,
