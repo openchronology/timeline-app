@@ -164,6 +164,7 @@ It imports one repository into one timeline at a time.
 | `--only <kinds>`      | Only these kinds, comma-separated: `--only commits`.                                                                          |
 | `--except <kinds>`    | Every kind but these: `--except forks,branches`.                                                                              |
 | `--since <time>`      | Only what was updated or happened since then. Use it to bring a timeline up to date.                                          |
+| `--no-branch-view`    | Leave the timeline's views alone: no [Branches view](#the-branches-view).                                                     |
 | `--dry-run`           | Read the repository and report what would be written, without writing.                                                        |
 
 **Access and limits:**
@@ -172,6 +173,7 @@ It imports one repository into one timeline at a time.
 - **Requests:**
   - **Items:** listing them costs one request per 100. Each item's events cost at least one more, since every item has its own timeline. A repository with 2,000 issues therefore costs about 2,020 requests, under half an hour of GitHub's hourly limit.
   - **Commits:** one request per 100 commits on the default branch, plus one per other branch that has commits of its own.
+  - **The Branches view:** one request per 100 pull requests, plus one per branch it shows.
   - **Keeping it small:** `--since` keeps later runs small, and `--only commits` reads no items at all.
 - **Rate limit:** when the limit runs out, the importer waits if it resets within 15 minutes, and otherwise stops with a message.
 - **GitHub Enterprise:** set `GITHUB_API_URL`, such as `https://github.example.com/api/v3`.
@@ -179,8 +181,20 @@ It imports one repository into one timeline at a time.
 Exit codes:
 
 - **0:** everything was imported.
-- **1:** the repository could not be read, or the timeline written.
+- **1:** the repository could not be read, or the timeline or its Branches view written.
 - **2:** a usage error.
+
+### The Branches view
+
+With `branches` among the kinds (the default), the importer also saves a view of the timeline called **Branches** and makes it the timeline's [default view](views.md), so the timeline opens with each branch in a track of its own:
+
+- **Which branches:** the seven most recently active, by their last commit, merge or update (seven is the most separations a view shows). They come from the repository's own pull requests, merge requests on GitLab, which outlive their branches, and from the branches that still exist. The default branch is the main timeline.
+- **When:** each track disjoins from the main timeline at the moment its branch began, `Branch <name>`: its first commit, or its pull request's opening if that came first. A merged branch unites back into the main timeline at its pull request's `Merged` moment. A branch with commits after its pull request was merged is still under way, and stays apart.
+- **What is in each:** a branch's tag. A branch merged with a merge commit has its commits in the default branch's history, which is read first, so for the branches shown, the importer reads each one's pull request commits again and tags them, and the pull request itself, with the branch.
+
+The view belongs to the API key's account and is public: anyone who can read the timeline sees it. Running the importer again updates the same view, found by its title among the account's views of the timeline. It becomes the default only if the timeline has no default view, or has this one. A default view its authors chose is kept, and the Branches view is listed under **Views**. `--no-branch-view` leaves views alone.
+
+The webhook receiver does not change the view. Run the importer with `--since` to bring it up to date.
 
 ## Following changes live
 

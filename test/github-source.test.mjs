@@ -786,6 +786,15 @@ test('the command imports one repository into one timeline, of the kinds asked f
       lines.join('\n'),
       /acme\/app → .*: would import 3 issues and pull requests \(2 open\), 5 commits, 12 other events, 4 other durations, 2 links\./,
     );
+    // The Branches view (#557): feat/new_feature, which has commits of its own and is not
+    // merged; old has none.
+    assert.match(lines.join('\n'), /Branches view: feat\/new_feature\./);
+    lines.length = 0;
+    assert.equal(
+      await run('--repo', 'acme/app', '--timeline', TIMELINE, '--dry-run', '--no-branch-view'),
+      0,
+    );
+    assert.doesNotMatch(lines.join('\n'), /Branches view/);
     // Only commits: no item is read, and no link made (they need the items).
     lines.length = 0;
     github.seen.length = 0;

@@ -220,6 +220,32 @@ export class TimelineWriter {
       throw Object.assign(new Error('save'), { status, value, retryAfter });
     }
   }
+  /**
+   * Makes `view` ({id, separation}) the timeline's default view, unless it has a default view
+   * of its own: none, or `view`'s saved view (id) already, is replaced. Saved as a settings
+   * change with no entries, against a fresh revision. Resolves with whether it is the default.
+   */
+  async setDefaultView(timeline, view) {
+    for (let attempt = 0; ; attempt++) {
+      this.forget(timeline);
+      const loaded = await this.load(timeline);
+      if (!loaded.state) throw Object.assign(new Error('load'), loaded);
+      const current = loaded.state.settings.view;
+      if (current && current.id !== view.id) return false;
+      const { status, value, retryAfter } = await this.request(`timelines/${timeline}/changes`, {
+        method: 'PUT',
+        body: JSON.stringify({
+          revision: loaded.state.revision,
+          settings: { ...loaded.state.settings, view },
+          changes: [],
+        }),
+      });
+      if (status === 200) return true;
+      // Someone else saved: look again at their settings, which may now name a default.
+      if (status === 409 && attempt < 5) continue;
+      throw Object.assign(new Error('save'), { status, value, retryAfter });
+    }
+  }
   /** The key owner's storage use and quota (`GET /api/timelines/usage`), or null if unknown. */
   async usage() {
     const { status, value } = await this.request('timelines/usage');

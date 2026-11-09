@@ -256,8 +256,11 @@ export async function readGitlab(reader, repository, { since, kinds = eventKinds
   }
   // Commits, the default branch's first; then each other branch until it meets history read.
   const commitIds = new Set();
+  // Each other branch's own commits, first and last (for the Branches view, #557).
+  const branchTimes = [];
+  let main = null;
   if (keeps(kinds, 'commit') || keeps(kinds, 'branch')) {
-    const main = (await reader.get(`${reader.api}${project}`)).value.default_branch;
+    main = (await reader.get(`${reader.api}${project}`)).value.default_branch;
     const branches = [{ name: main }];
     for await (const branch of reader.list(`${project}/repository/branches`))
       // A branch with nothing since `since` is not read: GitLab dates each one's last commit.
@@ -266,7 +269,8 @@ export async function readGitlab(reader, repository, { since, kinds = eventKinds
     const seen = new Set();
     for (const { name: branch, head } of branches) {
       if (head && seen.has(head)) continue;
-      let first = null;
+      let first = null,
+        last = null;
       for await (const entry of reader.list(`${project}/repository/commits`, {
         ref_name: branch,
         ...(since ? { since } : {}),
@@ -288,7 +292,10 @@ export async function readGitlab(reader, repository, { since, kinds = eventKinds
           links.push(...commitLinks(repository, commit));
         }
         if (!first || Date.parse(commit.time) < Date.parse(first.time)) first = commit;
+        if (!last || Date.parse(commit.time) > Date.parse(last.time)) last = commit;
       }
+      if (branch !== main && first)
+        branchTimes.push({ name: branch, first: first.time, last: last.time });
       if (branch !== main && first && keeps(kinds, 'branch'))
         moments.push(branchMoment(repository, branch, { verb: 'branch', time: first.time }));
     }
@@ -341,6 +348,8 @@ export async function readGitlab(reader, repository, { since, kinds = eventKinds
     items: keeps(kinds, 'item') ? items.length : 0,
     open: keeps(kinds, 'item') ? items.filter((i) => i.state === 'open').length : 0,
     commits: commitIds.size,
+    main,
+    branches: branchTimes,
     warnings,
   };
 }
