@@ -19,7 +19,9 @@ import {
   isOngoing,
   printEntityTime,
   frameWithOngoing,
+  filterDocument,
 } from '../dist/core.mjs';
+import { RemoteWorkspace } from '../dist/remote-cache.mjs';
 
 const gregorian = { ...DEFAULT_PRESENTATION, mode: 'gregorian' };
 const doc = (presentation = gregorian) => ({
@@ -205,4 +207,47 @@ test("a store's placeholder window, joined with its ongoing durations, is what t
     const counted = (f) => f.groups.reduce((n, g) => n + BigInt(g.durationCount ?? '0'), 0n);
     assert.equal(counted(joined), counted(expected), `summaries in [${left}, +${span}]`);
   }
+});
+
+test("a server window's ongoing band keeps the end it was resolved at under unsaved edits", () => {
+  const start = '1000';
+  const workspace = new RemoteWorkspace(validateDocument(doc()));
+  const band = {
+    ...resolveDuration(
+      { id: 'open', start, end: { ongoing: true }, metadata: { title: 'Open' } },
+      () => undefined,
+      Q.parse('5000'),
+    ),
+  };
+  assert.equal(band.last, '5000/1');
+  const frame = { groups: [], durations: [band] };
+  const [overlaid] = workspace.overlay(
+    frame,
+    new Viewport(Q.zero, Q.parse('9000')),
+    Q.zero,
+  ).durations;
+  assert.equal(overlaid.last, '5000/1', 'not a point at its start');
+  assert.ok(isOngoing(overlaid.end));
+});
+
+test('a separated side keeps an ongoing end, to resolve when it is drawn', () => {
+  const d = validateDocument(doc());
+  for (const filter of [
+    { tags: ['nothing'], mode: 'none' },
+    { separations: [{ related: { duration: 'issue' }, depth: 'direct' }], track: 0 },
+  ]) {
+    const issue = filterDocument(d, filter).durations?.find((x) => x.id === 'issue');
+    assert.ok(issue, JSON.stringify(filter));
+    assert.deepEqual(issue.end, { ongoing: true });
+    assert.equal(issue.start, '1000/1');
+  }
+  // Drawn from its side, it ends at the clock like the whole timeline's.
+  const side = new TimelineIndex(
+    validateDocument(filterDocument(d, { tags: ['nothing'], mode: 'none' })),
+  );
+  side.clock = at(2000);
+  const issue = side
+    .frame(new Viewport(Q.zero, Q.from(5000n)), 1000)
+    .durations.find((b) => b.id === 'issue');
+  assert.equal(issue.last, '2000/1');
 });

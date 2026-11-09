@@ -2501,6 +2501,23 @@ export class PostgresStore {
           ],
         );
         const page = rows.slice(0, query.limit);
+        // An ongoing duration's search row ends at its start (a placeholder): it ends now
+        // (#537), where the timeline has a "now".
+        const linkedDurations = page.filter((r) => r.kind === 'duration').map((r) => r.id);
+        if (now && linkedDurations.length) {
+          const open = new Set(
+            (
+              await c.query(
+                `SELECT band->>'id' AS id FROM ${index('oc_duration_nodes')} x
+                WHERE band->>'id'=ANY($2::text[]) AND band->'end'->>'ongoing'='true'`,
+                [id, linkedDurations],
+              )
+            ).rows.map((r) => r.id),
+          );
+          for (const r of page)
+            if (r.kind === 'duration' && open.has(r.id))
+              r.last = now.compare(Q.parse(r.first)) > 0 ? now.toString() : r.first;
+        }
         let reachable, direct;
         if (!query.after) {
           // Everything connected through any number of links (an undirected closure): a

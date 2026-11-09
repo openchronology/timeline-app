@@ -4612,7 +4612,7 @@ async function durationPage(
     const lower = Q.parse(group.first),
       upper = Q.parse(group.last);
     const inside = [...index.durations.values()]
-      .map((d) => resolveDuration(d, (id) => index.momentTime(id)))
+      .map((d) => resolveDuration(d, (id) => index.momentTime(id), index.now() ?? undefined))
       .filter(
         (b): b is DurationBand =>
           !!b &&
@@ -4923,7 +4923,11 @@ function fitDuration(id: string, known?: DurationBand) {
     frame.durations?.find((b) => b.id === id && !b.sourceKey) ??
     frame.durations?.find((b) => b.id === id) ??
     (model?.durations.has(id)
-      ? resolveDuration(model.durations.get(id)!, (moment) => model!.momentTime(moment))
+      ? resolveDuration(
+          model.durations.get(id)!,
+          (moment) => model!.momentTime(moment),
+          model.now() ?? undefined,
+        )
       : null);
   if (band) navigate(Viewport.fit(Q.parse(band.first), Q.parse(band.last)));
 }
@@ -4963,7 +4967,11 @@ function fit() {
   // A timeline of durations alone fits its durations.
   if (!first && model && !sparseWorkspace())
     for (const duration of model.durations.values()) {
-      const band = resolveDuration(duration, (id) => model!.momentTime(id));
+      const band = resolveDuration(
+        duration,
+        (id) => model!.momentTime(id),
+        model.now() ?? undefined,
+      );
       if (!band) continue;
       const [start, end] = [Q.parse(band.first), Q.parse(band.last)];
       if (!first || start.compare(first) < 0) first = start;
@@ -6321,7 +6329,11 @@ function requestRangeDelete() {
   const between = `between ${presented(lower, 'input')} and ${presented(upper, 'input')}`;
   const durations = (index: TimelineIndex) =>
     [...index.durations.values()].filter((duration) => {
-      const band = resolveDuration(duration, (id) => index.momentTime(id));
+      const band = resolveDuration(
+        duration,
+        (id) => index.momentTime(id),
+        index.now() ?? undefined,
+      );
       return (
         !!band && Q.parse(band.first).compare(lower) >= 0 && Q.parse(band.last).compare(upper) <= 0
       );
@@ -8731,7 +8743,9 @@ function summaryName(group: FrameGroup) {
 function durationLabel(duration: Duration) {
   const band =
     frame.durations?.find((b) => b.id === duration.id) ??
-    (model ? resolveDuration(duration, (id) => model!.momentTime(id)) : null);
+    (model
+      ? resolveDuration(duration, (id) => model!.momentTime(id), model.now() ?? undefined)
+      : null);
   return (
     (duration.metadata.title || 'Untitled duration') +
     (band ? ` · ${presented(Q.parse(band.first))} → ${presented(Q.parse(band.last))}` : '')
@@ -8794,7 +8808,7 @@ function showDuration(duration: Duration, readOnly: boolean, isNew = false) {
     // Its band on the timeline: on a separated track, under that track's key.
     const band =
       frame.durations?.find((b) => b.id === (b.sourceKey ? b.sourceKey + ':' : '') + duration.id) ??
-      resolveDuration(duration, (id) => model?.momentTime(id));
+      resolveDuration(duration, (id) => model?.momentTime(id), model?.now() ?? undefined);
     const when = band
       ? `${presentedAlone(Q.parse(band.first))} → ${presentedAlone(Q.parse(band.last))}`
       : '';
@@ -8860,9 +8874,21 @@ function durationFromForm(): Duration {
     parseTime,
   );
 }
+/**
+ * JSON with each object's keys sorted: a duration's details write its metadata in their own
+ * order (extra fields first), which may not be the order it was saved in by an importer or the
+ * API, so comparing as written would see an edit where there was none.
+ */
+function sortedJson(value: unknown): string {
+  return JSON.stringify(value, (_key, v: unknown) =>
+    v && typeof v === 'object' && !Array.isArray(v)
+      ? Object.fromEntries(Object.entries(v).sort(([a], [b]) => (a < b ? -1 : a > b ? 1 : 0)))
+      : v,
+  );
+}
 function applyDuration(next: Duration) {
   if (!openDuration || !model || !durationEditable()) return;
-  if (JSON.stringify(next) === JSON.stringify(openDuration.duration)) return;
+  if (sortedJson(next) === sortedJson(openDuration.duration)) return;
   // A new duration stays in the dialog until Save adds it.
   if (openDuration.isNew) {
     openDuration.duration = next;
@@ -10987,7 +11013,9 @@ function unsavedMatches(text: string) {
     changed.add('duration:' + id);
     const band =
       bands.get(id) ??
-      (change.after ? resolveDuration(change.after, (m) => sparse.momentTime(m)) : null);
+      (change.after
+        ? resolveDuration(change.after, (m) => sparse.momentTime(m), model?.now() ?? undefined)
+        : null);
     if (change.after && band)
       consider('duration', id, band.first, band.last, change.after.metadata);
   }
@@ -11218,7 +11246,7 @@ async function followLink(link: TimelineLink | null) {
   }
   const known = model && !sparseWorkspace() ? model.durations.get(link.id) : undefined;
   const band = known
-    ? resolveDuration(known, (id) => model!.momentTime(id))
+    ? resolveDuration(known, (id) => model!.momentTime(id), model!.now() ?? undefined)
     : (
         await timelineQuery<{ band: DurationBand | null }>({
           kind: 'duration',
@@ -11361,7 +11389,9 @@ function describe(key: string): RelatedEntry | null {
   } else {
     const duration = model?.durations.get(ref.duration);
     const band =
-      duration && model ? resolveDuration(duration, (id) => model!.momentTime(id)) : null;
+      duration && model
+        ? resolveDuration(duration, (id) => model!.momentTime(id), model.now() ?? undefined)
+        : null;
     if (duration && band)
       return {
         kind: 'duration',
@@ -13203,7 +13233,7 @@ async function durationListPage(
       threshold = Q.parse(source.threshold);
     bands = index
       ? [...index.durations.values()]
-          .map((d) => resolveDuration(d, (id) => index.momentTime(id)))
+          .map((d) => resolveDuration(d, (id) => index.momentTime(id), index.now() ?? undefined))
           .filter(
             (b): b is DurationBand =>
               !!b &&
