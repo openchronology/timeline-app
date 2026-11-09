@@ -2926,7 +2926,7 @@ function heading() {
   // Shown while separated too (#548), with how many separations are shown; not while
   // comparing other timelines.
   el('separate-button').hidden = (!!comparison && !separation) || (!model && !remote && !local);
-  const separations = separation ? ('tracks' in separation ? separation.tracks.length : 1) : 0;
+  const separations = separation ? separation.tracks.length : 0;
   el('separate-count').hidden = !separations;
   text('separate-count', separations ? String(separations) : '');
   el('separate-count').setAttribute(
@@ -4743,7 +4743,9 @@ function saveView(delay = 300) {
       left: viewport.left.toString(),
       right: viewport.left.add(viewport.span).toString(),
       density: Number(input('density').value),
-      separation: separation ?? undefined,
+      separation: separation
+        ? { tracks: separation.tracks, ...(separation.titles ? { titles: separation.titles } : {}) }
+        : undefined,
     });
   if (delay) viewTimer = setTimeout(save, delay);
   else save();
@@ -6461,7 +6463,10 @@ function requestTimeMap(
   mapRelated =
     related ??
     (filter && 'related' in filter
-      ? { ref: filter.related, label: separation && 'label' in separation ? separation.label : '' }
+      ? {
+          ref: filter.related,
+          label: separation?.titles?.[refKey(filter.related)] ?? '',
+        }
       : null);
   input('map-scale').value = '1';
   input('map-offset').value = '0';
@@ -6741,14 +6746,23 @@ el('map-dialog').addEventListener(
 el('separation-map').onclick = () => {
   if (!separation) return;
   const center = viewport.left.add(viewport.span.div(Q.from(2n)));
-  requestTimeMap(
-    center,
-    null,
-    'tracks' in separation
-      ? { tags: [...new Set(separation.tracks.flatMap((t) => t.tags))], mode: 'any' }
-      : { related: separation.related, depth: separation.depth, mode: 'any' },
-  );
+  const filter = separatedEvents(separation.tracks);
+  if (filter) requestTimeMap(center, null, filter);
 };
+/**
+ * The events separated, as the time mapping selects them: those with any of the tags, or an
+ * entity's related or connected set (#552); null for separations by tags and relationships
+ * together, or by several entities, which it cannot select at once.
+ */
+function separatedEvents(tracks: SeparationTrack[]): ViewFilter | null {
+  const tags = tracks.flatMap((t) => ('tags' in t ? t.tags : []));
+  if (tags.length && tracks.every((t) => 'tags' in t))
+    return { tags: [...new Set(tags)], mode: 'any' };
+  const only = tracks[0];
+  return tracks.length === 1 && 'related' in only
+    ? { related: only.related, depth: only.depth, mode: 'any' }
+    : null;
+}
 /** Records a new edit; any redoable edits branch away and are discarded. */
 function record(edit: HistoryEntry) {
   history.push(edit);
@@ -8811,7 +8825,7 @@ function showDuration(duration: Duration, readOnly: boolean, isNew = false) {
   renderDurationPluginFields();
   renderRelated(
     el('duration-related'),
-    readOnly && comparison ? null : { duration: duration.id },
+    readOnly && comparison && !separation ? null : { duration: duration.id },
     readOnly,
   );
   // A new duration has no place on the timeline yet to fit.
@@ -9328,10 +9342,14 @@ async function loadTagCounts(): Promise<{ tag: string; count: number }[]> {
  * What is separated: groups of tags, each its own track above the rest (events with any of a
  * group's tags), or an entity and its related or connected set (#342).
  */
-type Separation =
-  /** `resolved`: each disjoin's and union's time, once read (for drawing and the label). */
-  | { tracks: SeparationTrack[]; resolved?: ResolvedSeparation[] }
-  | { related: EntityRef; depth: 'direct' | 'all'; label: string };
+type Separation = {
+  /** Its separations: by tags, or by an entity's relationships (#552). */
+  tracks: SeparationTrack[];
+  /** Each disjoin's and union's time, once read (for drawing and the label). */
+  resolved?: ResolvedSeparation[];
+  /** The titles of the entities separated by their relationships, by reference key. */
+  titles?: Record<string, string>;
+};
 /**
  * A timeline's default view as a server or file sent it (#416), or nothing when it has none or
  * it isn't one this version reads: the timeline then opens whole.
@@ -9357,10 +9375,80 @@ function timelineView(): TimelineView | undefined {
 }
 /** The separation shown, as a default view keeps it (without the entity's title). */
 function shownSeparation(): ViewSeparation | null {
-  if (!separation) return null;
-  return 'tracks' in separation
-    ? tagSeparation(separation.tracks)
-    : { related: separation.related, depth: separation.depth };
+  return separation ? tagSeparation(separation.tracks) : null;
+}
+/**
+ * The titles of the entities `tracks` separate by relationships, by reference key; null for
+ * one no longer on the timeline (or that cannot be read).
+ */
+async function relatedTitles(tracks: SeparationTrack[]): Promise<Record<string, string | null>> {
+  const titles: Record<string, string | null> = {};
+  for (const t of tracks)
+    if ('related' in t && !(refKey(t.related) in titles)) {
+      const title = await entityTitle(t.related).catch(() => null);
+      titles[refKey(t.related)] =
+        title === null ? null : title || ('moment' in t.related ? 'this moment' : 'this duration');
+    }
+  return titles;
+}
+/**
+ * Shows separations, reading the titles of the entities any separate by relationships first:
+ * those no longer on the timeline are left out (and with none left, the whole timeline is).
+ */
+async function separateWithTitles(tracks: SeparationTrack[]): Promise<boolean> {
+  const request = documentRequest;
+  const found = await relatedTitles(tracks);
+  if (request !== documentRequest || comparison) return false;
+  const kept = keptTracks(tracks, (t) => !('related' in t) || found[refKey(t.related)] != null);
+  if (!kept.length) return false;
+  const titles: Record<string, string> = {};
+  for (const [key, title] of Object.entries(found)) if (title !== null) titles[key] = title;
+  startSeparation({ tracks: kept, titles });
+  return true;
+}
+/**
+ * The separations `keep` keeps, their disjoins and unions following them: one naming a
+ * separation left out names the main timeline instead.
+ */
+function keptTracks(
+  tracks: SeparationTrack[],
+  keep: (t: SeparationTrack) => boolean,
+): SeparationTrack[] {
+  const position = new Map<number, number>();
+  tracks.forEach((t, i) => keep(t) && position.set(i, position.size));
+  const moved = (track: number | null) => (track === null ? null : (position.get(track) ?? null));
+  return tracks
+    .filter(keep)
+    .map((t) => ({
+      ...t,
+      ...(t.disjoins ? { disjoins: t.disjoins.map((d) => ({ ...d, from: moved(d.from) })) } : {}),
+      ...(t.unions ? { unions: t.unions.map((u) => ({ ...u, into: moved(u.into) })) } : {}),
+    }))
+    .map((t) => {
+      // A disjoin or union that now names itself, or names a track twice, goes.
+      const index = tracks.filter(keep).indexOf(t);
+      const once = <T extends { from?: number | null; into?: number | null }>(
+        list: T[] | undefined,
+        key: 'from' | 'into',
+      ) => {
+        const seen = new Set<number | null>();
+        const kept = (list ?? []).filter((j) => {
+          const track = j[key] ?? null;
+          if (track === index || seen.has(track)) return false;
+          seen.add(track);
+          return true;
+        });
+        return kept.length ? kept : undefined;
+      };
+      const { disjoins, unions, ...rest } = t;
+      const d = once(disjoins, 'from'),
+        u = once(unions, 'into');
+      return {
+        ...rest,
+        ...(d ? { disjoins: d } : {}),
+        ...(u ? { unions: u } : {}),
+      } as SeparationTrack;
+    });
 }
 /**
  * An entity's title, or null when it is not on the timeline (as it was saved, for an indexed
@@ -9395,19 +9483,9 @@ async function entityTitle(ref: EntityRef): Promise<string | null> {
 async function openDefaultView(view: TimelineView | undefined) {
   const chosen = view?.separation;
   if (!chosen || comparison) return;
-  if (!('related' in chosen)) {
-    startSeparation(viewSeparations(chosen));
-    nameDefaultView(view);
-    return;
-  }
-  const request = documentRequest;
-  const title = await entityTitle(chosen.related).catch(() => null);
-  if (title === null || request !== documentRequest || comparison) return;
-  startSeparation({
-    related: chosen.related,
-    depth: chosen.depth,
-    label: title || ('moment' in chosen.related ? 'this moment' : 'this duration'),
-  });
+  const tracks = viewSeparations(chosen);
+  if (tracks.every((t) => 'tags' in t)) startSeparation(tracks);
+  else if (!(await separateWithTitles(tracks))) return;
   nameDefaultView(view);
 }
 /**
@@ -9432,6 +9510,18 @@ function nameDefaultView(view: TimelineView | undefined) {
     .then((saved) => name(saved.title, true))
     .catch(() => {});
 }
+/** The title of an entity a separation follows the relationships of (#552). */
+function relatedName(choice: Separation, track: { related: EntityRef }): string {
+  return (
+    choice.titles?.[refKey(track.related)] ??
+    ('moment' in track.related ? 'this moment' : 'this duration')
+  );
+}
+/** A separated track's title: its tags, or the entity whose relationships it follows. */
+function trackTitle(choice: Separation, track: SeparationTrack): string {
+  if ('tags' in track) return `Tagged ${track.tags.join(', ')}`;
+  return `${track.depth === 'direct' ? 'Related to' : 'Connected to'} ${relatedName(choice, track)}`;
+}
 /**
  * Shows the timeline separated: by groups of tags (each a track of the events with any of its
  * tags, above a last track of everything else, which has none of them), or by an entity's
@@ -9445,52 +9535,43 @@ function startSeparation(by: SeparationTrack[] | Separation) {
   flushDurationEdit();
   const presentation = model?.presentation ?? remote?.presentation ?? DEFAULT_PRESENTATION;
   const plugins = installedPlugins();
-  const label = 'tracks' in choice ? separationLabel(choice) : choice.label;
-  // Where a separation disjoins, its tracks are the whole plan's (#549): each event's track
-  // depends on its time. Without disjoins, each is a plain tag filter, as before.
-  const disjoins =
-    'tracks' in choice && choice.tracks.some((t) => t.disjoins?.length || t.unions?.length);
   type Track = { key: string; title: string; filter: ViewFilter; arcs: boolean };
+  // Plain filters where they say it all: tags (each a track, the rest none of them), or one
+  // entity's relationships. Where a separation disjoins or unites (#549), or separations by
+  // tags and relationships mix (#552), each track is the whole plan's, as an event's track
+  // depends on its time and on the other separations.
+  const only = choice.tracks[0];
+  const plain = !choice.tracks.some((t) => t.disjoins?.length || t.unions?.length);
+  const tagged = plain && choice.tracks.every((t) => 'tags' in t);
+  const related = plain && choice.tracks.length === 1 && 'related' in only ? only : null;
+  const filter = (track: number | null): ViewFilter => {
+    if (related)
+      return {
+        related: related.related,
+        depth: related.depth,
+        mode: track === null ? 'none' : 'any',
+      };
+    if (tagged)
+      return track === null
+        ? {
+            tags: [...new Set(choice.tracks.flatMap((t) => ('tags' in t ? t.tags : [])))],
+            mode: 'none',
+          }
+        : { tags: (choice.tracks[track] as { tags: string[] }).tags, mode: 'any' };
+    return { separations: choice.tracks, track };
+  };
   // Each separated track asks for the whole timeline's arcs, each end marked with whether it
   // is on that track (#415); arcAxes places every end on the first track that has it, and
   // ends no separated track has on the last. The last track asks for none.
-  const tracks: Track[] =
-    'tracks' in choice
-      ? [
-          ...choice.tracks.map(({ tags }, i) => ({
-            key: choice.tracks.length === 1 ? 'tagged' : `tagged-${i + 1}`,
-            title: `Tagged ${tags.join(', ')}`,
-            filter: disjoins
-              ? { separations: choice.tracks, track: i }
-              : { tags, mode: 'any' as const },
-            arcs: true,
-          })),
-          {
-            key: 'rest',
-            title: 'Everything else',
-            filter: disjoins
-              ? { separations: choice.tracks, track: null }
-              : {
-                  tags: [...new Set(choice.tracks.flatMap((t) => t.tags))],
-                  mode: 'none' as const,
-                },
-            arcs: false,
-          },
-        ]
-      : [
-          {
-            key: 'tagged',
-            title: `Related to ${label}`,
-            filter: { related: choice.related, depth: choice.depth, mode: 'any' },
-            arcs: true,
-          },
-          {
-            key: 'rest',
-            title: 'Everything else',
-            filter: { related: choice.related, depth: choice.depth, mode: 'none' },
-            arcs: false,
-          },
-        ];
+  const tracks: Track[] = [
+    ...choice.tracks.map((t, i) => ({
+      key: choice.tracks.length === 1 ? 'tagged' : `tagged-${i + 1}`,
+      title: trackTitle(choice, t),
+      filter: filter(i),
+      arcs: true,
+    })),
+    { key: 'rest', title: 'Everything else', filter: filter(null), arcs: false },
+  ];
   let sources: ComparisonSource[];
   if (!sparseWorkspace() && model) {
     const document = model.document();
@@ -9537,40 +9618,40 @@ function startSeparation(by: SeparationTrack[] | Separation) {
   separation = choice;
   startComparison(sources, presentation);
   // Disjoins' times, from the moments they follow (#549): drawn once read.
-  if ('tracks' in choice)
-    void resolveDisjoins(choice).catch((error) =>
-      toast(
-        `Could not read when a separation disjoins or unites: ${error instanceof Error ? error.message : String(error)}`,
-      ),
-    );
+  void resolveDisjoins(choice).catch((error) =>
+    toast(
+      `Could not read when a separation disjoins or unites: ${error instanceof Error ? error.message : String(error)}`,
+    ),
+  );
   // Separating keeps the current view rather than fitting the tracks.
   viewport = before;
-  // The bar names what was separated: the tags, or the entity whose relationships were
+  // The bar names what was separated: the tags, or the entities whose relationships were
   // followed (#342).
-  const groups = 'tracks' in choice ? choice.tracks.length : 0;
+  const count = choice.tracks.length;
+  const name = 'related' in only ? relatedName(choice, only) : '';
   text(
     'separation-heading',
-    groups > 1
-      ? `${groups} separations`
-      : groups
+    count > 1
+      ? `${count} separations`
+      : 'tags' in only
         ? 'Separated by tags'
-        : 'related' in choice && choice.depth === 'direct'
+        : only.depth === 'direct'
           ? 'Separated: related to'
           : 'Separated: connected to',
   );
   // With disjoins' times when already read (a timeline held here); else once they are.
-  text('separation-tags', 'tracks' in choice ? separationLabel(choice) : label);
+  text('separation-tags', separationLabel(choice));
   text(
     'separation-note',
-    groups > 1
-      ? 'Read-only. Each separation’s events (with any of its tags) are shown in its own track; everything else stays below.'
-      : groups
+    count > 1
+      ? 'Read-only. Each separation’s events (with any of its tags, or related to its event) are shown in its own track; everything else stays below.'
+      : 'tags' in only
         ? 'Read-only. Events with any of these tags are shown above; everything else stays below.'
-        : 'related' in choice && choice.depth === 'direct'
-          ? `Read-only. Shown above: ${label} and the events related to it; everything else stays below.`
-          : `Read-only. Shown above: ${label} and everything connected to it through relationships; everything else stays below.`,
+        : only.depth === 'direct'
+          ? `Read-only. Shown above: ${name} and the events related to it; everything else stays below.`
+          : `Read-only. Shown above: ${name} and everything connected to it through relationships; everything else stays below.`,
   );
-  el('separation-map').hidden = !bulkEditable();
+  el('separation-map').hidden = !bulkEditable() || !separatedEvents(choice.tracks);
   heading();
   requestRender();
 }
@@ -9591,12 +9672,18 @@ type DraftJoin = {
   time: string;
   moment: { id: string; title: string } | null;
 };
-/** A separation as the dialog edits it: its tags, disjoins and unions. */
-type SeparateDraft = { tags: string[]; disjoins: DraftJoin[]; unions: DraftJoin[] };
+/**
+ * A separation as the dialog edits it: its tags, disjoins and unions; or, for one by an
+ * entity's relationships (#552), that entity, which only its details change.
+ */
+type SeparateDraft = {
+  tags: string[];
+  related?: { ref: EntityRef; depth: 'direct' | 'all'; title: string };
+  disjoins: DraftJoin[];
+  unions: DraftJoin[];
+};
 let separateDraft: SeparateDraft[] = [];
 let separateCounts: { tag: string; count: number }[] = [];
-/** Whether the separation by an entity's relationships, if shown, is to be kept. */
-let separateKeepsRelated = false;
 let closeTagPicker: (() => void) | null = null;
 type Resolvable = { resolved?: ResolvedSeparation[] };
 /** A disjoin or union as the dialog edits it, with its time when known. */
@@ -9617,19 +9704,27 @@ function openSeparateDialog() {
   if (comparison && !separation) return;
   closeTagPicker?.();
   text('separate-error', '');
-  separateDraft =
-    separation && 'tracks' in separation
-      ? separation.tracks.map((t, i) => ({
-          tags: [...t.tags],
-          disjoins: (t.disjoins ?? []).map((d, k) =>
-            draftJoin(d.from, d, (separation as Resolvable).resolved?.[i]?.disjoins?.[k]?.at),
-          ),
-          unions: (t.unions ?? []).map((u, k) =>
-            draftJoin(u.into, u, (separation as Resolvable).resolved?.[i]?.unions?.[k]?.at),
-          ),
-        }))
-      : [{ tags: [], disjoins: [], unions: [] }];
-  separateKeepsRelated = !!separation && 'related' in separation;
+  const shown = separation;
+  separateDraft = shown
+    ? shown.tracks.map((t, i) => ({
+        tags: 'tags' in t ? [...t.tags] : [],
+        ...('related' in t
+          ? {
+              related: {
+                ref: t.related,
+                depth: t.depth,
+                title: relatedName(shown, t),
+              },
+            }
+          : {}),
+        disjoins: (t.disjoins ?? []).map((d, k) =>
+          draftJoin(d.from, d, (separation as Resolvable).resolved?.[i]?.disjoins?.[k]?.at),
+        ),
+        unions: (t.unions ?? []).map((u, k) =>
+          draftJoin(u.into, u, (separation as Resolvable).resolved?.[i]?.unions?.[k]?.at),
+        ),
+      }))
+    : [{ tags: [], disjoins: [], unions: [] }];
   // A disjoin or union that follows a moment shows its title, once read.
   for (const draft of separateDraft)
     for (const disjoin of [...draft.disjoins, ...draft.unions])
@@ -9658,12 +9753,6 @@ function openSeparateDialog() {
 }
 el('separate-button').onclick = openSeparateDialog;
 function renderSeparateDialog() {
-  const related = separation && 'related' in separation ? separation : null;
-  el('separate-related').hidden = !related || !separateKeepsRelated;
-  text(
-    'separate-related-text',
-    related ? `Separated by relationships: ${related.label}. Separating by tags replaces it.` : '',
-  );
   el('separate-clear').hidden = !separation;
   el<HTMLButtonElement>('separate-add').disabled = separateDraft.length >= SEPARATION_LIMIT;
   el('separate-add').title =
@@ -9704,6 +9793,21 @@ function separationItem(index: number): HTMLLIElement {
     renderSeparateDialog();
   };
   heading.append(name, remove);
+  if (draft.related) {
+    // By an entity's relationships (#552): named here, chosen in the entity's details.
+    const about = document.createElement('p');
+    about.className = 'separation-related';
+    about.id = `separation-related-${index}`;
+    about.textContent = `${draft.related.depth === 'direct' ? 'Related to' : 'Connected to'} “${draft.related.title}”`;
+    const hint = document.createElement('p');
+    hint.className = 'field-hint';
+    hint.textContent =
+      draft.related.depth === 'direct'
+        ? 'The event and the events related to it. Change it from the event’s details.'
+        : 'The event and everything connected to it through relationships. Change it from the event’s details.';
+    item.append(heading, about, hint, joinsList(index));
+    return item;
+  }
   const chips = document.createElement('div');
   chips.className = 'tag-chips';
   chips.setAttribute('aria-labelledby', name.id);
@@ -10144,10 +10248,6 @@ el('separate-add').onclick = () => {
   renderSeparateDialog();
   el('separate-list').querySelector<HTMLButtonElement>('li:last-child .tag-picker-toggle')?.click();
 };
-el('separate-related-remove').onclick = () => {
-  separateKeepsRelated = false;
-  renderSeparateDialog();
-};
 el('separate-clear').onclick = () => {
   closeTagPicker?.();
   el<HTMLDialogElement>('separate-dialog').close();
@@ -10159,11 +10259,11 @@ el('separate-dialog').addEventListener('close', () => closeTagPicker?.());
 el<HTMLFormElement>('separate-form').onsubmit = (event) => {
   event.preventDefault();
   try {
-    // Separations with no tags are dropped, with disjoins from them and unions into them;
-    // the others' references follow the ones kept.
+    // Separations with no tags (and not by an entity's relationships) are dropped, with
+    // disjoins from them and unions into them; the others' references follow the ones kept.
     const kept = separateDraft
       .map((draft, i) => ({ draft, i, tags: validateEntityTags(draft.tags) }))
-      .filter(({ tags }) => tags.length);
+      .filter(({ draft, tags }) => tags.length || draft.related);
     const position = new Map(kept.map(({ i }, k) => [i, k]));
     const when = (d: DraftJoin, k: number, verb: string) => {
       if (d.kind === 'first') return { first: true as const };
@@ -10193,18 +10293,14 @@ el<HTMLFormElement>('separate-form').onsubmit = (event) => {
         return into === -1 ? [] : [{ into, ...when(u, k, 'unites') } as Union];
       });
       return {
-        tags,
+        ...(draft.related ? { related: draft.related.ref, depth: draft.related.depth } : { tags }),
         ...(disjoins.length ? { disjoins } : {}),
         ...(unions.length ? { unions } : {}),
       };
     });
-    validateSeparations(tracks);
-    if (!tracks.length) {
-      // Nothing chosen: the relationships' separation stays, or the timeline rejoins.
-      if (separation && 'related' in separation && separateKeepsRelated) {
-        el<HTMLDialogElement>('separate-dialog').close();
-        return;
-      }
+    if (tracks.length) validateSeparations(tracks);
+    else {
+      // Nothing chosen: the timeline rejoins.
       if (!separation) throw new Error('Choose at least one tag.');
       el<HTMLDialogElement>('separate-dialog').close();
       stopComparison();
@@ -10213,7 +10309,8 @@ el<HTMLFormElement>('separate-form').onsubmit = (event) => {
       return;
     }
     el<HTMLDialogElement>('separate-dialog').close();
-    startSeparation(tracks);
+    // The entities' titles, for those separated by relationships, as they were.
+    startSeparation({ tracks, ...(separation?.titles ? { titles: separation.titles } : {}) });
   } catch (error) {
     text('separate-error', error instanceof Error ? error.message : String(error));
   }
@@ -11388,7 +11485,46 @@ function setLink(a: EntityRef, b: EntityRef, related: boolean, display?: SearchR
   else model.unrelate(link.a, link.b);
   changed();
 }
+/** An entity as a separation names it: by its own ID, not its track's (`<track>:<id>`). */
+function separatedRef(ref: EntityRef): EntityRef {
+  return 'moment' in ref
+    ? { moment: unqualifiedId(ref.moment) }
+    : { duration: unqualifiedId(ref.duration) };
+}
+/**
+ * Separates an entity's related (`direct`) or connected (`all`) set (#552): beside the
+ * separations shown, or changing the depth of the one already following it.
+ */
+function separateRelated(ref: EntityRef, depth: 'direct' | 'all', title: string) {
+  const key = refKey(ref);
+  const current = separation?.tracks ?? [];
+  const at = current.findIndex((t) => 'related' in t && refKey(t.related) === key);
+  if (at < 0 && current.length >= SEPARATION_LIMIT)
+    return void toast(`At most ${SEPARATION_LIMIT} separations are shown at once.`);
+  const tracks: SeparationTrack[] =
+    at < 0
+      ? [...current, { related: ref, depth }]
+      : current.map((t, i) => (i === at && 'related' in t ? { ...t, depth } : t));
+  startSeparation({ tracks, titles: { ...separation?.titles, [key]: title } });
+}
+/** Stops separating an entity's relationships; with no separation left, rejoins. */
+function stopSeparatingRelated(ref: EntityRef) {
+  if (!separation) return;
+  const key = refKey(ref);
+  const tracks = keptTracks(
+    separation.tracks,
+    (t) => !('related' in t) || refKey(t.related) !== key,
+  );
+  if (tracks.length) startSeparation({ tracks, titles: separation.titles });
+  else {
+    stopComparison();
+    heading();
+    requestRender();
+  }
+}
 function renderRelated(host: HTMLElement, ref: EntityRef | null, readOnly = false) {
+  // While separated, an entity's ID is its track's (`<track>:<id>`): its own is what links name.
+  if (ref && separation) ref = separatedRef(ref);
   host.replaceChildren();
   host.hidden = !ref;
   if (!ref) return;
@@ -11449,22 +11585,44 @@ function renderRelated(host: HTMLElement, ref: EntityRef | null, readOnly = fals
           ? `${beyond.toLocaleString()} more through other relationships.`
           : '';
       actions.replaceChildren();
-      if (page.related.length && !comparison) {
-        const label = describeLabel(ref);
+      if (page.related.length && (!comparison || separation)) {
+        // Separations by its relationships (#552), beside any others shown: added, changed
+        // from related to connected (or back), or stopped, here only.
+        const own = ref;
+        const key = refKey(own);
+        const shown = separation?.tracks.find(
+          (t): t is Extract<SeparationTrack, { related: EntityRef }> =>
+            'related' in t && refKey(t.related) === key,
+        );
+        const label = describeLabel(own);
+        const close = () => {
+          durationDialog.close();
+          el<HTMLDialogElement>('inspector').close();
+        };
         for (const [depth, text] of [
-          ['direct', 'Separate related'],
-          ['all', 'Separate all connected'],
+          ['direct', shown ? 'Separate only related' : 'Separate related'],
+          ['all', shown ? 'Separate all connected instead' : 'Separate all connected'],
         ] as const) {
-          if (depth === 'all' && beyond <= 0) continue;
+          if (depth === 'all' && beyond <= 0 && shown?.depth !== 'all') continue;
+          if (shown?.depth === depth) continue;
           const button = document.createElement('button');
           button.type = 'button';
           button.textContent = text;
           button.onclick = () => {
-            durationDialog.close();
-            el<HTMLDialogElement>('inspector').close();
-            startSeparation({ related: ref, depth, label });
+            close();
+            separateRelated(own, depth, label);
           };
           actions.append(button);
+        }
+        if (shown) {
+          const stop = document.createElement('button');
+          stop.type = 'button';
+          stop.textContent = 'Stop separating';
+          stop.onclick = () => {
+            close();
+            stopSeparatingRelated(own);
+          };
+          actions.append(stop);
         }
       }
     }
@@ -12246,8 +12404,11 @@ function disjoinName(when: DisjoinTime | UnionTime, at: Q | null | undefined): s
   const bound = 'first' in when ? 'its first moment' : 'its last moment';
   return known ? `${known} (${bound})` : bound;
 }
-/** The bar's label for separations: each one's tags, and when it disjoins and unites. */
-function separationLabel(choice: { tracks: SeparationTrack[]; resolved?: ResolvedSeparation[] }) {
+/**
+ * The bar's label for separations: each one's tags (or the entity whose relationships it
+ * follows), and when it disjoins and unites.
+ */
+function separationLabel(choice: Separation) {
   const name = (track: number | null) => (track === null ? 'main' : `separation ${track + 1}`);
   return choice.tracks
     .map((t, i) => {
@@ -12261,19 +12422,31 @@ function separationLabel(choice: { tracks: SeparationTrack[]; resolved?: Resolve
             `into ${name(u.into)} at ${disjoinName(u, choice.resolved?.[i]?.unions?.[k]?.at)}`,
         ),
       ];
-      return when.length ? `${t.tags.join(', ')} (${when.join('; ')})` : t.tags.join(', ');
+      // One alone is named by its entity: the heading says how it is separated.
+      const what =
+        'tags' in t
+          ? t.tags.join(', ')
+          : choice.tracks.length === 1
+            ? relatedName(choice, t)
+            : `${t.depth === 'direct' ? 'related to' : 'connected to'} “${relatedName(choice, t)}”`;
+      return when.length ? `${what} (${when.join('; ')})` : what;
     })
     .join(' · ');
 }
+/** The events a separation takes, as a plain filter: its tags, or its entity's set (#552). */
+function trackFilter(track: SeparationTrack): ViewFilter {
+  return 'tags' in track
+    ? { tags: track.tags, mode: 'any' }
+    : { related: track.related, depth: track.depth, mode: 'any' };
+}
 /**
- * The latest moment with any of `tags` in a server or desktop timeline: in the last group of a
+ * The latest moment a filter takes in a server or desktop timeline: in the last group of a
  * whole-timeline overview with moments, and the pages of moments from there on.
  */
-async function lastTaggedTime(tags: string[]): Promise<string | undefined> {
+async function lastTaggedTime(filter: ViewFilter): Promise<string | undefined> {
   const info = (local ?? remote)!;
   if (!info.first || !info.last) return undefined;
-  const revision = info.revision,
-    filter = { tags, mode: 'any' as const };
+  const revision = info.revision;
   const lower = Q.parse(info.first),
     upper = Q.parse(info.last);
   const frame = await timelineQuery<Frame>({
@@ -12324,43 +12497,42 @@ async function resolveDisjoins(choice: {
     const momentTime = async (id: string) =>
       (await timelineQuery<{ event: PointEvent | null }>({ kind: 'moment', id, revision })).event
         ?.time;
-    const firstTime = async (tags: string[]) => {
+    const firstTime = async (filter: ViewFilter) => {
       if (!info.first || !info.last) return undefined;
       const page = await timelineQuery<EventPage>({
         kind: 'events',
         lower: info.first,
         upper: info.last,
         limit: 1,
-        filter: { tags, mode: 'any' },
+        filter,
         revision,
       });
       return page.events[0]?.time;
     };
-    const time = async (when: DisjoinTime | UnionTime, tags: string[]) => {
+    const time = async (when: DisjoinTime | UnionTime, track: SeparationTrack) => {
       const at =
         'at' in when
           ? when.at
           : 'moment' in when
             ? await momentTime(when.moment).catch(() => undefined)
             : 'first' in when
-              ? await firstTime(tags).catch(() => undefined)
-              : await lastTaggedTime(tags).catch(() => undefined);
+              ? await firstTime(trackFilter(track)).catch(() => undefined)
+              : await lastTaggedTime(trackFilter(track)).catch(() => undefined);
       return at === undefined ? null : Q.parse(at);
     };
     choice.resolved = await Promise.all(
       choice.tracks.map(async (t) => ({
-        tags: t.tags,
         ...(t.disjoins
           ? {
               disjoins: await Promise.all(
-                t.disjoins.map(async (d) => ({ from: d.from, at: await time(d, t.tags) })),
+                t.disjoins.map(async (d) => ({ from: d.from, at: await time(d, t) })),
               ),
             }
           : {}),
         ...(t.unions
           ? {
               unions: await Promise.all(
-                t.unions.map(async (u) => ({ into: u.into, at: await time(u, t.tags) })),
+                t.unions.map(async (u) => ({ into: u.into, at: await time(u, t) })),
               ),
             }
           : {}),

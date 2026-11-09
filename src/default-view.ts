@@ -19,24 +19,35 @@ export type ViewSeparation =
   | { related: EntityRef; depth: 'direct' | 'all' };
 /** The most tag separations shown at once: each is a track, and a comparison has eight. */
 export const SEPARATION_LIMIT = 7;
-/** A tag separation's separations: one for `{tags}`, each of `{groups}` or `{separations}`. */
+/**
+ * A view's separations: one for `{tags}` or `{related}` (#552), each of `{groups}` or
+ * `{separations}`.
+ */
 export function viewSeparations(s: ViewSeparation | null | undefined): SeparationTrack[] {
-  if (!s || 'related' in s) return [];
+  if (!s) return [];
+  if ('related' in s) return [{ related: s.related, depth: s.depth }];
   if ('separations' in s) return s.separations;
   return ('tags' in s ? [s.tags] : s.groups).map((tags) => ({ tags }));
 }
-/** A tag separation's groups of tags. */
+/** A view's groups of tags: its separations by tags. */
 export const separationGroups = (s: ViewSeparation | null | undefined): string[][] =>
-  viewSeparations(s).map((t) => t.tags);
+  viewSeparations(s).flatMap((t) => ('tags' in t ? [t.tags] : []));
 /**
- * Tag separations as a default view keeps them: `{tags}` for one, `{groups}` for several, and
- * `{separations}` when any disjoins or unites.
+ * Separations as a default view keeps them: `{tags}` for one by tags, `{groups}` for several,
+ * `{related, depth}` for one by an entity's relationships, and `{separations}` when they mix
+ * the two or any disjoins or unites.
  */
 export function tagSeparation(tracks: SeparationTrack[] | string[][]): ViewSeparation {
-  const list: SeparationTrack[] = tracks.map((t) => (Array.isArray(t) ? { tags: [...t] } : t));
-  if (list.some((t) => t.disjoins?.length || t.unions?.length))
-    return { separations: list.map((t) => ({ ...t, tags: [...t.tags] })) };
-  return list.length === 1 ? { tags: [...list[0].tags] } : { groups: list.map((t) => [...t.tags]) };
+  const list: SeparationTrack[] = tracks.map((t) =>
+    Array.isArray(t) ? { tags: [...t] } : 'tags' in t ? { ...t, tags: [...t.tags] } : { ...t },
+  );
+  const tagged = list.flatMap((t) => ('tags' in t ? [t.tags] : []));
+  if (list.some((t) => t.disjoins?.length || t.unions?.length)) return { separations: list };
+  if (tagged.length === list.length)
+    return tagged.length === 1 ? { tags: tagged[0] } : { groups: tagged };
+  const only = list[0];
+  if (list.length === 1 && 'related' in only) return { related: only.related, depth: only.depth };
+  return { separations: list };
 }
 /**
  * A timeline's default view: its separation, and when it is one of the timeline's saved views
@@ -145,19 +156,14 @@ function validateViewSeparation(s: unknown): { separation: ViewSeparation } {
  */
 export function sameSeparation(a: ViewSeparation | null, b: ViewSeparation | null): boolean {
   if (!a || !b) return a === b;
-  if ('related' in a || 'related' in b)
-    return (
-      'related' in a &&
-      'related' in b &&
-      refKey(a.related) === refKey(b.related) &&
-      a.depth === b.depth
-    );
-  // Tag separations: the same tags (in any order), disjoins and unions for each; without them, the
-  // groups in any order.
+  // The same separations: by tags (in any order) or the same entity and depth, with the same
+  // disjoins and unions; without those, in any order.
   const key = (s: ViewSeparation) => {
     const tracks = viewSeparations(s).map((t) =>
       JSON.stringify({
-        tags: [...t.tags].sort(),
+        ...('tags' in t
+          ? { tags: [...t.tags].sort() }
+          : { related: refKey(t.related), depth: t.depth }),
         disjoins: t.disjoins ?? [],
         unions: t.unions ?? [],
       }),

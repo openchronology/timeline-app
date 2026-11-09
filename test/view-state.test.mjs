@@ -42,10 +42,15 @@ test('a stored view is read back whole', () => {
     {},
   );
   assert.deepEqual(readViewState(JSON.stringify({ separation: { groups: [['ok'], []] } })), {});
+  // An entity's relationships, as tabs kept them before they were a kind of separation (#552),
+  // and as they are kept now.
   const related = { related: { duration: 'd1' }, depth: 'all', label: 'Release' };
-  assert.deepEqual(readViewState(JSON.stringify({ separation: related })), {
-    separation: related,
-  });
+  const now = {
+    tracks: [{ related: { duration: 'd1' }, depth: 'all' }],
+    titles: { 'd:d1': 'Release' },
+  };
+  assert.deepEqual(readViewState(JSON.stringify({ separation: related })), { separation: now });
+  assert.deepEqual(readViewState(JSON.stringify({ separation: now })), { separation: now });
 });
 
 test('malformed or missing parts are dropped', () => {
