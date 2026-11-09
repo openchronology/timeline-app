@@ -11,6 +11,8 @@ import { browserEntryCount, BROWSER_COPY_MAX_EVENTS } from './browser-copy.js';
 import { liveUpdates } from './live-updates.js';
 import { ComparisonView } from './comparison.js';
 import type { ComparisonSource, ComparisonGroup, EventPage } from './comparison.js';
+import { collapseTrackSpans, shownTracks } from './track-summaries.js';
+import type { TrackSpan } from './track-summaries.js';
 import { comparisonUI } from './comparison-ui.js';
 import { createCommunityUI } from './community-ui.js';
 import { createSuiteUI } from './suite-ui.js';
@@ -1436,6 +1438,56 @@ function axisLabel(
   return full.length <= 27 ? full : full.slice(0, 24) + '…';
 }
 const displayedBounds = new Map<string, { text: string; time: Q }>();
+/**
+ * How a separation's tracks are drawn in the current view (#560): the spans collapsed into the
+ * track they unite into, too narrow to show apart, and the tracks hidden, having nothing in view.
+ */
+let trackPlan: { collapsed: TrackSpan[]; hidden: Set<string> } = {
+  collapsed: [],
+  hidden: new Set(),
+};
+/**
+ * A separation's joined frame as it is drawn (#560): each track whose disjoin and union are
+ * closer than the grouping distance summarized on the track it unites into, and the tracks
+ * with nothing left in view hidden. The rest of the timeline is always drawn. Other frames
+ * are drawn as they are.
+ */
+function separatedFrame(f: Frame): Frame {
+  const before = [...trackPlan.hidden].join('\u0000');
+  if (!separation || !('tracks' in separation) || !comparison || comparison.combined) {
+    trackPlan = { collapsed: [], hidden: new Set() };
+    if (before) fitStageToTracks();
+    return f;
+  }
+  const keys = comparison.tracks.map((t) => t.source.key),
+    rest = keys[keys.length - 1];
+  const spans: TrackSpan[] = [];
+  separation.resolved?.forEach((resolved, i) => {
+    const begins = earliestJoin(i, 'disjoins'),
+      ends = separationEnds(i);
+    if (!begins || !ends || !keys[i]) return;
+    const union = resolved.unions?.find((u) => u.at && u.at.compare(ends) === 0);
+    if (!union) return;
+    spans.push({ key: keys[i], into: union.into === null ? rest : keys[union.into], begins, ends });
+  });
+  const collapsed = collapseTrackSpans(f, spans, viewport.threshold(width(), pixels()));
+  const shown = shownTracks(collapsed.frame, keys, viewport.left, viewport.right, rest);
+  trackPlan = {
+    collapsed: collapsed.collapsed,
+    hidden: new Set(keys.filter((k) => !shown.has(k))),
+  };
+  // Tracks shown or hidden change the room the stage needs.
+  if ([...trackPlan.hidden].join('\u0000') !== before) fitStageToTracks();
+  return collapsed.frame;
+}
+/** The track a separation's arc end or curve is drawn on: its own, or where it collapsed. */
+function drawnTrack(key: string, at?: Q): string {
+  if (at)
+    for (const span of trackPlan.collapsed)
+      if (span.key === key && at.compare(span.begins) >= 0 && at.compare(span.ends) <= 0)
+        return drawnTrack(span.into, at);
+  return key;
+}
 function comparisonRows() {
   const rows = new Map<string, { offset: number; title: number }>();
   let total = 0;
@@ -1443,6 +1495,8 @@ function comparisonRows() {
   const fields = pluginFields(comparison.plugins).filter((field) => field.kind === 'stack');
   const ordered = [...frame.groups].sort((a, b) => Q.parse(a.first).compare(Q.parse(b.first)));
   for (const track of comparison.tracks) {
+    // A separation's track with nothing in view takes no room (#560).
+    if (trackPlan.hidden.has(track.source.key)) continue;
     let up = 0,
       down = 0,
       lane = 0;
@@ -1497,12 +1551,16 @@ window.addEventListener('resize', () => fitStageToTracks());
 function renderAxis() {
   const axis = el('axis');
   const rowPlan = comparisonRows();
+  // The first track drawn (#560: a separation's may be hidden) has the baseline and ticks the
+  // others copy.
+  const owner =
+    comparison?.tracks.find((t) => !trackPlan.hidden.has(t.source.key)) ?? comparison?.tracks[0];
   axis.replaceChildren();
   const baseline = document.createElement('div');
   baseline.className = 'axis-baseline';
   baseline.style.left = `${inset() / uiScale}px`;
   baseline.style.right = `${inset() / uiScale}px`;
-  baseline.style.top = `${192 + (comparison && !comparison.combined ? (rowPlan.rows.get(comparison.tracks[0].source.key)?.offset ?? 0) : 0)}px`;
+  baseline.style.top = `${192 + (comparison && !comparison.combined ? (rowPlan.rows.get(owner!.source.key)?.offset ?? 0) : 0)}px`;
   axis.append(baseline);
   const rulerPresenter = timelinePresenter();
   let rules: RulerPlan;
@@ -1566,12 +1624,14 @@ function renderAxis() {
       value.title = presented(time) + '\nExact: ' + time.toString();
       tick.append(value);
     }
-    tick.style.transform = `translateY(${comparison && !comparison.combined ? (rowPlan.rows.get(comparison.tracks[0].source.key)?.offset ?? 0) : 0}px)`;
+    tick.style.transform = `translateY(${comparison && !comparison.combined ? (rowPlan.rows.get(owner!.source.key)?.offset ?? 0) : 0}px)`;
     axis.append(tick);
   }
   if (comparison && !comparison.combined) {
     const originalTicks = [...axis.querySelectorAll<HTMLElement>('.axis-tick')];
     for (const [index, track] of comparison.tracks.entries()) {
+      if (trackPlan.hidden.has(track.source.key)) continue;
+      const owns = track === owner;
       const title = document.createElement('div');
       title.className = 'comparison-axis-title';
       title.textContent = track.source.title;
@@ -1587,8 +1647,8 @@ function renderAxis() {
       const ends = separationEnds(index);
       const after = (tick: HTMLElement) => !!ends && Q.parse(tick.dataset.time!).compare(ends) > 0;
       let line: HTMLElement = baseline;
-      const ticks = index ? [] : originalTicks;
-      if (index) {
+      const ticks = owns ? originalTicks : [];
+      if (!owns) {
         line = baseline.cloneNode(true) as HTMLElement;
         // From the left, whatever the first track's start (it may disjoin).
         line.style.left = line.style.right = `${inset() / uiScale}px`;
@@ -2448,7 +2508,9 @@ function stopComparison(restore = true) {
 function renderComparison(refresh: boolean) {
   const view = comparison!;
   const cached = view.cached(viewport, width(), pixels());
-  frame = cached ?? (liveTransitionPending ? frame : view.visible(viewport, width(), pixels()));
+  frame = separatedFrame(
+    cached ?? (liveTransitionPending ? frame : view.visible(viewport, width(), pixels())),
+  );
   renderAxis();
   drawFrame();
   if (cached) {
@@ -2476,7 +2538,7 @@ function renderComparison(refresh: boolean) {
         if (comparison !== view || request !== frameRequest || controller.signal.aborted) return;
         animateLiveFrame = liveTransitionPending;
         liveTransitionPending = false;
-        frame = result;
+        frame = separatedFrame(result);
         renderAxis();
         drawFrame();
         el('loading-window').hidden = true;
@@ -12427,7 +12489,13 @@ function arcAxes(): ((edge: EdgeBand, end: 'a' | 'b') => number) | null {
     }
     return (edge, end) => {
       const ends = on.get(edge.id.slice((edge.sourceKey ?? '').length + 1));
-      return axis((end === 'a' ? ends?.a : ends?.b) ?? rest);
+      // An end within a collapsed span is on the track it united into; one on a hidden track
+      // (out of view) on the rest (#560).
+      const drawn = drawnTrack(
+        (end === 'a' ? ends?.a : ends?.b) ?? rest,
+        parsedTime(end === 'a' ? edge.aTime : edge.bTime),
+      );
+      return axis(trackPlan.hidden.has(drawn) ? rest : drawn);
     };
   }
   return (edge, end) => axis((end === 'a' ? edge.aKey : edge.bKey) ?? edge.sourceKey);
@@ -12635,12 +12703,17 @@ function renderSeparationForks(svg: Element) {
     svg.append(path);
   };
   const x = (at: Q) => (inset() + viewport.x(at, width())) / uiScale;
+  // None within a span collapsed into the track it unites into, nor to or from a hidden
+  // track (#560).
+  const drawn = (index: number | null, at: Q) =>
+    drawnTrack(keys[track(index)], at) === keys[track(index)] &&
+    !trackPlan.hidden.has(keys[track(index)]);
   separation.resolved?.forEach((resolved, i) => {
     if (!keys[i]) return;
     const own = axis(keys[i]),
       title = comparison!.tracks[i].source.title;
     for (const disjoin of resolved.disjoins ?? [])
-      if (disjoin.at)
+      if (disjoin.at && drawn(i, disjoin.at) && drawn(disjoin.from, disjoin.at))
         curve(
           x(disjoin.at),
           axis(keys[track(disjoin.from)]),
@@ -12651,7 +12724,7 @@ function renderSeparationForks(svg: Element) {
     // Only the first union is drawn: the track ends there.
     const ends = separationEnds(i);
     const union = resolved.unions?.find((u) => u.at && ends && u.at.compare(ends) === 0);
-    if (union?.at)
+    if (union?.at && drawn(i, union.at) && drawn(union.into, union.at))
       curve(
         x(union.at),
         own,

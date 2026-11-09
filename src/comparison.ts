@@ -70,6 +70,8 @@ export interface ComparisonSource {
 /** A frame group that remembers which source it came from (absent once groups are combined). */
 export interface ComparisonGroup extends FrameGroup {
   sourceKey?: string;
+  /** The tracks its members are read from, where they are not its own (track-summaries.ts). */
+  sources?: string[];
 }
 /**
  * One source on the shared axis: `shared = original × scale + offset`, in exact rationals.
@@ -515,7 +517,12 @@ export class ComparisonView {
     const candidates: PointEvent[] = [];
     let more = false;
     for (const track of this.tracks) {
-      if (group.sourceKey && group.sourceKey !== track.source.key) continue;
+      if (
+        group.sources
+          ? !group.sources.includes(track.source.key)
+          : group.sourceKey && group.sourceKey !== track.source.key
+      )
+        continue;
       let lower = Q.parse(group.first).sub(track.offset).div(track.scale).toString();
       const upper = Q.parse(group.last).sub(track.offset).div(track.scale).toString();
       let cursor: Cursor = null;

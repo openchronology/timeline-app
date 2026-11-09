@@ -40,6 +40,13 @@ The button stays in the toolbar while separated, with how many separations are s
 
 Each track has its own summaries, so nearby moments and collapsed durations group within their own side. Server and desktop timelines show the saved version while separated; unsaved edits are kept and reappear when you rejoin. Complete in-memory timelines, such as browser drafts and offline HTML, include unsaved edits.
 
+### Tracks as you zoom
+
+Tracks follow what is in view, as moments do:
+
+- **Empty tracks:** a separation's track with nothing in view is not drawn, and the others close up. It returns when you pan or zoom to its events. The main timeline is always drawn.
+- **Too close to draw apart:** when a separation disjoins and unites again within less than the distance at which moments group, its stretch of track is too short to show. Everything it held between them is a summary on the track it unites into, such as `3 moments · 1 duration`, which takes in that track's moments within the same distance. The summary lists the separation's own moments. Its curves are not drawn, and if that leaves its track with nothing in view, the track is not drawn either. Zoom in and it opens out into its own track again.
+
 ## A default view
 
 Someone who can edit a timeline can make a separation its default view: separate it, by tags or by **Separate related** or **Separate all connected**, and select **Make this the default view** in the bar above the tracks. Everyone then opens it that way: readers, embeds, shared links, imported files, desktop files and browser drafts. The bar says "This is the timeline's default view", and **Rejoin** still returns to the whole timeline. **Clear default view**, in the bar or in the **Separate by tags** dialog (which also says what the timeline opens separated by), makes it open whole again.
