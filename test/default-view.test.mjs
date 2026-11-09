@@ -8,6 +8,8 @@ import {
   validateDocument,
   validateTimelineView,
   sameSeparation,
+  separationGroups,
+  tagSeparation,
   draftSettings,
   draftDocument,
 } from '../dist/core.mjs';
@@ -100,4 +102,29 @@ test('merges take a default view changed on one side, and refuse one changed on 
   assert.equal('view' in rebaseDocument(ours, base, ours), false);
   const theirs = validateDocument(doc({ separation: { tags: ['trade'] } }));
   assert.throws(() => rebaseDocument(base, ours, theirs), /view/);
+});
+
+test('several separations are a default view of groups of tags (#548)', () => {
+  const view = validateTimelineView({ separation: { groups: [['War', 'siege'], ['trade']] } });
+  assert.deepEqual(view, { separation: { groups: [['war', 'siege'], ['trade']] } });
+  assert.throws(() => validateTimelineView({ separation: { groups: [['war']] } }), /two to 7/);
+  assert.throws(
+    () => validateTimelineView({ separation: { groups: Array(8).fill(['war']) } }),
+    /two to 7/,
+  );
+  assert.throws(
+    () => validateTimelineView({ separation: { groups: [['war'], []] } }),
+    /needs a tag/,
+  );
+  // The same groups in any order, each the same tags in any order.
+  assert.ok(
+    sameSeparation(
+      { groups: [['war', 'siege'], ['trade']] },
+      { groups: [['trade'], ['siege', 'war']] },
+    ),
+  );
+  assert.ok(!sameSeparation({ groups: [['war'], ['trade']] }, { tags: ['war', 'trade'] }));
+  assert.ok(sameSeparation({ tags: ['war'] }, { tags: ['war'] }));
+  assert.deepEqual(tagSeparation([['war']]), { tags: ['war'] });
+  assert.deepEqual(separationGroups({ groups: [['a'], ['b']] }), [['a'], ['b']]);
 });

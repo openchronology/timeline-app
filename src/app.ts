@@ -77,6 +77,9 @@ import {
   validateTimelineImage,
   validateTimelineView,
   sameSeparation,
+  separationGroups,
+  tagSeparation,
+  SEPARATION_LIMIT,
   contentLabels,
   describeLabels,
   CONTENT_LABELS_KEY,
@@ -2871,7 +2874,16 @@ function heading() {
   star.textContent = `${remote?.starred ? '★ Starred' : '☆ Star'} · ${remote?.star_count ?? '0'}`;
 
   el('add-button').hidden = !editable();
-  el('separate-button').hidden = !!comparison || (!model && !remote && !local);
+  // Shown while separated too (#548), with how many separations are shown; not while
+  // comparing other timelines.
+  el('separate-button').hidden = (!!comparison && !separation) || (!model && !remote && !local);
+  const separations = separation ? ('groups' in separation ? separation.groups.length : 1) : 0;
+  el('separate-count').hidden = !separations;
+  text('separate-count', separations ? String(separations) : '');
+  el('separate-count').setAttribute(
+    'aria-label',
+    separations === 1 ? '1 separation shown' : `${separations} separations shown`,
+  );
   el('search-bar').hidden = !!comparison || (!model && !remote && !local);
   el<HTMLButtonElement>('undo-button').disabled = !history.length;
   el<HTMLButtonElement>('redo-button').disabled = !future.length;
@@ -6678,8 +6690,8 @@ el('separation-map').onclick = () => {
   requestTimeMap(
     center,
     null,
-    'tags' in separation
-      ? { tags: separation.tags, mode: 'any' }
+    'groups' in separation
+      ? { tags: [...new Set(separation.groups.flat())], mode: 'any' }
       : { related: separation.related, depth: separation.depth, mode: 'any' },
   );
 };
@@ -9255,8 +9267,12 @@ async function loadTagCounts(): Promise<{ tag: string; count: number }[]> {
   });
   return result.tags;
 }
+/**
+ * What is separated: groups of tags, each its own track above the rest (events with any of a
+ * group's tags), or an entity and its related or connected set (#342).
+ */
 type Separation =
-  { tags: string[] } | { related: EntityRef; depth: 'direct' | 'all'; label: string };
+  { groups: string[][] } | { related: EntityRef; depth: 'direct' | 'all'; label: string };
 /**
  * A timeline's default view as a server or file sent it (#416), or nothing when it has none or
  * it isn't one this version reads: the timeline then opens whole.
@@ -9275,8 +9291,8 @@ function timelineView(): TimelineView | undefined {
 /** The separation shown, as a default view keeps it (without the entity's title). */
 function shownSeparation(): ViewSeparation | null {
   if (!separation) return null;
-  return 'tags' in separation
-    ? { tags: [...separation.tags] }
+  return 'groups' in separation
+    ? tagSeparation(separation.groups)
     : { related: separation.related, depth: separation.depth };
 }
 /**
@@ -9312,8 +9328,8 @@ async function entityTitle(ref: EntityRef): Promise<string | null> {
 async function openDefaultView(view: TimelineView | undefined) {
   const chosen = view?.separation;
   if (!chosen || comparison) return;
-  if ('tags' in chosen) {
-    startSeparation(chosen.tags);
+  if (!('related' in chosen)) {
+    startSeparation(separationGroups(chosen));
     return;
   }
   const request = documentRequest;
@@ -9325,41 +9341,67 @@ async function openDefaultView(view: TimelineView | undefined) {
     label: title || ('moment' in chosen.related ? 'this moment' : 'this duration'),
   });
 }
-function startSeparation(by: string[] | Separation) {
-  const choice: Separation = Array.isArray(by) ? { tags: by } : by;
+/**
+ * Shows the timeline separated: by groups of tags (each a track of the events with any of its
+ * tags, above a last track of everything else, which has none of them), or by an entity's
+ * relationships (one track above the rest). Read-only; nothing is saved.
+ */
+function startSeparation(by: string[][] | Separation) {
+  const choice: Separation = Array.isArray(by) ? { groups: by } : by;
   flushEventEdit();
   flushDurationEdit();
   const presentation = model?.presentation ?? remote?.presentation ?? DEFAULT_PRESENTATION;
   const plugins = installedPlugins();
-  const label = 'tags' in choice ? choice.tags.join(', ') : choice.label;
-  const filterFor = (mode: 'any' | 'none') =>
-    'tags' in choice
-      ? { tags: choice.tags, mode }
-      : { related: choice.related, depth: choice.depth, mode };
-  const modes = [
-    {
-      key: 'tagged',
-      mode: 'any' as const,
-      title: 'tags' in choice ? `Tagged ${label}` : `Related to ${label}`,
-    },
-    { key: 'rest', mode: 'none' as const, title: 'Everything else' },
-  ];
+  const label =
+    'groups' in choice ? choice.groups.map((g) => g.join(', ')).join(' · ') : choice.label;
+  type Track = { key: string; title: string; filter: ViewFilter; arcs: boolean };
+  // Each separated track asks for the whole timeline's arcs, each end marked with whether it
+  // is on that track (#415); arcAxes places every end on the first track that has it, and
+  // ends no separated track has on the last. The last track asks for none.
+  const tracks: Track[] =
+    'groups' in choice
+      ? [
+          ...choice.groups.map((tags, i) => ({
+            key: choice.groups.length === 1 ? 'tagged' : `tagged-${i + 1}`,
+            title: `Tagged ${tags.join(', ')}`,
+            filter: { tags, mode: 'any' as const },
+            arcs: true,
+          })),
+          {
+            key: 'rest',
+            title: 'Everything else',
+            filter: { tags: [...new Set(choice.groups.flat())], mode: 'none' as const },
+            arcs: false,
+          },
+        ]
+      : [
+          {
+            key: 'tagged',
+            title: `Related to ${label}`,
+            filter: { related: choice.related, depth: choice.depth, mode: 'any' },
+            arcs: true,
+          },
+          {
+            key: 'rest',
+            title: 'Everything else',
+            filter: { related: choice.related, depth: choice.depth, mode: 'none' },
+            arcs: false,
+          },
+        ];
   let sources: ComparisonSource[];
-  // Arcs (#415) are the whole timeline's: the upper track's answers carry them all, each end
-  // marked with whether it is on that track (the lower track is the rest), so the lower
-  // track's ask for none.
   if (!sparseWorkspace() && model) {
     const document = model.document();
-    const arcs = separationArcs(document, filterFor('any'));
-    sources = modes.map(({ key, mode, title }) => {
-      const index = new TimelineIndex(filterDocument(document, filterFor(mode)));
+    sources = tracks.map(({ key, title, filter, arcs }) => {
+      const index = new TimelineIndex(filterDocument(document, filter));
       return {
         key,
         title,
         presentation,
         plugins,
         index,
-        arcs: mode === 'any' ? arcs : () => ({ edges: [], edgesTruncated: false }),
+        arcs: arcs
+          ? separationArcs(document, filter)
+          : () => ({ edges: [], edgesTruncated: false }),
         first: index.points.minKey()?.toString(),
         last: index.points.maxKey()?.toString(),
       };
@@ -9368,7 +9410,7 @@ function startSeparation(by: string[] | Separation) {
     const info = (local ?? remote)!;
     if (sparseWorkspace()?.dirtyCount)
       toast('Separation shows the saved version. Your unsaved edits are kept for when you rejoin.');
-    sources = modes.map(({ key, mode, title }) => ({
+    sources = tracks.map(({ key, title, filter, arcs }) => ({
       key,
       title,
       presentation,
@@ -9380,9 +9422,9 @@ function startSeparation(by: string[] | Separation) {
         timelineQuery<Frame | EventPage>(
           {
             ...query,
-            filter: filterFor(mode),
+            filter,
             revision: (local ?? remote)!.revision,
-            ...(query.kind === 'overview' && mode === 'none' ? { arcs: false } : {}),
+            ...(query.kind === 'overview' && !arcs ? { arcs: false } : {}),
           },
           signal,
         ),
@@ -9391,69 +9433,326 @@ function startSeparation(by: string[] | Separation) {
   const before = viewport.clone();
   separation = choice;
   startComparison(sources, presentation);
-  // Separating keeps the current view rather than fitting both tracks.
+  // Separating keeps the current view rather than fitting the tracks.
   viewport = before;
   // The bar names what was separated: the tags, or the entity whose relationships were
   // followed (#342).
+  const groups = 'groups' in choice ? choice.groups.length : 0;
   text(
     'separation-heading',
-    'tags' in choice
-      ? 'Separated by tags'
-      : choice.depth === 'direct'
-        ? 'Separated: related to'
-        : 'Separated: connected to',
+    groups > 1
+      ? `${groups} separations`
+      : groups
+        ? 'Separated by tags'
+        : 'related' in choice && choice.depth === 'direct'
+          ? 'Separated: related to'
+          : 'Separated: connected to',
   );
   text('separation-tags', label);
   text(
     'separation-note',
-    'tags' in choice
-      ? 'Read-only. Events with any of these tags are shown above; everything else stays below.'
-      : choice.depth === 'direct'
-        ? `Read-only. Shown above: ${label} and the events related to it; everything else stays below.`
-        : `Read-only. Shown above: ${label} and everything connected to it through relationships; everything else stays below.`,
+    groups > 1
+      ? 'Read-only. Each separation’s events (with any of its tags) are shown in its own track; everything else stays below.'
+      : groups
+        ? 'Read-only. Events with any of these tags are shown above; everything else stays below.'
+        : 'related' in choice && choice.depth === 'direct'
+          ? `Read-only. Shown above: ${label} and the events related to it; everything else stays below.`
+          : `Read-only. Shown above: ${label} and everything connected to it through relationships; everything else stays below.`,
   );
   el('separation-map').hidden = !bulkEditable();
   heading();
   requestRender();
 }
-el('separate-button').onclick = () => {
-  if (comparison) return;
+/**
+ * The Separate dialog (#548): the separations shown, each a list of tags as chips, added from
+ * a picker that searches the timeline's tags (or takes a new one); separations can be added,
+ * removed, and applied together, or all rejoined. `separateDraft` is the dialog's state until
+ * it is applied.
+ */
+let separateDraft: string[][] = [];
+let separateCounts: { tag: string; count: number }[] = [];
+/** Whether the separation by an entity's relationships, if shown, is to be kept. */
+let separateKeepsRelated = false;
+let closeTagPicker: (() => void) | null = null;
+function openSeparateDialog() {
+  if (comparison && !separation) return;
+  closeTagPicker?.();
   text('separate-error', '');
-  input('separate-extra').value = '';
-  const host = el('separate-tags');
-  host.replaceChildren();
-  text('separate-error', 'Loading tags…');
+  separateDraft =
+    separation && 'groups' in separation ? separation.groups.map((g) => [...g]) : [[]];
+  separateKeepsRelated = !!separation && 'related' in separation;
+  separateCounts = [];
+  renderSeparateDialog();
   el<HTMLDialogElement>('separate-dialog').showModal();
+  text('separate-error', 'Loading tags…');
   void loadTagCounts()
     .then((counts) => {
-      text('separate-error', counts.length ? '' : 'No events have tags yet.');
-      for (const { tag, count } of counts) {
-        const label = document.createElement('label');
-        label.className = 'checkbox-label';
-        const box = document.createElement('input');
-        box.type = 'checkbox';
-        box.value = tag;
-        label.append(box, `${tag} (${count.toLocaleString()})`);
-        host.append(label);
-      }
+      separateCounts = counts;
+      text('separate-error', counts.length ? '' : 'No events have tags yet: type one to add it.');
     })
     .catch((error) =>
       text('separate-error', error instanceof Error ? error.message : String(error)),
     );
+}
+el('separate-button').onclick = openSeparateDialog;
+function renderSeparateDialog() {
+  const related = separation && 'related' in separation ? separation : null;
+  el('separate-related').hidden = !related || !separateKeepsRelated;
+  text(
+    'separate-related-text',
+    related ? `Separated by relationships: ${related.label}. Separating by tags replaces it.` : '',
+  );
+  el('separate-clear').hidden = !separation;
+  el<HTMLButtonElement>('separate-add').disabled = separateDraft.length >= SEPARATION_LIMIT;
+  el('separate-add').title =
+    separateDraft.length >= SEPARATION_LIMIT
+      ? `At most ${SEPARATION_LIMIT} separations are shown at once.`
+      : '';
+  const list = el('separate-list');
+  list.replaceChildren(...separateDraft.map((_, i) => separationItem(i)));
+}
+/** One separation in the dialog: its heading and Remove, its tags as chips, and the picker. */
+function separationItem(index: number): HTMLLIElement {
+  const group = separateDraft[index];
+  const item = document.createElement('li');
+  item.className = 'separation-item';
+  const heading = document.createElement('div');
+  heading.className = 'separation-item-heading';
+  const name = document.createElement('span');
+  name.id = `separation-name-${index}`;
+  name.textContent = `Separation ${index + 1}`;
+  const remove = document.createElement('button');
+  remove.type = 'button';
+  remove.textContent = 'Remove';
+  remove.setAttribute('aria-label', `Remove separation ${index + 1}`);
+  remove.hidden = separateDraft.length === 1 && !group.length;
+  remove.onclick = () => {
+    separateDraft.splice(index, 1);
+    if (!separateDraft.length) separateDraft.push([]);
+    renderSeparateDialog();
+  };
+  heading.append(name, remove);
+  const chips = document.createElement('div');
+  chips.className = 'tag-chips';
+  chips.setAttribute('aria-labelledby', name.id);
+  const renderChips = () =>
+    chips.replaceChildren(
+      ...group.map((tag) => {
+        const chip = document.createElement('span');
+        chip.className = 'tag-chip';
+        const x = document.createElement('button');
+        x.type = 'button';
+        x.textContent = '×';
+        x.setAttribute('aria-label', `Remove ${tag}`);
+        x.onclick = () => {
+          group.splice(group.indexOf(tag), 1);
+          renderChips();
+          remove.hidden = separateDraft.length === 1 && !group.length;
+        };
+        chip.append(tag, x);
+        return chip;
+      }),
+    );
+  renderChips();
+  item.append(
+    heading,
+    chips,
+    tagPicker(group, () => {
+      renderChips();
+      remove.hidden = separateDraft.length === 1 && !group.length;
+    }),
+  );
+  return item;
+}
+/**
+ * A combobox for one separation's tags: a toggle opening a panel with a search box and a
+ * list of the timeline's tags (with how many events carry each), several selectable; a tag
+ * no event has yet can be added by typing it. Changes `group` in place, then `changed()`.
+ */
+function tagPicker(group: string[], changed: () => void): HTMLElement {
+  const picker = document.createElement('div');
+  picker.className = 'tag-picker';
+  const toggle = document.createElement('button');
+  toggle.type = 'button';
+  toggle.className = 'tag-picker-toggle';
+  toggle.textContent = 'Add tags ▾';
+  toggle.setAttribute('aria-haspopup', 'listbox');
+  toggle.setAttribute('aria-expanded', 'false');
+  const panel = document.createElement('div');
+  panel.className = 'tag-picker-panel';
+  panel.hidden = true;
+  const search = document.createElement('input');
+  search.type = 'search';
+  search.className = 'tag-picker-search';
+  search.placeholder = 'Search or add a tag';
+  search.spellcheck = false;
+  search.setAttribute('aria-label', 'Search tags');
+  search.setAttribute('autocomplete', 'off');
+  const options = document.createElement('ul');
+  options.className = 'tag-picker-options';
+  options.setAttribute('role', 'listbox');
+  options.setAttribute('aria-multiselectable', 'true');
+  options.setAttribute('aria-label', 'Tags');
+  panel.append(search, options);
+  picker.append(toggle, panel);
+  let active = 0;
+  let shown: { tag: string; count: number | null }[] = [];
+  const typed = () => {
+    try {
+      return validateEntityTags([search.value])[0] ?? null;
+    } catch {
+      return null;
+    }
+  };
+  const render = () => {
+    const query = search.value.trim().toLowerCase();
+    // Matching tags, an exact match first, then by how many events carry them.
+    shown = separateCounts
+      .filter(({ tag }) => !query || tag.includes(query))
+      .map(({ tag, count }) => ({ tag, count }))
+      .sort((a, b) => Number(b.tag === query) - Number(a.tag === query));
+    // A tag no event has yet, offered as typed: after the tags that match, so Enter picks a
+    // match, and first only when none does.
+    const fresh = typed();
+    if (fresh && !separateCounts.some((c) => c.tag === fresh))
+      shown.push({ tag: fresh, count: null });
+    active = Math.min(active, Math.max(0, shown.length - 1));
+    options.replaceChildren(
+      ...shown.map(({ tag, count }, i) => {
+        const option = document.createElement('li');
+        option.setAttribute('role', 'option');
+        option.id = `tag-option-${Math.random().toString(36).slice(2)}`;
+        option.setAttribute('aria-selected', String(group.includes(tag)));
+        option.classList.toggle('active', i === active);
+        const name = document.createElement('span');
+        name.textContent = count === null ? `Add “${tag}”` : tag;
+        option.append(name);
+        if (count !== null) {
+          const n = document.createElement('span');
+          n.className = 'tag-count';
+          n.textContent = count.toLocaleString();
+          option.append(n);
+        }
+        option.onmousedown = (event) => event.preventDefault();
+        option.onclick = () => {
+          active = i;
+          choose(tag);
+        };
+        return option;
+      }),
+    );
+    if (!shown.length) {
+      const empty = document.createElement('li');
+      empty.className = 'tag-picker-empty';
+      empty.textContent = separateCounts.length ? 'No tag matches.' : 'Type a tag to add it.';
+      options.append(empty);
+    }
+    const current = options.children[active] as HTMLElement | undefined;
+    if (current?.id) search.setAttribute('aria-activedescendant', current.id);
+    else search.removeAttribute('aria-activedescendant');
+    current?.scrollIntoView?.({ block: 'nearest' });
+  };
+  const choose = (tag: string) => {
+    if (group.includes(tag)) group.splice(group.indexOf(tag), 1);
+    else group.push(tag);
+    changed();
+    render();
+    search.focus();
+  };
+  const open = () => {
+    closeTagPicker?.();
+    panel.hidden = false;
+    toggle.setAttribute('aria-expanded', 'true');
+    search.value = '';
+    active = 0;
+    render();
+    search.focus();
+    // A click outside its separation closes it; one on its chips (removing a tag) does not.
+    const outside = (event: MouseEvent) => {
+      if (!(picker.closest('.separation-item') ?? picker).contains(event.target as Node)) close();
+    };
+    // On click, not mousedown: closing moves what follows up, which must not move the
+    // button being pressed.
+    document.addEventListener('click', outside, true);
+    closeTagPicker = () => {
+      document.removeEventListener('click', outside, true);
+      close();
+    };
+  };
+  const close = () => {
+    panel.hidden = true;
+    toggle.setAttribute('aria-expanded', 'false');
+    if (closeTagPicker) {
+      const done = closeTagPicker;
+      closeTagPicker = null;
+      done();
+    }
+  };
+  toggle.onclick = () => (panel.hidden ? open() : close());
+  search.oninput = () => {
+    active = 0;
+    render();
+  };
+  search.onkeydown = (event) => {
+    if (event.key === 'ArrowDown' || event.key === 'ArrowUp') {
+      event.preventDefault();
+      if (!shown.length) return;
+      active = (active + (event.key === 'ArrowDown' ? 1 : shown.length - 1)) % shown.length;
+      render();
+    } else if (event.key === 'Enter') {
+      // Enter chooses the highlighted tag (a typed new one comes first), not the form.
+      event.preventDefault();
+      const tag = shown[active]?.tag;
+      if (tag) choose(tag);
+    } else if (event.key === 'Escape') {
+      // Closes the picker, not the dialog.
+      event.preventDefault();
+      event.stopPropagation();
+      close();
+      toggle.focus();
+    }
+  };
+  return picker;
+}
+el('separate-add').onclick = () => {
+  if (separateDraft.length >= SEPARATION_LIMIT) return;
+  separateDraft.push([]);
+  renderSeparateDialog();
+  el('separate-list').querySelector<HTMLButtonElement>('li:last-child .tag-picker-toggle')?.click();
 };
+el('separate-related-remove').onclick = () => {
+  separateKeepsRelated = false;
+  renderSeparateDialog();
+};
+el('separate-clear').onclick = () => {
+  closeTagPicker?.();
+  el<HTMLDialogElement>('separate-dialog').close();
+  stopComparison();
+  heading();
+  requestRender();
+};
+el('separate-dialog').addEventListener('close', () => closeTagPicker?.());
 el<HTMLFormElement>('separate-form').onsubmit = (event) => {
   event.preventDefault();
   try {
-    const chosen = [
-      ...[...el('separate-tags').querySelectorAll<HTMLInputElement>('input:checked')].map(
-        (box) => box.value,
-      ),
-      ...parseTagInput(input('separate-extra').value),
-    ];
-    const tags = validateTags(chosen);
-    if (!tags.length) throw new Error('Choose at least one tag.');
+    const groups = separateDraft
+      .map((group) => validateEntityTags(group))
+      .filter((group) => group.length);
+    if (!groups.length) {
+      // Nothing chosen: the relationships' separation stays, or the timeline rejoins.
+      if (separation && 'related' in separation && separateKeepsRelated) {
+        el<HTMLDialogElement>('separate-dialog').close();
+        return;
+      }
+      if (!separation) throw new Error('Choose at least one tag.');
+      el<HTMLDialogElement>('separate-dialog').close();
+      stopComparison();
+      heading();
+      requestRender();
+      return;
+    }
     el<HTMLDialogElement>('separate-dialog').close();
-    startSeparation(tags);
+    startSeparation(groups);
   } catch (error) {
     text('separate-error', error instanceof Error ? error.message : String(error));
   }
@@ -9485,8 +9784,14 @@ function updateDefaultViewControls() {
     'separate-default-text',
     !saved
       ? ''
-      : 'tags' in saved
-        ? `This timeline opens separated by tags: ${saved.tags.join(', ')}.`
+      : !('related' in saved)
+        ? separationGroups(saved).length > 1
+          ? `This timeline opens with ${separationGroups(saved).length} separations: ${separationGroups(
+              saved,
+            )
+              .map((g) => g.join(', '))
+              .join(' · ')}.`
+          : `This timeline opens separated by tags: ${separationGroups(saved)[0].join(', ')}.`
         : saved.depth === 'direct'
           ? 'This timeline opens with an event and the events related to it separated above.'
           : 'This timeline opens with an event and everything connected to it separated above.',
@@ -10874,10 +11179,25 @@ function arcAxes(): ((edge: EdgeBand, end: 'a' | 'b') => number) | null {
   if (comparison.combined) return () => 192;
   const rows = comparisonRows().rows;
   const axis = (key: string | undefined) => 192 + (rows.get(key ?? '')?.offset ?? 0);
-  if (separation && comparison.tracks.length === 2) {
-    const upper = axis(comparison.tracks[0].source.key),
-      lower = axis(comparison.tracks[1].source.key);
-    return (edge, end) => ((end === 'a' ? edge.aIn : edge.bIn) === false ? lower : upper);
+  if (separation) {
+    // Each separated track's answer has every arc, its ends marked with whether they are on
+    // that track: an end is drawn on the first track that has it, else on the last (the rest,
+    // whose own answer has no arcs). An arc is drawn once, from the first track's answer.
+    const tracks = comparison.tracks.map((t) => t.source.key),
+      rest = tracks[tracks.length - 1];
+    const on = new Map<string, { a?: string; b?: string }>();
+    for (const edge of frame.edges ?? []) {
+      const key = edge.sourceKey ?? '';
+      const id = edge.id.slice(key.length + 1);
+      const ends = on.get(id) ?? {};
+      if (edge.aIn !== false && ends.a === undefined) ends.a = key;
+      if (edge.bIn !== false && ends.b === undefined) ends.b = key;
+      on.set(id, ends);
+    }
+    return (edge, end) => {
+      const ends = on.get(edge.id.slice((edge.sourceKey ?? '').length + 1));
+      return axis((end === 'a' ? ends?.a : ends?.b) ?? rest);
+    };
   }
   return (edge, end) => axis((end === 'a' ? edge.aKey : edge.bKey) ?? edge.sourceKey);
 }
@@ -10896,7 +11216,10 @@ function renderEdgeArcs() {
     describe(refKey(ref))?.title ||
     onScreen().get(refKey(ref))?.title ||
     ('moment' in ref ? 'Moment' : 'Duration');
+  // A separation's tracks each carry the arcs: drawn once, from the first track's.
+  const firstTrack = separation && comparison ? comparison.tracks[0].source.key : null;
   for (const edge of axes ? (frame.edges ?? []) : []) {
+    if (firstTrack !== null && edge.sourceKey !== firstTrack) continue;
     const xa = (inset() + viewport.x(parsedTime(edge.aTime), width())) / uiScale,
       xb = (inset() + viewport.x(parsedTime(edge.bTime), width())) / uiScale;
     // Each end on its track's axis: an arc within a track rises above it; one between the

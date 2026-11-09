@@ -9,8 +9,9 @@
 import { Q } from './core.js';
 import type { EntityRef } from './relationships.js';
 
+/** Groups of tags (each a separation, #538 era), or an entity's relationships. */
 export type StoredSeparation =
-  { tags: string[] } | { related: EntityRef; depth: 'direct' | 'all'; label: string };
+  { groups: string[][] } | { related: EntityRef; depth: 'direct' | 'all'; label: string };
 export interface ViewState {
   /** The view's bounds, as exact rationals. */
   left?: string;
@@ -32,12 +33,20 @@ const TAGS = 64,
 function separationOf(value: unknown): StoredSeparation | undefined {
   if (!value || typeof value !== 'object') return undefined;
   const v = value as Record<string, unknown>;
+  const group = (list: unknown) => {
+    if (!Array.isArray(list)) return null;
+    const tags = list.filter((t): t is string => typeof t === 'string' && !!t && t.length <= TEXT);
+    return tags.length && tags.length === list.length && tags.length <= TAGS ? tags : null;
+  };
+  // One group, as tabs kept it before there could be several.
   if (Array.isArray(v.tags)) {
-    const tags = v.tags.filter(
-      (t): t is string => typeof t === 'string' && !!t && t.length <= TEXT,
-    );
-    return tags.length && tags.length === v.tags.length && tags.length <= TAGS
-      ? { tags }
+    const tags = group(v.tags);
+    return tags ? { groups: [tags] } : undefined;
+  }
+  if (Array.isArray(v.groups)) {
+    const groups = v.groups.map(group);
+    return groups.length && groups.length <= 7 && groups.every((g) => g !== null)
+      ? { groups: groups as string[][] }
       : undefined;
   }
   const related = v.related as Record<string, unknown> | null | undefined;

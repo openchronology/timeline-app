@@ -6,8 +6,23 @@ import { validateEntityTags } from './tags.js';
 import { refKey, validateRef } from './relationships.js';
 import type { EntityRef } from './relationships.js';
 
-/** What a timeline opens separated by: tags, or an entity and its related or connected set. */
-export type ViewSeparation = { tags: string[] } | { related: EntityRef; depth: 'direct' | 'all' };
+/**
+ * What a timeline opens separated by: tags (one separation), several groups of tags (one
+ * track each, above the rest), or an entity and its related or connected set.
+ */
+export type ViewSeparation =
+  { tags: string[] } | { groups: string[][] } | { related: EntityRef; depth: 'direct' | 'all' };
+/** The most tag separations shown at once: each is a track, and a comparison has eight. */
+export const SEPARATION_LIMIT = 7;
+/** A tag separation's groups: one for `{tags}`, each of `{groups}`; none for an entity's. */
+export function separationGroups(s: ViewSeparation | null | undefined): string[][] {
+  if (!s) return [];
+  return 'tags' in s ? [s.tags] : 'groups' in s ? s.groups : [];
+}
+/** Tag separations as a default view keeps them: `{tags}` for one, `{groups}` for several. */
+export function tagSeparation(groups: string[][]): ViewSeparation {
+  return groups.length === 1 ? { tags: [...groups[0]] } : { groups: groups.map((g) => [...g]) };
+}
 export interface TimelineView {
   separation: ViewSeparation;
 }
@@ -29,6 +44,20 @@ export function validateTimelineView(value: unknown): TimelineView {
     if (!tags.length) throw new Error('A default separation needs at least one tag.');
     return { separation: { tags } };
   }
+  if (object(s) && 'groups' in s) {
+    if (Object.keys(s).length !== 1 || !Array.isArray(s.groups))
+      throw new Error('A default separation by several groups of tags has only its groups.');
+    if (s.groups.length < 2 || s.groups.length > SEPARATION_LIMIT)
+      throw new Error(
+        `A default view has two to ${SEPARATION_LIMIT} groups of tags; one is {"tags": [...]}.`,
+      );
+    const groups = s.groups.map((group) => {
+      const tags = validateEntityTags(group);
+      if (!tags.length) throw new Error('Each group of a default separation needs a tag.');
+      return tags;
+    });
+    return { separation: { groups } };
+  }
   if (object(s) && 'related' in s) {
     if (
       Object.keys(s).some((k) => k !== 'related' && k !== 'depth') ||
@@ -45,9 +74,18 @@ export function validateTimelineView(value: unknown): TimelineView {
  */
 export function sameSeparation(a: ViewSeparation | null, b: ViewSeparation | null): boolean {
   if (!a || !b) return a === b;
-  if ('tags' in a || 'tags' in b)
+  if ('related' in a || 'related' in b)
     return (
-      'tags' in a && 'tags' in b && [...a.tags].sort().join(',') === [...b.tags].sort().join(',')
+      'related' in a &&
+      'related' in b &&
+      refKey(a.related) === refKey(b.related) &&
+      a.depth === b.depth
     );
-  return refKey(a.related) === refKey(b.related) && a.depth === b.depth;
+  // Tag separations: the same groups, each the same tags, in any order.
+  const key = (s: ViewSeparation) =>
+    separationGroups(s)
+      .map((g) => [...g].sort().join(','))
+      .sort()
+      .join('|');
+  return key(a) === key(b);
 }

@@ -1,6 +1,7 @@
 // Copyright (c) 2026 Athan Clark. SPDX-License-Identifier: GPL-3.0-only
 // Relationships in the editor: linked, drawn as arcs, and separating.
 import assert from 'node:assert/strict';
+import { separateBy } from './tags-browser.mjs';
 import { readFile } from 'node:fs/promises';
 import { closeMomentDetails } from './moment-dialog-browser.mjs';
 /** Relationships are linked from an entity's details, drawn as arcs and used to separate. */
@@ -201,9 +202,7 @@ export async function checkRelationships(page, restore) {
     );
     await page.locator('#separation-rejoin').click();
     await page.locator('#separation-settings').waitFor({ state: 'hidden' });
-    await page.locator('#separate-button').click();
-    await page.locator('#separate-extra').fill('anything');
-    await page.locator('#separate-submit').click();
+    await separateBy(page, ['anything']);
     await page.locator('#separation-settings').waitFor({ state: 'visible' });
     assert.equal(
       await bar(),

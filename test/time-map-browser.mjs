@@ -1,6 +1,7 @@
 // Copyright (c) 2026 Athan Clark. SPDX-License-Identifier: GPL-3.0-only
 // Shifting and scaling times in the editor (#96).
 import assert from 'node:assert/strict';
+import { separateBy } from './tags-browser.mjs';
 import { closeMomentDetails } from './moment-dialog-browser.mjs';
 /**
  * Shifting and scaling times for good (#96), in a timeline in the page: what is tagged, from
@@ -123,9 +124,7 @@ export async function checkTimeMap(page, restore) {
   await counted(10);
 
   // A separated track, from its bar: back to the whole timeline, with those moved.
-  await page.locator('#separate-button').click();
-  await page.locator('#separate-extra').fill('early');
-  await page.locator('#separate-submit').click();
+  await separateBy(page, ['early']);
   await page.locator('#separation-settings').waitFor();
   await page.locator('#separation-map').click();
   await dialog.waitFor();

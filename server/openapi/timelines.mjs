@@ -294,6 +294,26 @@ export const schemas = {
           },
           {
             type: 'object',
+            required: ['groups'],
+            additionalProperties: false,
+            properties: {
+              groups: {
+                type: 'array',
+                minItems: 2,
+                maxItems: 7,
+                description:
+                  'Several separations (#548): each group’s events in a track of its own, above everything else.',
+                items: {
+                  type: 'array',
+                  minItems: 1,
+                  maxItems: 40,
+                  items: { type: 'string', minLength: 1, maxLength: 64 },
+                },
+              },
+            },
+          },
+          {
+            type: 'object',
             required: ['related', 'depth'],
             additionalProperties: false,
             properties: { related: ref('EntityRef'), depth: { enum: ['direct', 'all'] } },

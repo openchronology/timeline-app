@@ -6,7 +6,17 @@ Events (moments and durations) can carry tags: short labels you choose, such as 
 
 ## Separating by tags
 
-**Separate by tags** in the timeline toolbar lists the timeline's tags with how many events use each. Choose one or more (or type others) and select **Separate**. Events carrying any of the chosen tags move into a track above; everything else stays in the track below. The view keeps its position, and both tracks pan and zoom together, using the same layout as comparisons. A duration that follows a moment on the other side keeps that moment's time. Relationships are still drawn: links within a track arc over it, and links between the tracks cross the gap from one event to the other ([relationships](relationships.md#arcs-between-tracks)). Both tracks are read-only; **Rejoin** returns to the whole timeline. Separation never changes or saves the timeline. To move what is in the upper track for good, **Shift or scale these…** in its bar returns to the whole timeline and [shifts or scales](time-mapping.md) those events.
+**Separate by tags** in the timeline toolbar opens a list of separations. In each, **Add tags** opens a picker:
+
+- it lists the timeline's tags with how many events use each, the most used first;
+- its search box narrows the list, or names a tag no event has yet (**Add "…"**);
+- several tags can be chosen at once, with the mouse or the arrow keys and Enter.
+
+Each chosen tag shows as a chip, whose **×** removes it. **+ Add a separation** adds another, up to seven, and **Remove** takes one away. Select **Separate**.
+
+Each separation's events (those carrying any of its tags) move into a track of their own, in the order listed. Everything else, which carries none of them, stays in the last track. An event carrying tags of two separations appears in both.
+
+The button stays in the toolbar while separated, with how many separations are shown. It reopens the list to change them, or to **Rejoin all**. The view keeps its position, and both tracks pan and zoom together, using the same layout as comparisons. A duration that follows a moment on the other side keeps that moment's time. Relationships are still drawn: links within a track arc over it, and links between the tracks cross the gap from one event to the other ([relationships](relationships.md#arcs-between-tracks)). The tracks are read-only; **Rejoin** returns to the whole timeline. Separation never changes or saves the timeline. To move the separated events for good, **Shift or scale these…** in the bar returns to the whole timeline and [shifts or scales](time-mapping.md) the events carrying any separated tag.
 
 Each track has its own summaries, so nearby moments and collapsed durations group within their own side. Server and desktop timelines show the saved version while separated; unsaved edits are kept and reappear when you rejoin. Complete in-memory timelines, such as browser drafts and offline HTML, include unsaved edits.
 
@@ -18,6 +28,12 @@ The default view is one of the timeline's settings, like its title and tags, so 
 
 ```json
 { "view": { "separation": { "tags": ["war", "trade"] } } }
+```
+
+Several separations are `groups`, two to seven of them, each a list of tags:
+
+```json
+{ "view": { "separation": { "groups": [["war", "siege"], ["trade"]] } } }
 ```
 
 ```json
