@@ -214,8 +214,16 @@ try {
   await dialog.getByRole('button', { name: 'Make default: War apart' }).click();
   await dialog.locator('.dialog-actions [data-close]').click();
   await frame.locator('#separation-rejoin').click();
+  await frame.locator('#toast').evaluate((toast) => (toast.textContent = ''));
   await frame.locator('#publish-button').click();
-  await frame.locator('#toast', { hasText: 'Timeline saved' }).waitFor({ timeout: 30000 });
+  await frame
+    .locator('#toast', { hasText: 'Timeline saved' })
+    .waitFor({ timeout: 30000 })
+    .catch(async (error) => {
+      throw new Error(`Not saved: ${await frame.locator('#toast').textContent()}`, {
+        cause: error,
+      });
+    });
   assert.equal(
     (await pool.query('SELECT view FROM oc_timelines WHERE id=$1', [created.id])).rows[0].view.id,
     view.id,
@@ -247,6 +255,9 @@ try {
   // The default view follows the view: changed through the API, the timeline opens the new way.
   const changed = await key(`views/${view.id}`, { separation: { tags: ['trade'] } }, 'PUT');
   assert.equal(changed.status, 200);
+  // A new tab: a reload in the same tab shows what it showed before.
+  page = await page.context().newPage();
+  page.on('pageerror', (e) => errors.push(e.message));
   frame = await opened(page, `/timelines/${created.id}`);
   await frame.locator('#separation-tags', { hasText: 'trade' }).waitFor({ timeout: 15000 });
   // A link to a view opens it.
