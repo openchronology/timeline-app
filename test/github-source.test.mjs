@@ -16,6 +16,8 @@ import {
   itemDuration,
   validSignature,
   NOTES_LIMIT,
+  clip,
+  tag,
 } from '../server/github-source.mjs';
 import {
   StintTracker,
@@ -91,6 +93,27 @@ test('closed issues and merged pull requests end when they closed or merged', ()
   assert.ok(merged.metadata.tags.includes('state:merged'));
   const long = itemDuration('acme/app', issue({ body: 'x'.repeat(NOTES_LIMIT + 50) }));
   assert.ok(long.metadata.description.startsWith('x'.repeat(NOTES_LIMIT) + '…'));
+});
+
+test('text is cut short only between whole characters, never inside an emoji', () => {
+  // An emoji is two UTF-16 units: cut between them, it is not valid Unicode, and PostgreSQL
+  // refuses the whole save (as a pull request whose text ended at 🤖 once did).
+  const wellFormed = (s) =>
+    !/[\ud800-\udbff](?![\udc00-\udfff])|(?<![\ud800-\udbff])[\udc00-\udfff]/.test(s);
+  assert.equal(clip('ab🤖', 3), 'ab');
+  assert.equal(clip('ab🤖', 4), 'ab🤖');
+  assert.equal(clip('abc', 5), 'abc');
+  const body = 'x'.repeat(NOTES_LIMIT - 1) + '🤖 Generated';
+  const d = itemDuration('acme/app', issue({ body, title: 'y'.repeat(294) + '🤖🤖' }));
+  assert.ok(wellFormed(d.metadata.description));
+  assert.ok(d.metadata.description.startsWith('x'.repeat(NOTES_LIMIT - 1) + '…'));
+  assert.ok(wellFormed(d.metadata.title));
+  assert.ok(wellFormed(tag('z'.repeat(127) + '🤖')));
+  const closed = timelineEvent('acme/app', issue({ title: 'w'.repeat(290) + '🤖🤖🤖' }), {
+    event: 'closed',
+    created_at: '2026-11-03T00:00:00Z',
+  });
+  assert.ok(wellFormed(closed.moments[0].metadata.title));
 });
 
 test('a repository too long for a tag is named by a hash, the same each time', () => {

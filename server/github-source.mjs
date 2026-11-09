@@ -28,6 +28,16 @@ import {
 /** The User-Agent GitHub requires of API clients: the project, never a person. */
 export const USER_AGENT =
   'OpenChronology-github-source/1.0 (https://github.com/openchronology/timeline-app)';
+/**
+ * The first `limit` UTF-16 units of `text`, never ending in half of a surrogate pair: an emoji cut
+ * in two is not valid Unicode, and PostgreSQL refuses to store it as JSON.
+ */
+export function clip(text, limit) {
+  const s = String(text);
+  if (s.length <= limit) return s;
+  const code = s.charCodeAt(limit - 1);
+  return s.slice(0, code >= 0xd800 && code <= 0xdbff ? limit - 1 : limit);
+}
 /** The most characters of an issue's text a duration keeps as its notes. */
 export const NOTES_LIMIT = 4000;
 const ID = /^[A-Za-z0-9_.:-]{1,128}$/;
@@ -109,13 +119,12 @@ export function seconds(timestamp) {
 
 /** A tag as events' tags allow it: lower case, no commas or control characters, 128 at most. */
 export function tag(text) {
-  return String(text)
+  const cleaned = String(text)
     .normalize('NFC')
     .replace(/[\x00-\x1f\x7f,]/g, ' ')
     .trim()
-    .toLowerCase()
-    .slice(0, 128)
-    .trim();
+    .toLowerCase();
+  return clip(cleaned, 128).trim();
 }
 
 /** Room in a tag's 128 characters for a repository, leaving `#` or `!` and a nine-digit number. */
@@ -168,7 +177,7 @@ export function itemDuration(repository, item) {
   const closed = item.state === 'closed';
   const body = typeof item.body === 'string' ? item.body : '';
   const notes =
-    (body.length > NOTES_LIMIT ? body.slice(0, NOTES_LIMIT) + '…' : body) +
+    (body.length > NOTES_LIMIT ? clip(body, NOTES_LIMIT) + '…' : body) +
     (item.html_url ? (body ? '\n\n' : '') + item.html_url : '');
   const assignees = item.assignees ?? (item.assignee ? [item.assignee] : []);
   const tags = [
@@ -190,7 +199,7 @@ export function itemDuration(repository, item) {
     end:
       closed && (merged ?? item.closed_at) ? seconds(merged ?? item.closed_at) : { ongoing: true },
     metadata: {
-      title: `${mr ? '!' : '#'}${item.number} ${item.title ?? ''}`.trim().slice(0, 300),
+      title: clip(`${mr ? '!' : '#'}${item.number} ${item.title ?? ''}`.trim(), 300),
       ...(notes ? { description: notes } : {}),
       ...(item.html_url ? { url: item.html_url } : {}),
       tags: [...new Set(tags)].slice(0, 40),
