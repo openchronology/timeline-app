@@ -45,6 +45,8 @@ A view moved to a timeline that lacks some of its tags or moments still opens. S
 
 A view outlives its timeline. Deleting a timeline leaves its views as views of no timeline, until their owners reassign them.
 
+A mirrored repository's timeline can open in a view made for it: [och-import-github](github.md#the-branches-view) saves a **Branches** view, each recent branch in a track from when it began until it was merged.
+
 ## Views in files
 
 Desktop files, browser drafts and `.ochx` exports keep a list of views of their own, with the same Open, Make default, Edit, Duplicate and Delete. They are part of the file, so they go wherever the file goes. They are private to whoever has it, and nothing is shared or forked. Creating a server timeline from such a file makes its views the creator's private saved views of the new timeline. If the file's default view was one of them, the timeline's default view names the saved view made from it.

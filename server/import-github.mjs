@@ -42,6 +42,7 @@ import {
   timelineEvent,
 } from './github-events.mjs';
 import { relationshipKey } from '../dist/core.mjs';
+import { branchView, readBranchRequests, saveBranchView } from './branch-view.mjs';
 import { loadConfiguration } from './env-file.mjs';
 
 const sleep = (ms) => new Promise((resume) => setTimeout(resume, ms));
@@ -207,9 +208,12 @@ export async function readRepository(reader, repository, { since, kinds = eventK
     }
   // Commits, branch by branch: the default branch's first.
   const commitIds = new Set();
+  // Each other branch's own commits, first and last (for the Branches view, #557).
+  const branchTimes = [];
+  let main = null;
   if (keeps(kinds, 'commit') || keeps(kinds, 'branch')) {
     const repo = await reader.get(`${reader.api}/repos/${path}`);
-    const main = repo.value.default_branch;
+    main = repo.value.default_branch;
     const branches = [{ name: main }];
     for await (const branch of reader.list(`/repos/${path}/branches`))
       if (branch.name !== main)
@@ -219,7 +223,8 @@ export async function readRepository(reader, repository, { since, kinds = eventK
       // A branch whose last commit was read with an earlier one (merged, or not moved on)
       // has nothing of its own.
       if (head && seen.has(head)) continue;
-      let first = null;
+      let first = null,
+        last = null;
       for await (const entry of reader.list(`/repos/${path}/commits`, {
         sha: branch,
         since,
@@ -243,7 +248,10 @@ export async function readRepository(reader, repository, { since, kinds = eventK
           links.push(...commitLinks(repository, commit));
         }
         if (!first || Date.parse(commit.time) < Date.parse(first.time)) first = commit;
+        if (!last || Date.parse(commit.time) > Date.parse(last.time)) last = commit;
       }
+      if (branch !== main && first)
+        branchTimes.push({ name: branch, first: first.time, last: last.time });
       if (branch !== main && first && keeps(kinds, 'branch'))
         moments.push(
           branchMoment(repository, branch, {
@@ -293,16 +301,22 @@ export async function readRepository(reader, repository, { since, kinds = eventK
       ? [...numbers.values()].filter((item) => item.state !== 'closed').length
       : 0,
     commits: commitIds.size,
+    main,
+    branches: branchTimes,
   };
 }
 
 const USAGE = `Usage: och-import-github --repo <repository> --timeline <uuid>
-  [--only <kinds>] [--except <kinds>] [--since <ISO time>] [--dry-run]
+  [--only <kinds>] [--except <kinds>] [--since <ISO time>] [--no-branch-view] [--dry-run]
 
 Imports one repository into one timeline. A repository is owner/name on github.com, or
 <platform>:<host>/<path> elsewhere, such as forgejo:codeberg.org/acme/app.
 Kinds: ${Object.keys(EVENT_KINDS).join(', ')}. All by default; --only commits imports just
 those, --except forks,branches everything else.
+
+With branches, it also saves a Branches view: the most recently active branches, each in a
+track from when it began until it was merged, and makes it the timeline's default view unless
+the timeline has its own. --no-branch-view leaves views alone.
 
 Environment: OCH_API_URL and OCH_API_KEY (not needed for --dry-run); GITHUB_TOKEN, or
 FORGEJO_TOKEN for Forgejo and Gitea, GITLAB_TOKEN for GitLab (recommended; needed for
@@ -322,6 +336,7 @@ export async function main(argv = process.argv.slice(2), env = process.env, out 
         except: { type: 'string' },
         since: { type: 'string' },
         'dry-run': { type: 'boolean' },
+        'no-branch-view': { type: 'boolean' },
         help: { type: 'boolean' },
       },
     }).values;
@@ -392,7 +407,8 @@ export async function main(argv = process.argv.slice(2), env = process.env, out 
       out.error(error.message);
       return 2;
     }
-  let changes;
+  let changes,
+    view = null;
   try {
     if (writer) {
       // Before reading GitHub: that the timeline can take what it reads.
@@ -407,6 +423,12 @@ export async function main(argv = process.argv.slice(2), env = process.env, out 
       platform === 'gitlab'
         ? await readGitlab(reader, repository, { since, kinds })
         : await readRepository(reader, repository, { since, kinds });
+    // The Branches view (#557), from the repository's own pull requests and branches.
+    if (keeps(kinds, 'branch') && !options['no-branch-view'])
+      view = await branchView(reader, repository, changes, {
+        kinds,
+        requests: await readBranchRequests(reader, repository),
+      });
   } catch (error) {
     out.error(`${repository}: ${error.message}`);
     return 1;
@@ -420,8 +442,12 @@ export async function main(argv = process.argv.slice(2), env = process.env, out 
   ].join(', ');
   for (const warning of changes.warnings ?? []) out.error(`${repository}: ${warning}`);
   out.log(`Requests: ${reader.requests}.`);
+  const tracks = view
+    ? view.separations.map((s) => `${s.tags[0]}${s.unions ? ' (merged)' : ''}`).join(', ')
+    : '';
   if (!writer) {
     out.log(`${repository} → ${timeline}: would import ${summary}.`);
+    if (view) out.log(`  Branches view: ${tracks}.`);
     for (const d of [...changes.durations, ...changes.moments].slice(0, 3))
       out.log('  ' + JSON.stringify(d));
     return 0;
@@ -434,6 +460,15 @@ export async function main(argv = process.argv.slice(2), env = process.env, out 
     });
     if (changes.links.length) await writer.send(timeline, { links: changes.links });
     out.log(`${repository} → ${timeline}: imported ${summary}.`);
+    if (view) {
+      const saved = await saveBranchView(writer, timeline, view);
+      out.log(
+        `${repository} → ${timeline}: ${saved.created ? 'saved' : 'updated'} the Branches view (${tracks})` +
+          (saved.isDefault
+            ? ', the timeline’s default view.'
+            : '; the timeline keeps its own default view.'),
+      );
+    }
     return 0;
   } catch (error) {
     out.error(
