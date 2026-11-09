@@ -260,6 +260,7 @@ export const HELP_SECTIONS = [
       'time-presentation',
       'durations',
       'tags',
+      'views',
       'relationships',
       'images',
       'search',

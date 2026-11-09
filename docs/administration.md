@@ -245,7 +245,7 @@ Some limits stay the same whatever this setting is:
   separation by tags or relationships is built on its first query for each saved revision:
   at most 20 builds a minute per address without an account and 60 per account, two at once
   in each process with up to 16 waiting (503 "Separating is busy" beyond). Filters naming
-  tags or entities a timeline lacks build nothing new ([views](tags.md#views)).
+  tags or entities a timeline lacks build nothing new ([how separations are read](tags.md#how-separations-are-read)).
 - `.och` files exchanged with the server are at most 64 MiB. `TIMELINE_FILE_BYTES` in the
   environment file changes this: a size from `1MiB` to `1GiB`, such as `128MiB`. An invalid
   value stops the server at startup. The limit applies to uploads, exports, and the

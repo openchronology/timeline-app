@@ -10,10 +10,9 @@ import {
   pathParam,
   timelineId,
   errors,
-  PUBLIC,
   TIMELINE_READ,
   SIGNED_IN_READ,
-  SIGNED_IN,
+  TIMELINE_WRITE,
 } from './common.mjs';
 
 const VIEWS = 'Views';
@@ -22,7 +21,7 @@ export const tags = [
   {
     name: VIEWS,
     description:
-      'Saved views: named configurations of separations of a timeline, private or public, shared with members, forked, duplicated and reassigned to other timelines as templates (docs/views.md).',
+      'Saved views: named configurations of separations of a timeline, private or public, shared with members, forked, duplicated and reassigned to other timelines as templates (docs/views.md). API keys reach them with the timeline scopes, so scripts and AI assistants can make views: `timelines:read` to read, `timelines:write` to change.',
   },
 ];
 
@@ -49,7 +48,7 @@ const copy = (fork) => ({
     description: fork
       ? 'Makes a private copy of a view someone else owns, which remembers the view it came from (`upstream`) while that exists. Of the same timeline, or of `timeline` (which the account must be able to read).'
       : 'Makes a private copy of a view the account can read, its own included, with no link back. Of the same timeline, or of `timeline`.',
-    security: SIGNED_IN,
+    security: TIMELINE_WRITE,
     parameters: [viewId],
     requestBody: body(
       {
@@ -107,7 +106,7 @@ export const paths = {
       summary: 'List your views',
       description:
         'The account’s own views and those shared with it, of any timeline: templates to copy to another. The 200 most recently changed.',
-      security: SIGNED_IN_READ,
+      security: [...SIGNED_IN_READ, { apiKey: ['timelines:read'] }],
       responses: {
         200: json({
           type: 'object',
@@ -123,7 +122,7 @@ export const paths = {
       summary: 'Save a view',
       description:
         'Saves a separation as a view of a timeline the account can read (or of none). Private unless `visibility` says public. An account keeps at most 500 views.',
-      security: SIGNED_IN,
+      security: TIMELINE_WRITE,
       requestBody: body({
         type: 'object',
         required: ['title', 'separation'],
@@ -146,7 +145,7 @@ export const paths = {
       summary: 'Read a view',
       description:
         'A view, for its owner and members, or anyone who may read its timeline when it is public.',
-      security: PUBLIC,
+      security: TIMELINE_READ,
       parameters: [viewId],
       responses: { 200: json(ref('SavedView')), ...errors(404) },
     },
@@ -156,7 +155,7 @@ export const paths = {
       summary: 'Change a view',
       description:
         'Changes a view’s title, description or separation, or reassigns it to another timeline the account can read (its owner and editors). Only its owner changes its visibility. Timelines whose default view names it open as it now is.',
-      security: SIGNED_IN,
+      security: TIMELINE_WRITE,
       parameters: [viewId],
       requestBody: body({
         type: 'object',
@@ -180,7 +179,7 @@ export const paths = {
       summary: 'Delete a view',
       description:
         'Deletes a view (its owner). Timelines whose default view named it open with their own copy of its separation.',
-      security: SIGNED_IN,
+      security: TIMELINE_WRITE,
       parameters: [viewId],
       responses: {
         200: json({ type: 'object', required: ['ok'], properties: { ok: { const: true } } }),
@@ -196,7 +195,7 @@ export const paths = {
       tags: [VIEWS],
       summary: 'List those a view is shared with',
       description: 'The accounts a view is shared with, for anyone who may read it.',
-      security: PUBLIC,
+      security: TIMELINE_READ,
       parameters: [viewId],
       responses: { 200: members, ...errors(404) },
     },
@@ -206,7 +205,7 @@ export const paths = {
       summary: 'Share a view',
       description:
         'Shares a view with an account as a viewer (reads it) or an editor (also changes and reassigns it), or changes its role. Its owner only.',
-      security: SIGNED_IN,
+      security: TIMELINE_WRITE,
       parameters: [viewId],
       requestBody: body(member),
       responses: { 200: members, ...errors(400, 401, 403, 404, 429) },
@@ -216,7 +215,7 @@ export const paths = {
       tags: [VIEWS],
       summary: 'Stop sharing a view',
       description: 'Stops sharing a view with an account. Its owner only.',
-      security: SIGNED_IN,
+      security: TIMELINE_WRITE,
       parameters: [viewId],
       requestBody: body({
         type: 'object',

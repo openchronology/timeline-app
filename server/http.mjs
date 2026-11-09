@@ -530,12 +530,15 @@ export function createRequestHandler({
         throw new HttpError(400, 'Invalid request path.');
       }
       const method = req.method;
-      // API keys reach only the timeline endpoints, refused before anything else is read.
+      // API keys reach only the timeline and view endpoints (#550), refused before anything
+      // else is read.
       if (
         (req.headers.authorization ?? '').startsWith('Bearer och_key_') &&
-        !pathname.startsWith('/api/timelines')
+        !pathname.startsWith('/api/timelines') &&
+        pathname !== '/api/views' &&
+        !pathname.startsWith('/api/views/')
       )
-        throw new HttpError(403, 'API keys are limited to timeline endpoints.');
+        throw new HttpError(403, 'API keys are limited to timeline and view endpoints.');
       // Health, for anyone (load balancers, Compose): 503 unless the database answers with
       // the current schema. The query reads no rows (LIMIT 0, joins ON false) but fails if
       // any table or column named is missing, so a server whose migration has not run

@@ -44,6 +44,8 @@ Each track has its own summaries, so nearby moments and collapsed durations grou
 
 Someone who can edit a timeline can make a separation its default view: separate it, by tags or by **Separate related** or **Separate all connected**, and select **Make this the default view** in the bar above the tracks. Everyone then opens it that way: readers, embeds, shared links, imported files, desktop files and browser drafts. The bar says "This is the timeline's default view", and **Rejoin** still returns to the whole timeline. **Clear default view**, in the bar or in the **Separate by tags** dialog (which also says what the timeline opens separated by), makes it open whole again.
 
+To keep several ways of showing a timeline, save them as [views](views.md): a default view can be one of them, and then follows it as it changes.
+
 The default view is one of the timeline's settings, like its title and tags, so it is an unsaved change until the timeline is saved (for a server or desktop timeline: rejoin, then save; a browser draft keeps it at once). Saves, exports (`.ochx`, `.och`), forks, copies, merges, pull requests and saved history keep it. In a document it is `view`:
 
 ```json
@@ -87,7 +89,7 @@ How it fits with the rest:
 - **Comparisons** of timelines ignore their default views: each track is a whole timeline.
 - **Editing:** a separation is read-only, so someone who opens their timeline to edit it rejoins first. Unsaved edits are kept while separated, as before. **Make this the default view** is shown only to those who could edit the timeline, and not in View mode.
 
-## Views
+## How separations are read
 
 A separation reads two filtered views of one saved state: entities with any of the tags, and entities with none of them. Each view is a full index of its filtered document, so summaries, duration bands, collapsed-duration clusters, pages of moments and of durations run at normal index speed and match the same rules as the whole timeline.
 

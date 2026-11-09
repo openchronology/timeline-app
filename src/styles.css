@@ -4159,3 +4159,129 @@ body[data-warnings]:not([data-images-shown])
     max-height: calc(100dvh - 72px - env(safe-area-inset-top) - env(safe-area-inset-bottom));
   }
 }
+/* Saved views (#550): the Views dialog's cards, and sharing one. */
+.views-dialog {
+  width: min(640px, calc(100vw - 32px));
+}
+.views-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+.views-list {
+  display: grid;
+  gap: 8px;
+  max-height: min(50vh, 420px);
+  overflow-y: auto;
+  margin: 10px 0 0;
+  padding: 2px;
+  list-style: none;
+}
+.views-none {
+  color: var(--muted);
+  font-size: 13px;
+}
+.view-card {
+  display: grid;
+  gap: 4px;
+  padding: 10px 12px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  background: var(--paper);
+}
+.view-card-heading {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+}
+.view-badge {
+  padding: 1px 8px;
+  border-radius: 999px;
+  border: 1px solid var(--line-strong);
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--muted);
+}
+.view-badge-default {
+  background: var(--hover);
+  color: var(--ink);
+}
+.view-card-about,
+.view-card-description {
+  margin: 0;
+  font-size: 13px;
+  color: var(--muted);
+  overflow-wrap: anywhere;
+}
+.view-card-description {
+  color: var(--ink);
+}
+.view-card-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: 4px;
+}
+.view-card-actions button {
+  min-height: 0;
+  height: 28px;
+  padding: 0 10px;
+  font-size: 13px;
+}
+.views-templates {
+  margin-top: 14px;
+}
+.views-templates summary {
+  cursor: pointer;
+  font-weight: 600;
+}
+.view-link {
+  display: flex;
+  gap: 6px;
+}
+.view-link input {
+  flex: 1;
+  min-width: 0;
+}
+.view-link button {
+  flex-shrink: 0;
+  width: auto;
+}
+.view-members-heading {
+  margin: 14px 0 4px;
+  font-size: 14px;
+}
+.view-members {
+  display: grid;
+  gap: 6px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.view-members li {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 13px;
+}
+.view-members li span {
+  flex: 1;
+}
+.view-members select,
+.view-member-add select {
+  width: auto;
+}
+.view-member-add {
+  display: flex;
+  gap: 6px;
+  margin-top: 10px;
+}
+.view-member-add input {
+  flex: 1;
+  min-width: 0;
+}
+.view-member-add button {
+  width: auto;
+  flex-shrink: 0;
+}

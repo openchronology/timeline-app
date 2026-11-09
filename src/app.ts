@@ -77,6 +77,9 @@ import {
   validateSeparations,
   validateTimelineImage,
   validateTimelineView,
+  validateSavedViews,
+  validateViewText,
+  SAVED_VIEW_LIMIT,
   sameSeparation,
   separationGroups,
   viewSeparations,
@@ -181,6 +184,7 @@ import type {
   TimelineDocument,
   TimelineImage,
   TimelineView,
+  SavedViewEntry,
   ViewSeparation,
   TimePresentation,
   PresentationContext,
@@ -279,6 +283,8 @@ interface RemoteTimeline {
   image?: TimelineImage;
   /** How it opens (#416): its default separation, if any (the server sends null for none). */
   view?: TimelineView;
+  /** A desktop file's own views (#550); a server's are read apart. */
+  views?: SavedViewEntry[];
   assets?: Record<string, string>;
   /** Its sensitive-content labels (#115): its owner's and moderators'. */
   labels?: string[];
@@ -2375,6 +2381,7 @@ function startComparison(sources: ComparisonSource[], presentation: TimePresenta
 function stopComparison(restore = true) {
   if (!comparison) return;
   separation = null;
+  shownView = null;
   el('separation-settings').hidden = true;
   comparisonController?.abort();
   comparison.dispose();
@@ -3389,6 +3396,7 @@ async function openRemote(id: string, restoreSeparation = true) {
   if (info.tags) info.tags = validateTags(info.tags);
   info.image = info.image ? validateTimelineImage(info.image) : undefined;
   info.view = readTimelineView(info.view);
+  info.views = readSavedViews(info.views);
   if (info.comparison) {
     const sources = await comparisonSources(info.comparison.sources);
     if (request !== documentRequest) return;
@@ -3428,7 +3436,11 @@ async function openRemote(id: string, restoreSeparation = true) {
   // A reload in this tab shows it as it was, separated or rejoined (#128); otherwise it opens
   // in its default view (#416). A link to a moment shows the whole timeline.
   if (restoreSeparation) {
-    if (stored.separation) startSeparation(stored.separation);
+    // A link to one of its views (#550) opens in that view.
+    const linked = linkedViewId();
+    if (linked && (await openLinkedView(linked))) {
+      // Opened.
+    } else if (stored.separation) startSeparation(stored.separation);
     else if (!stored.left) await openDefaultView(info.view);
   }
   requestRender();
@@ -7596,6 +7608,7 @@ async function moveToLatest(id: string) {
   if (info.tags) info.tags = validateTags(info.tags);
   info.image = info.image ? validateTimelineImage(info.image) : undefined;
   info.view = readTimelineView(info.view);
+  info.views = readSavedViews(info.views);
   // Settings not edited here are as `before` had them: they take the latest.
   adoptSettings(index, before!, info);
   if (
@@ -7627,6 +7640,7 @@ const SETTING_KEYS = [
   'tags',
   'image',
   'view',
+  'views',
   'presentation',
   'plugins',
   'assets',
@@ -7688,6 +7702,7 @@ function takeSetting(
   if (key === 'tags') index.tags = saved.tags ? validateTags(saved.tags) : undefined;
   if (key === 'image') index.image = saved.image ? validateTimelineImage(saved.image) : undefined;
   if (key === 'view') index.view = readTimelineView(saved.view);
+  if (key === 'views') index.views = readSavedViews(saved.views);
   if (key === 'presentation')
     index.presentation = saved.presentation ? validatePresentation(saved.presentation) : undefined;
   if (key === 'plugins')
@@ -9321,6 +9336,14 @@ type Separation =
  * A timeline's default view as a server or file sent it (#416), or nothing when it has none or
  * it isn't one this version reads: the timeline then opens whole.
  */
+/** A file's saved views (#550), or none when they are missing or not ones this version reads. */
+function readSavedViews(value: unknown): SavedViewEntry[] | undefined {
+  try {
+    return value == null ? undefined : validateSavedViews(value);
+  } catch {
+    return undefined;
+  }
+}
 function readTimelineView(value: unknown): TimelineView | undefined {
   try {
     return value == null ? undefined : validateTimelineView(value);
@@ -9374,6 +9397,7 @@ async function openDefaultView(view: TimelineView | undefined) {
   if (!chosen || comparison) return;
   if (!('related' in chosen)) {
     startSeparation(viewSeparations(chosen));
+    nameDefaultView(view);
     return;
   }
   const request = documentRequest;
@@ -9384,6 +9408,29 @@ async function openDefaultView(view: TimelineView | undefined) {
     depth: chosen.depth,
     label: title || ('moment' in chosen.related ? 'this moment' : 'this duration'),
   });
+  nameDefaultView(view);
+}
+/**
+ * A default view that is a saved view (#550) is shown as that view: by its title, from the
+ * file's list, or read from the server.
+ */
+function nameDefaultView(view: TimelineView | undefined) {
+  const id = view?.id;
+  if (!id || !separation) return;
+  const shown = separation;
+  const name = (title: string, server: boolean) => {
+    if (separation !== shown) return;
+    shownView = { id, title, server };
+    text('separation-heading', `View: ${title}`);
+  };
+  if (!serverViews()) {
+    const saved = model?.views?.find((v) => v.id === id);
+    if (saved) name(saved.title, false);
+    return;
+  }
+  void api<{ title: string }>(`views/${encodeURIComponent(id)}`)
+    .then((saved) => name(saved.title, true))
+    .catch(() => {});
 }
 /**
  * Shows the timeline separated: by groups of tags (each a track of the events with any of its
@@ -9392,6 +9439,8 @@ async function openDefaultView(view: TimelineView | undefined) {
  */
 function startSeparation(by: SeparationTrack[] | Separation) {
   const choice: Separation = Array.isArray(by) ? { tracks: by } : by;
+  // A separation chosen anew is no saved view's (openView names its own after).
+  shownView = null;
   flushEventEdit();
   flushDurationEdit();
   const presentation = model?.presentation ?? remote?.presentation ?? DEFAULT_PRESENTATION;
@@ -10169,6 +10218,559 @@ el<HTMLFormElement>('separate-form').onsubmit = (event) => {
     text('separate-error', error instanceof Error ? error.message : String(error));
   }
 };
+/**
+ * Saved views (#550): named separations of the timeline. A server's are its saved views, read
+ * and changed through its API, shared, forked, duplicated and reassigned; a file's (a desktop
+ * file, a browser draft) are a list it keeps, changed like its other settings.
+ */
+type ViewCard = {
+  id: string;
+  title: string;
+  description: string;
+  separation: ViewSeparation;
+  /** A server's saved view, with what the reader may do; else one the file keeps. */
+  server: boolean;
+  visibility?: 'private' | 'public';
+  owner?: string;
+  role?: string;
+  canEdit: boolean;
+  canShare: boolean;
+  canFork: boolean;
+  canDuplicate: boolean;
+  upstream?: { id: string; title: string } | null;
+  timeline?: { id: string; title: string } | null;
+};
+/** A server's saved view as its API sends it. */
+type ServerView = Omit<ViewCard, 'server'>;
+/** The view shown, while the separation is the one it was opened with. */
+let shownView: { id: string; title: string; server: boolean } | null = null;
+let viewCards: ViewCard[] = [];
+/** Whether views are a server's saved views (else a file's list). */
+const serverViews = () => !!remote && !local && !offlineHtml;
+/** Whether this file's views may be changed here (as its default view may). */
+const fileViewsEditable = () => !viewMode && mayEditTimeline() && !!model;
+const fromServer = (v: ServerView): ViewCard => ({ ...v, server: true });
+const fromFile = (v: SavedViewEntry): ViewCard => {
+  const editable = fileViewsEditable();
+  return {
+    id: v.id,
+    title: v.title,
+    description: v.description ?? '',
+    separation: v.separation,
+    server: false,
+    canEdit: editable,
+    canShare: editable,
+    canFork: false,
+    canDuplicate: editable,
+  };
+};
+/** Shows a view: its separation, named by the view in the bar. */
+async function openView(view: {
+  id: string;
+  title: string;
+  separation: ViewSeparation;
+  server: boolean;
+}) {
+  if (comparison && !separation) return void toast('Exit the comparison to open a view.');
+  if (separation) stopComparison();
+  await openDefaultView({ separation: view.separation });
+  if (!separation) return void toast('This view separates by an event this timeline lacks.');
+  shownView = { id: view.id, title: view.title, server: view.server };
+  text('separation-heading', `View: ${view.title}`);
+  heading();
+  updateDefaultViewControls();
+}
+/** Opens the views dialog, listing the timeline's views. */
+function openViewsDialog() {
+  text('views-error', '');
+  renderViewsDialog();
+  el<HTMLDialogElement>('views-dialog').showModal();
+  void loadViews();
+}
+el('views-button').onclick = openViewsDialog;
+/** Reads the timeline's views: a server's, and the signed-in account's of other timelines. */
+async function loadViews() {
+  if (!serverViews()) {
+    viewCards = (model?.views ?? []).map(fromFile);
+    renderViewsDialog();
+    return;
+  }
+  const id = remote!.id;
+  text('views-status', 'Loading views…');
+  try {
+    const { views } = await api<{ views: ServerView[] }>(`timelines/${id}/views`);
+    if (remote?.id !== id) return;
+    viewCards = views.map(fromServer);
+    text('views-status', '');
+    renderViewsDialog();
+    if (session.user) {
+      const mine = await api<{ views: ServerView[] }>('views');
+      if (remote?.id !== id) return;
+      renderViewTemplates(mine.views.filter((v) => v.timeline?.id !== id).map(fromServer));
+    }
+  } catch (error) {
+    text('views-status', '');
+    text('views-error', error instanceof Error ? error.message : String(error));
+  }
+}
+/** Whether views can be saved here, and why not. */
+function viewSaving(): string | null {
+  if (serverViews()) return session.user ? null : 'Sign in to save views.';
+  if (!fileViewsEditable()) return 'This timeline’s views cannot be changed here.';
+  if ((model?.views?.length ?? 0) >= SAVED_VIEW_LIMIT)
+    return `A file keeps at most ${SAVED_VIEW_LIMIT} views.`;
+  return null;
+}
+function renderViewsDialog() {
+  const shown = shownSeparation();
+  text(
+    'views-showing',
+    shownView
+      ? `Showing the view “${shownView.title}”.`
+      : shown
+        ? 'Showing a separation that is not saved as a view.'
+        : 'Showing the whole timeline. Separate it to save a view.',
+  );
+  const refusal = viewSaving();
+  const save = el<HTMLButtonElement>('views-save');
+  save.disabled = !shown || !!refusal;
+  save.title = refusal ?? (shown ? '' : 'Separate the timeline first.');
+  // The shown view, changed since it was opened: saved into it.
+  const current = shownView && viewCards.find((v) => v.id === shownView!.id);
+  const update = el<HTMLButtonElement>('views-update');
+  update.hidden = !(current?.canEdit && shown && !sameSeparation(shown, current.separation));
+  update.textContent = current ? `Update “${current.title}” with what is shown` : '';
+  const list = el('views-list');
+  list.replaceChildren(...viewCards.map((card) => viewCardElement(card, false)));
+  if (!viewCards.length) {
+    const none = document.createElement('li');
+    none.className = 'views-none';
+    none.textContent = serverViews()
+      ? 'No views of this timeline yet.'
+      : 'This file keeps no views yet.';
+    list.append(none);
+  }
+  el('views-templates').hidden = !serverViews() || !session.user;
+}
+function renderViewTemplates(cards: ViewCard[]) {
+  el('views-template-list').replaceChildren(
+    ...(cards.length
+      ? cards.map((card) => viewCardElement(card, true))
+      : [
+          Object.assign(document.createElement('li'), {
+            className: 'views-none',
+            textContent: 'You have no views of other timelines.',
+          }),
+        ]),
+  );
+}
+/** A view's card: its title, badges, description and actions. */
+function viewCardElement(card: ViewCard, template: boolean): HTMLElement {
+  const item = document.createElement('li');
+  item.className = 'view-card';
+  item.dataset.view = card.id;
+  const head = document.createElement('div');
+  head.className = 'view-card-heading';
+  const title = document.createElement('strong');
+  title.textContent = card.title;
+  head.append(title);
+  const badge = (label: string, className = '') => {
+    const span = document.createElement('span');
+    span.className = 'view-badge ' + className;
+    span.textContent = label;
+    head.append(span);
+  };
+  const isDefault = !template && timelineView()?.id === card.id;
+  if (isDefault) badge('Default', 'view-badge-default');
+  if (shownView?.id === card.id) badge('Shown');
+  if (card.server) badge(card.visibility === 'public' ? 'Public' : 'Private');
+  item.append(head);
+  const about: string[] = [];
+  if (card.server && card.owner && card.role !== 'owner') about.push(`by ${card.owner}`);
+  if (card.role === 'editor' || card.role === 'viewer')
+    about.push(`shared with you as ${card.role}`);
+  if (card.upstream) about.push(`forked from “${card.upstream.title}”`);
+  if (template) about.push(card.timeline ? `of “${card.timeline.title}”` : 'of no timeline');
+  if (about.length) {
+    const line = document.createElement('p');
+    line.className = 'view-card-about';
+    line.textContent = about.join(' · ');
+    item.append(line);
+  }
+  if (card.description) {
+    const description = document.createElement('p');
+    description.className = 'view-card-description';
+    description.textContent = card.description;
+    item.append(description);
+  }
+  const actions = document.createElement('div');
+  actions.className = 'view-card-actions';
+  const button = (label: string, action: () => void | Promise<void>, primary = false) => {
+    const b = document.createElement('button');
+    b.type = 'button';
+    b.textContent = label;
+    b.setAttribute('aria-label', `${label}: ${card.title}`);
+    if (primary) b.className = 'button-primary';
+    b.onclick = () =>
+      void Promise.resolve(action()).catch((error) =>
+        text('views-error', error instanceof Error ? error.message : String(error)),
+      );
+    actions.append(b);
+  };
+  if (template) {
+    // A template: copied here, or moved here (reassigned) by those who may change it.
+    button(
+      'Copy here',
+      () => copyView(card, card.canFork ? 'fork' : 'duplicate', remote!.id),
+      true,
+    );
+    if (card.canEdit) button('Move here', () => reassignView(card, remote!.id));
+  } else {
+    button(
+      'Open',
+      async () => {
+        el<HTMLDialogElement>('views-dialog').close();
+        await openView(card);
+      },
+      true,
+    );
+    if (!isDefault && !viewMode && mayEditTimeline() && model)
+      button('Make default', () => makeViewDefault(card));
+    if (card.canEdit) button('Edit…', () => openViewEditor(card));
+    if (card.server && card.canShare) button('Share…', () => openViewSharing(card));
+    if (card.server && card.canFork) button('Fork', () => copyView(card, 'fork'));
+    if (card.canDuplicate) button('Duplicate', () => copyView(card, 'duplicate'));
+    if (card.canShare) button('Delete', () => deleteView(card));
+  }
+  item.append(actions);
+  return item;
+}
+/** The timeline opens in a view (a setting, saved with the timeline). */
+function makeViewDefault(card: ViewCard) {
+  setTimelineView({ id: card.id, separation: card.separation });
+  toast(
+    remote || local
+      ? `“${card.title}” is now the default view. Save the timeline to keep it.`
+      : `“${card.title}” is now the timeline’s default view.`,
+  );
+  renderViewsDialog();
+}
+/** Changes a file's views: `change` edits a copy; the default view follows its view. */
+function changeFileViews(change: (views: SavedViewEntry[]) => SavedViewEntry[]) {
+  if (!model || !fileViewsEditable())
+    throw new Error('This timeline’s views cannot be changed here.');
+  const views = change([...(model.views ?? [])]);
+  model.views = views.length ? validateSavedViews(views) : undefined;
+  const named = model.view?.id;
+  if (named) {
+    const view = model.views?.find((v) => v.id === named);
+    // The default follows its view; once the view is gone, it is its own copy.
+    model.view = view
+      ? { id: view.id, separation: view.separation }
+      : { separation: model.view!.separation };
+  }
+  changed();
+  updateDefaultViewControls();
+  viewCards = (model.views ?? []).map(fromFile);
+  renderViewsDialog();
+}
+const newViewId = () => 'view-' + crypto.randomUUID().slice(0, 8);
+async function copyView(card: ViewCard, kind: 'fork' | 'duplicate', timeline?: string) {
+  if (!card.server) {
+    changeFileViews((views) => [
+      ...views,
+      {
+        id: newViewId(),
+        title: `${card.title} (copy)`.slice(0, 200),
+        ...(card.description ? { description: card.description } : {}),
+        separation: card.separation,
+      },
+    ]);
+    return;
+  }
+  const copy = await api<ServerView>(`views/${card.id}/${kind}`, 'POST', {
+    ...(timeline ? { timeline } : {}),
+  });
+  toast(kind === 'fork' ? `Forked as “${copy.title}”.` : `Duplicated as “${copy.title}”.`);
+  await loadViews();
+}
+async function reassignView(card: ViewCard, timeline: string) {
+  await api<ServerView>(`views/${card.id}`, 'PUT', { timeline });
+  toast(`“${card.title}” is now a view of this timeline.`);
+  await loadViews();
+}
+async function deleteView(card: ViewCard) {
+  if (!confirm(`Delete the view “${card.title}”?`)) return;
+  if (card.server) await api(`views/${card.id}`, 'DELETE');
+  else changeFileViews((views) => views.filter((v) => v.id !== card.id));
+  if (shownView?.id === card.id) shownView = null;
+  toast(`Deleted “${card.title}”.`);
+  if (card.server) await loadViews();
+}
+el('views-update').onclick = () => {
+  const card = shownView && viewCards.find((v) => v.id === shownView!.id);
+  const shown = shownSeparation();
+  if (!card || !shown) return;
+  void saveViewChanges(card, { separation: shown }).catch((error) =>
+    text('views-error', error instanceof Error ? error.message : String(error)),
+  );
+};
+/** Saves changes to a view: a server's through its API, a file's in its list. */
+async function saveViewChanges(
+  card: ViewCard,
+  changes: Partial<{
+    title: string;
+    description: string;
+    separation: ViewSeparation;
+    visibility: 'private' | 'public';
+    timeline: string | null;
+  }>,
+) {
+  if (card.server) {
+    await api<ServerView>(`views/${card.id}`, 'PUT', changes);
+    await loadViews();
+  } else
+    changeFileViews((views) =>
+      views.map((v) =>
+        v.id !== card.id
+          ? v
+          : {
+              id: v.id,
+              title: changes.title ?? v.title,
+              ...((changes.description ?? v.description)
+                ? { description: changes.description ?? v.description }
+                : {}),
+              separation: changes.separation ?? v.separation,
+            },
+      ),
+    );
+  if (shownView?.id === card.id && changes.title) {
+    shownView.title = changes.title;
+    text('separation-heading', `View: ${changes.title}`);
+  }
+  toast(`Saved “${changes.title ?? card.title}”.`);
+}
+/** The view the edit dialog saves: null for a new one, from what is shown. */
+let viewEditing: ViewCard | null = null;
+el('views-save').onclick = () => openViewEditor(null);
+async function openViewEditor(card: ViewCard | null) {
+  viewEditing = card;
+  text('view-edit-heading', card ? `Edit “${card.title}”` : 'Save a view');
+  text('view-edit-submit', card ? 'Save' : 'Save view');
+  input('view-title').value = card?.title ?? '';
+  el<HTMLTextAreaElement>('view-description').value = card?.description ?? '';
+  text('view-edit-error', '');
+  const server = serverViews();
+  // Visibility: when saving to a server, or by a view's owner.
+  el('view-visibility').hidden = !server || (!!card && !card.canShare);
+  for (const radio of document.querySelectorAll<HTMLInputElement>('input[name="view-visibility"]'))
+    radio.checked = radio.value === (card?.visibility ?? 'private');
+  // Replacing an existing view's separations with the one shown.
+  const shown = shownSeparation();
+  el('view-replace-label').hidden = !card || !shown || sameSeparation(shown, card.separation);
+  input('view-replace').checked = !!card && shownView?.id === card.id;
+  // Reassigning a server's view: to a timeline the account can read.
+  const select = el<HTMLSelectElement>('view-timeline');
+  el('view-timeline-label').hidden = !server || !card;
+  select.replaceChildren();
+  el<HTMLDialogElement>('view-edit-dialog').showModal();
+  input('view-title').focus();
+  if (server && card) {
+    const current = card.timeline ?? { id: remote!.id, title: remote!.title };
+    const option = (id: string, title: string) =>
+      Object.assign(document.createElement('option'), { value: id, textContent: title });
+    select.append(option(current.id, current.title));
+    select.value = current.id;
+    try {
+      const { timelines } = await api<{ timelines: { id: string; title: string }[] }>('timelines');
+      for (const t of timelines) if (t.id !== current.id) select.append(option(t.id, t.title));
+    } catch {
+      // Signed out: only its own timeline is offered.
+    }
+  }
+}
+el<HTMLFormElement>('view-edit-form').onsubmit = (event) => {
+  event.preventDefault();
+  void (async () => {
+    const { title, description } = validateViewText(
+      input('view-title').value,
+      el<HTMLTextAreaElement>('view-description').value,
+    );
+    const visibility = (document.querySelector<HTMLInputElement>(
+      'input[name="view-visibility"]:checked',
+    )?.value ?? 'private') as 'private' | 'public';
+    const card = viewEditing;
+    const shown = shownSeparation();
+    if (card) {
+      const timeline = el<HTMLSelectElement>('view-timeline').value;
+      await saveViewChanges(card, {
+        title,
+        description,
+        ...(input('view-replace').checked && shown ? { separation: shown } : {}),
+        ...(card.server && card.canShare ? { visibility } : {}),
+        ...(card.server && timeline && timeline !== (card.timeline?.id ?? remote?.id)
+          ? { timeline }
+          : {}),
+      });
+    } else {
+      if (!shown) throw new Error('Separate the timeline first.');
+      if (serverViews()) {
+        const saved = await api<ServerView>('views', 'POST', {
+          timeline: remote!.id,
+          title,
+          description,
+          visibility,
+          separation: shown,
+        });
+        shownView = { id: saved.id, title: saved.title, server: true };
+        await loadViews();
+      } else {
+        const id = newViewId();
+        changeFileViews((views) => [
+          ...views,
+          { id, title, ...(description ? { description } : {}), separation: shown },
+        ]);
+        shownView = { id, title, server: false };
+      }
+      text('separation-heading', `View: ${title}`);
+      toast(`Saved the view “${title}”.`);
+    }
+    el<HTMLDialogElement>('view-edit-dialog').close();
+    renderViewsDialog();
+  })().catch((error) =>
+    text('view-edit-error', error instanceof Error ? error.message : String(error)),
+  );
+};
+/** The view the share dialog shares. */
+let viewSharing: ViewCard | null = null;
+async function openViewSharing(card: ViewCard) {
+  viewSharing = card;
+  text('view-share-heading', `Share “${card.title}”`);
+  text('view-share-error', '');
+  for (const radio of document.querySelectorAll<HTMLInputElement>(
+    'input[name="view-share-visibility"]',
+  ))
+    radio.checked = radio.value === card.visibility;
+  const link = new URL(sharePath(remote!, null), location.origin);
+  link.searchParams.set('view', card.id);
+  input('view-link').value = link.href;
+  input('view-member-name').value = '';
+  el('view-members').replaceChildren();
+  el<HTMLDialogElement>('view-share-dialog').showModal();
+  await loadViewMembers();
+}
+async function loadViewMembers(members?: { username: string; role: string }[]) {
+  const card = viewSharing;
+  if (!card) return;
+  const list =
+    members ??
+    (await api<{ members: { username: string; role: string }[] }>(`views/${card.id}/members`))
+      .members;
+  el('view-members').replaceChildren(
+    ...(list.length
+      ? list.map((member) => {
+          const item = document.createElement('li');
+          const name = document.createElement('span');
+          name.textContent = member.username;
+          const role = document.createElement('select');
+          role.setAttribute('aria-label', `${member.username}’s role`);
+          for (const value of ['viewer', 'editor'])
+            role.append(
+              Object.assign(document.createElement('option'), {
+                value,
+                textContent: value === 'viewer' ? 'Viewer' : 'Editor',
+              }),
+            );
+          role.value = member.role;
+          role.onchange = () => void shareView(member.username, role.value);
+          const remove = document.createElement('button');
+          remove.type = 'button';
+          remove.textContent = 'Remove';
+          remove.setAttribute('aria-label', `Stop sharing with ${member.username}`);
+          remove.onclick = () => void shareView(member.username, null);
+          item.append(name, role, remove);
+          return item;
+        })
+      : [
+          Object.assign(document.createElement('li'), {
+            className: 'views-none',
+            textContent: 'No one yet.',
+          }),
+        ]),
+  );
+}
+/** Shares the view with `username` as `role`, or stops (null). */
+async function shareView(username: string, role: string | null) {
+  const card = viewSharing;
+  if (!card) return;
+  try {
+    const { members } = await api<{ members: { username: string; role: string }[] }>(
+      `views/${card.id}/members`,
+      role ? 'POST' : 'DELETE',
+      role ? { username, role } : { username },
+    );
+    text('view-share-error', '');
+    await loadViewMembers(members);
+  } catch (error) {
+    text('view-share-error', error instanceof Error ? error.message : String(error));
+  }
+}
+el<HTMLFormElement>('view-share-form').onsubmit = (event) => {
+  event.preventDefault();
+  const username = input('view-member-name').value.trim();
+  if (!username) return void text('view-share-error', 'Type the username to share it with.');
+  void shareView(username, el<HTMLSelectElement>('view-member-role').value).then(() => {
+    input('view-member-name').value = '';
+  });
+};
+for (const radio of document.querySelectorAll<HTMLInputElement>(
+  'input[name="view-share-visibility"]',
+))
+  radio.onchange = () => {
+    const card = viewSharing;
+    if (!card || !radio.checked) return;
+    const visibility = radio.value as 'private' | 'public';
+    void api<ServerView>(`views/${card.id}`, 'PUT', { visibility })
+      .then(() => {
+        card.visibility = visibility;
+        text('view-share-error', '');
+        return loadViews();
+      })
+      .catch((error) =>
+        text('view-share-error', error instanceof Error ? error.message : String(error)),
+      );
+  };
+el('view-link-copy').onclick = () =>
+  void navigator.clipboard
+    ?.writeText(input('view-link').value)
+    .then(() => toast('Link copied.'))
+    .catch(() => input('view-link').select());
+/** A link's view (`?view=<id>`), for a server timeline. */
+const linkedViewId = () => {
+  const own = new URLSearchParams(location.search).get('view');
+  if (own) return own;
+  // The site's timeline page carries the editor in a frame of the same origin: the link is
+  // the page's.
+  try {
+    return window.parent !== window
+      ? new URLSearchParams(window.parent.location.search).get('view')
+      : null;
+  } catch {
+    return null;
+  }
+};
+/** Opens the view a link names; false when it cannot be read. */
+async function openLinkedView(id: string): Promise<boolean> {
+  try {
+    const view = await api<ServerView>(`views/${encodeURIComponent(id)}`);
+    if (view.timeline && view.timeline.id !== remote?.id) return false;
+    await openView({ ...view, server: true });
+    return true;
+  } catch {
+    toast('That view is unavailable. Sign in if it is private.');
+    return false;
+  }
+}
 /**
  * The default view's controls (#416): in the separation bar, whether what is shown is the
  * timeline's default view, and for those who can edit it, making it so or clearing it; in the
