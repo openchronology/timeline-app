@@ -101,6 +101,7 @@ export type { SearchResult, SearchPage } from './search.js';
 import { Rational as Q, RationalMap } from 'rational-ordered-map';
 import { validateInstalledPlugins, imageURL } from './plugins.js';
 import type { InstalledPlugin } from './plugins.js';
+export * from './track-summaries.js';
 export * from './plugins.js';
 export * from './background-chart.js';
 export * from './suites.js';
