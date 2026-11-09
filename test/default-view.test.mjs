@@ -45,7 +45,7 @@ test('a default view is a separation by tags or by an entity, normalized and bou
     {},
     { separation: null },
     { separation: { tags: [] } },
-    { separation: { tags: ['a,b'] } },
+    { separation: { tags: ['a\u0007b'] } },
     { separation: { tags: Array.from({ length: 41 }, (_, i) => 't' + i) } },
     { separation: { tags: ['x'.repeat(129)] } },
     { separation: { tags: ['war'], mode: 'any' } },

@@ -43,8 +43,10 @@ const base = validateDocument({
 });
 test('tags and embedded raster assets preserve plugin code across snapshots', () => {
   assert.deepEqual(validateTags([' Science ', 'science', 'History']), ['science', 'history']);
-  for (const input of [null, [''], ['a,b'], Array(41).fill('a'), ['x'.repeat(65)]])
+  for (const input of [null, [''], ['a\nb'], Array(41).fill('a'), ['x'.repeat(65)]])
     assert.throws(() => validateTags(input));
+  // A comma inside a tag is a semicolon (tags are entered separated by commas).
+  assert.deepEqual(validateTags(['a,b']), ['a;b']);
   const assets = { 'https://images.example/icon.png': 'data:image/png;base64,aGVsbG8=' };
   const document = validateDocument({
     ...base,

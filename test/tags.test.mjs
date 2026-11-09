@@ -424,3 +424,24 @@ test('separations by an entity’s relationships, beside separations by tags (#5
     ),
   );
 });
+
+test('a comma inside a tag is a semicolon, so events and separations agree', () => {
+  assert.deepEqual(validateEntityTags(['Type: Sovereign, banking and currency crisis']), [
+    'type: sovereign; banking and currency crisis',
+  ]);
+  const d = validateDocument({
+    ...doc(),
+    events: [{ id: 'c', time: '1/1', metadata: { title: 'C', tags: ['a, b', 'war'] } }],
+    durations: [],
+  });
+  assert.deepEqual(d.events[0].metadata.tags, ['a; b', 'war']);
+  // Saved before the change, a tag with a comma still reads, and separates, the new way.
+  const old = {
+    ...doc(),
+    events: [{ id: 'o', time: '1/1', metadata: { title: 'O', tags: ['a, b'] } }],
+    durations: [],
+  };
+  const [tagged] = filterDocument(old, { tags: validateEntityTags(['a, b']), mode: 'any' }).events;
+  assert.equal(tagged.id, 'o');
+  assert.deepEqual(validateSeparations([{ tags: ['a, b'] }])[0].tags, ['a; b']);
+});
