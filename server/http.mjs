@@ -20,6 +20,7 @@ import {
   timeDigits as timeDigitsFromEnv,
 } from './limits.mjs';
 import { deleteWhere, parseRetention, printRetention } from './retention.mjs';
+import { SavedViews } from './saved-views.mjs';
 import { setTimelineStar } from './stars.mjs';
 import { Administration, usage, requireDataProvider, avatarValue } from './administration.mjs';
 import { Moderation } from './moderation.mjs';
@@ -451,6 +452,7 @@ export function createRequestHandler({
   const administration = store ? new Administration(store, auth) : null;
   const moderation = store ? new Moderation(store, auth, administration) : null;
   const collaboration = store ? new Collaboration(store) : null;
+  const savedViews = store ? new SavedViews(store, { exportCache }) : null;
   const links = store ? new TimelineLinks(store, { limit: linkCap }) : null;
   const browserForks = store ? new BrowserForks(store, auth) : null;
   /**
@@ -1252,6 +1254,44 @@ export function createRequestHandler({
         if (related && uuid.test(related[1]) && method === 'GET') {
           await store.access(related[1], userId);
           return response(res, 200, await relatedTimelines(pool, userId, related[1], featured));
+        }
+        // Saved views (#550; saved-views.mjs). Reading: anyone who may read the view (a public
+        // one: anyone who may read its timeline). Writing: signed in, with the CSRF token and a
+        // rate limit; permissions are checked by SavedViews.
+        const timelineViews = /^\/api\/timelines\/([a-f0-9-]{36})\/views$/.exec(pathname);
+        if (timelineViews && uuid.test(timelineViews[1]) && method === 'GET')
+          return response(res, 200, await savedViews.list(timelineViews[1], userId));
+        const viewRoute =
+          /^\/api\/views(?:\/([a-f0-9-]{36})(?:\/(fork|duplicate|members))?)?$/.exec(pathname);
+        if (viewRoute) {
+          const [, viewId, sub] = viewRoute;
+          if (method === 'GET' && !viewId) return response(res, 200, await savedViews.mine(userId));
+          if (method === 'GET' && !sub)
+            return response(res, 200, await savedViews.get(viewId, userId));
+          if (method === 'GET' && sub === 'members')
+            return response(res, 200, await savedViews.members(viewId, userId));
+          auth.require(session, req);
+          await auth.rateLimit('views:' + userId);
+          const input = method === 'DELETE' && sub !== 'members' ? {} : await body(req, 131072);
+          if (method === 'POST' && !viewId)
+            return response(res, 201, await savedViews.create(userId, input));
+          if (method === 'PUT' && viewId && !sub)
+            return response(res, 200, await savedViews.update(viewId, userId, input));
+          if (method === 'DELETE' && viewId && !sub)
+            return response(res, 200, await savedViews.remove(viewId, userId));
+          if (method === 'POST' && (sub === 'fork' || sub === 'duplicate'))
+            return response(
+              res,
+              201,
+              await savedViews.copy(viewId, userId, input, { fork: sub === 'fork' }),
+            );
+          if (sub === 'members' && (method === 'POST' || method === 'DELETE'))
+            return response(
+              res,
+              200,
+              await savedViews.setMember(viewId, userId, input, { remove: method === 'DELETE' }),
+            );
+          throw new HttpError(405, 'Method not allowed.');
         }
         // Starring (stars.mjs): signed in, with the CSRF token and a rate limit.
         const star = /^\/api\/timelines\/([a-f0-9-]{36})\/star$/.exec(pathname);

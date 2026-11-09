@@ -272,60 +272,81 @@ export const schemas = {
   TimelineView: {
     type: 'object',
     description:
-      'How the timeline opens for readers, embeds and shared links (#416): separated by tags, or by an entity and what is related to it (`direct`) or connected to it (`all`). An entity that no longer exists opens the whole timeline.',
+      'How the timeline opens for readers, embeds and shared links (#416). When it is one of the timeline’s saved views (#550), `id` names it, and a server shows the view as it is now; `separation` is then a copy, used once the view is gone and in exports.',
     required: ['separation'],
     additionalProperties: false,
     properties: {
-      separation: {
-        oneOf: [
-          {
-            type: 'object',
-            required: ['tags'],
-            additionalProperties: false,
-            properties: {
-              tags: {
-                type: 'array',
-                minItems: 1,
-                maxItems: 40,
-                items: { type: 'string', minLength: 1, maxLength: 128 },
-                description: 'Normalized like entity tags: trimmed, lowercased, without commas.',
-              },
-            },
-          },
-          {
-            type: 'object',
-            required: ['separations'],
-            additionalProperties: false,
-            properties: { separations: ref('SeparationTracks') },
-          },
-          {
-            type: 'object',
-            required: ['groups'],
-            additionalProperties: false,
-            properties: {
-              groups: {
-                type: 'array',
-                minItems: 2,
-                maxItems: 7,
-                description:
-                  'Several separations (#548): each group’s events in a track of its own, above everything else.',
-                items: {
-                  type: 'array',
-                  minItems: 1,
-                  maxItems: 40,
-                  items: { type: 'string', minLength: 1, maxLength: 64 },
-                },
-              },
-            },
-          },
-          {
-            type: 'object',
-            required: ['related', 'depth'],
-            additionalProperties: false,
-            properties: { related: ref('EntityRef'), depth: { enum: ['direct', 'all'] } },
-          },
-        ],
+      id: {
+        type: 'string',
+        pattern: '^[A-Za-z0-9_.:-]{1,128}$',
+        description: 'A saved view: a server’s (its UUID), or one of a file’s `views`.',
       },
+      separation: ref('ViewSeparation'),
+    },
+  },
+  ViewSeparation: {
+    type: 'object',
+    description:
+      'A separation: by tags, by several separations (which may disjoin and unite), or by an entity and what is related to it (`direct`) or connected to it (`all`). An entity that no longer exists opens the whole timeline.',
+    oneOf: [
+      {
+        type: 'object',
+        required: ['tags'],
+        additionalProperties: false,
+        properties: {
+          tags: {
+            type: 'array',
+            minItems: 1,
+            maxItems: 40,
+            items: { type: 'string', minLength: 1, maxLength: 128 },
+            description: 'Normalized like entity tags: trimmed, lowercased, without commas.',
+          },
+        },
+      },
+      {
+        type: 'object',
+        required: ['separations'],
+        additionalProperties: false,
+        properties: { separations: ref('SeparationTracks') },
+      },
+      {
+        type: 'object',
+        required: ['groups'],
+        additionalProperties: false,
+        properties: {
+          groups: {
+            type: 'array',
+            minItems: 2,
+            maxItems: 7,
+            description:
+              'Several separations (#548): each group’s events in a track of its own, above everything else.',
+            items: {
+              type: 'array',
+              minItems: 1,
+              maxItems: 40,
+              items: { type: 'string', minLength: 1, maxLength: 64 },
+            },
+          },
+        },
+      },
+      {
+        type: 'object',
+        required: ['related', 'depth'],
+        additionalProperties: false,
+        properties: { related: ref('EntityRef'), depth: { enum: ['direct', 'all'] } },
+      },
+    ],
+  },
+  SavedViewEntry: {
+    type: 'object',
+    description: 'A view a file keeps (#550). A server makes them its creator’s saved views.',
+    required: ['id', 'title', 'separation'],
+    additionalProperties: false,
+    properties: {
+      id: { type: 'string', pattern: '^[A-Za-z0-9_.:-]{1,128}$' },
+      title: { type: 'string', minLength: 1, maxLength: 200 },
+      description: { type: 'string', maxLength: 2000 },
+      separation: ref('ViewSeparation'),
     },
   },
   TimelineImage: {
@@ -505,6 +526,13 @@ export const schemas = {
       },
       image: ref('TimelineImage'),
       view: ref('TimelineView'),
+      views: {
+        type: 'array',
+        maxItems: 100,
+        items: ref('SavedViewEntry'),
+        description:
+          'Views the file keeps (#550). Creating a timeline from it makes them the creator’s saved views; a server keeps none in the timeline itself.',
+      },
       assets: {
         type: 'object',
         maxProperties: 200,

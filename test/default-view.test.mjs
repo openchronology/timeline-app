@@ -7,6 +7,7 @@ import {
   TimelineIndex,
   validateDocument,
   validateTimelineView,
+  validateSavedViews,
   sameSeparation,
   separationGroups,
   tagSeparation,
@@ -157,4 +158,48 @@ test('a default view keeps separations that disjoin (#549)', () => {
       }),
     /another separation/,
   );
+});
+
+test('a default view names a saved view, and files keep a list of views (#550)', () => {
+  assert.deepEqual(validateTimelineView({ id: 'v1', separation: { tags: ['War'] } }), {
+    id: 'v1',
+    separation: { tags: ['war'] },
+  });
+  assert.throws(() => validateTimelineView({ id: 'a b', separation: { tags: ['war'] } }), /its ID/);
+  assert.throws(() => validateTimelineView({ name: 'x', separation: { tags: ['war'] } }), /only/);
+  const views = [
+    { id: 'war', title: ' Wars ', separation: { tags: ['War'] } },
+    {
+      id: 'trade',
+      title: 'Trade',
+      description: 'Ports and fairs',
+      separation: { separations: [{ tags: ['trade'], unions: [{ into: null, last: true }] }] },
+    },
+  ];
+  assert.deepEqual(validateSavedViews(views), [
+    { id: 'war', title: 'Wars', separation: { tags: ['war'] } },
+    { ...views[1] },
+  ]);
+  for (const [bad, error] of [
+    [[views[0], views[0]], /ID of its own/],
+    [[{ ...views[0], title: ' ' }], /title/],
+    [[{ ...views[0], description: 'x'.repeat(2001) }], /description/],
+    [[{ ...views[0], separation: { tags: [] } }], /tag/],
+    [Array.from({ length: 101 }, (_, i) => ({ ...views[0], id: 'v' + i })), /at most 100/],
+  ])
+    assert.throws(() => validateSavedViews(bad), error);
+  // Documents carry them, and the editor's index keeps them.
+  const document = validateDocument({
+    format: 'openchronology',
+    version: 1,
+    title: 'Views',
+    description: '',
+    events: [],
+    views,
+    view: { id: 'war', separation: { tags: ['war'] } },
+  });
+  assert.equal(document.views.length, 2);
+  const index = new TimelineIndex(document);
+  assert.deepEqual(index.document().views, document.views);
+  assert.deepEqual(index.document().view, { id: 'war', separation: { tags: ['war'] } });
 });

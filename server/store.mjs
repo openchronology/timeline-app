@@ -3,6 +3,7 @@
 // queries, forks that read through to their source's index, and the repairs migrate.mjs runs
 // (docs/architecture.md).
 import { compareLimit } from './limits.mjs';
+import { adoptFileViews, checkedViewReference } from './saved-views.mjs';
 import { adminId } from './key-requests.mjs';
 import {
   Q,
@@ -435,12 +436,19 @@ export class PostgresStore {
       (SELECT jsonb_build_object('case',mc.id,'reason',mc.reason,'decided_at',mc.decided_at,
         'appealed_at',mc.appealed_at,'appeal_outcome',mc.appeal_outcome)
         FROM oc_moderation_cases mc WHERE mc.target_kind='timeline' AND mc.target_id=t.id::text
-        AND mc.status='restricted') AS moderation
+        AND mc.status='restricted') AS moderation,
+      (SELECT sv.separation FROM oc_saved_views sv WHERE sv.timeline_id=t.id AND sv.id=CASE
+        WHEN t.view->>'id' ~ '^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$'
+        THEN (t.view->>'id')::uuid END) AS saved_view
       FROM oc_timelines t JOIN oc_users u ON u.id=t.owner_id
       LEFT JOIN oc_members m ON m.timeline_id=t.id AND m.user_id=$2::uuid WHERE t.id=$1`,
       [id, userId ?? null, adminId(userId)],
     );
     const timeline = rows[0];
+    // A default view naming one of its saved views (#550) opens as that view is now; the
+    // timeline's own copy serves once it is gone (or reassigned).
+    if (timeline?.saved_view) timeline.view = { ...timeline.view, separation: timeline.saved_view };
+    if (timeline) delete timeline.saved_view;
     // A timeline restricted by moderators (#115) is seen only by its owner and administrators.
     if (
       !timeline ||
@@ -1167,6 +1175,8 @@ export class PostgresStore {
         userId,
         document.title,
       ]);
+      // The views a file keeps become the creator's saved views of it (#550).
+      document = await adoptFileViews(c, id, userId, document);
       await this.replace(c, id, document);
       await this.checkpoint(c, id, userId, document, 'save');
     });
@@ -1205,6 +1215,23 @@ export class PostgresStore {
             'Someone changed this timeline. Export your edits before reloading.',
           );
         if (patch?.base) patch = await rebaseSave(c, t, patch);
+        // A default view names a saved view only when it is one of this timeline's that the
+        // saver may read (#550); files' own views are not kept here.
+        if (patch?.settings) {
+          const { views: _views, ...settings } = patch.settings;
+          patch = {
+            ...patch,
+            settings: settings.view
+              ? { ...settings, view: await checkedViewReference(c, id, userId, settings.view) }
+              : settings,
+          };
+        }
+        if (document) {
+          const { views: _views, ...rest } = document;
+          document = rest.view
+            ? { ...rest, view: await checkedViewReference(c, id, userId, rest.view) }
+            : rest;
+        }
         await this.checkScripts(patch ? patch.settings.plugins : document.plugins, t.plugins);
         if (patch && incremental(t, patch)) {
           // Sparse saves update the stored index in place and record only the patch.
