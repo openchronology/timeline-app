@@ -670,6 +670,11 @@ main {
   outline-offset: -4px;
   cursor: grab;
 }
+/* Separated or compared tracks (#556) at the reader's text size: the stage grows to show them,
+   up to the window (fitStageToTracks). Full screen keeps the whole window. */
+.timeline-stage.stage-tracks {
+  height: var(--stage-tracks-height, 365px);
+}
 /* A theme's stage keeps its own light or dark scheme, on its own ground (#382). */
 .timeline-stage.own-scheme {
   background: var(--timeline-background, var(--stage-ground));
