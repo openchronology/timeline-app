@@ -575,12 +575,16 @@ const SCENARIOS = [
     async run(d, t) {
       await closeDialogs(d);
       await show(d, t.fitted.left, t.fitted.right);
+      // From the button to the picker listing the timeline's tags (#548).
       const dialog = await timed(
         d,
-        `document.querySelectorAll('#separate-dialog .checkbox-label').length > 0`,
-        () => d.click('#separate-button'),
+        `document.querySelectorAll('#separate-dialog .tag-picker-options [role="option"]').length > 0`,
+        async () => {
+          await d.click('#separate-button');
+          await d.click('#separate-dialog .tag-picker-toggle');
+        },
       );
-      await d.click('#separate-dialog .checkbox-label input');
+      await d.click('#separate-dialog .tag-picker-options [role="option"]');
       await resetLoaded(d);
       const separate = await timed(d, loaded(visible('#separation-settings')), () =>
         d.click('#separate-submit'),
