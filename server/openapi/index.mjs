@@ -11,8 +11,9 @@ import * as collaboration from './collaboration.mjs';
 import * as accounts from './accounts.mjs';
 import * as community from './community.mjs';
 import * as passkeys from './passkeys.mjs';
+import * as views from './views.mjs';
 
-const AREAS = [timelines, collaboration, accounts, passkeys, community];
+const AREAS = [timelines, collaboration, views, accounts, passkeys, community];
 /** This build's release version, or its commit (dist/build-info.json). */
 function buildVersion() {
   try {

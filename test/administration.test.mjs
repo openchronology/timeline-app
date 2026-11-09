@@ -54,10 +54,17 @@ test('API scopes cannot grant account/admin access or bypass write restrictions'
   for (const method of ['PUT', 'POST', 'DELETE', 'PATCH'])
     assert.throws(() => authorizeKey(read, '/api/timelines/id', method));
   authorizeKey(write, '/api/timelines/id', 'PUT');
+  // Saved views (#550): read and made with the same scopes.
+  authorizeKey(read, '/api/views', 'GET');
+  authorizeKey(read, '/api/views/id/members', 'GET');
+  authorizeKey(write, '/api/views', 'POST');
+  authorizeKey(write, '/api/views/id', 'PUT');
+  assert.throws(() => authorizeKey(read, '/api/views', 'POST'));
   for (const path of [
     '/api/auth/account',
     '/api/admin/users',
     '/api/timelinesXYZ',
+    '/api/viewsXYZ',
     '/api/files/export',
   ])
     assert.throws(() => authorizeKey(write, path, 'GET'));

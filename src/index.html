@@ -384,6 +384,7 @@ Every point has a place. Explore the spaces between them.</textarea>
               <button id="separate-button" data-phone-menu>
                 Separate by tags<span id="separate-count" class="button-count" hidden></span>
               </button>
+              <button id="views-button" data-phone-menu>Views</button>
               <button id="presentation-button" data-phone-menu>Time display</button>
               <button id="plugins-button" data-phone-menu>Plugins</button>
               <button id="compare-button" data-phone-menu>Compare</button>
@@ -744,6 +745,121 @@ Every point has a place. Explore the spaces between them.</textarea>
           <button id="separate-submit" class="button-primary" type="submit">Separate</button
           ><button type="button" id="separate-clear" hidden>Rejoin all</button
           ><button type="button" data-close="separate-dialog">Cancel</button>
+        </div>
+      </form>
+    </dialog>
+    <dialog id="views-dialog" class="views-dialog" aria-labelledby="views-heading">
+      <div class="dialog-heading">
+        <h2 id="views-heading">Views</h2>
+        <button type="button" data-close="views-dialog" aria-label="Close">×</button>
+      </div>
+      <p class="field-hint">
+        A view is a saved set of separations (tags, disjoins and unions, or an event's
+        relationships) for showing this timeline a particular way.
+      </p>
+      <p id="views-showing" class="field-hint"></p>
+      <div class="views-actions">
+        <button type="button" id="views-save" class="button-primary">
+          Save what is shown as a view…</button
+        ><button type="button" id="views-update" hidden></button>
+      </div>
+      <p id="views-status" class="field-hint" role="status"></p>
+      <ul id="views-list" class="views-list" aria-label="Views of this timeline"></ul>
+      <details id="views-templates" class="views-templates" hidden>
+        <summary>Your views of other timelines</summary>
+        <p class="field-hint">
+          Copy or move one here to use it as a template. Tags and moments this timeline lacks are
+          ignored until you change its separations.
+        </p>
+        <ul
+          id="views-template-list"
+          class="views-list"
+          aria-label="Your views of other timelines"
+        ></ul>
+      </details>
+      <p id="views-error" class="form-error" role="alert"></p>
+      <div class="dialog-actions">
+        <button type="button" data-close="views-dialog">Close</button>
+      </div>
+    </dialog>
+    <dialog id="view-edit-dialog" aria-labelledby="view-edit-heading">
+      <form id="view-edit-form">
+        <div class="dialog-heading">
+          <h2 id="view-edit-heading">Save a view</h2>
+          <button type="button" data-close="view-edit-dialog" aria-label="Close">×</button>
+        </div>
+        <label>Title<input id="view-title" maxlength="200" autocomplete="off" /></label>
+        <label
+          >Description<textarea id="view-description" maxlength="2000" rows="3"></textarea>
+        </label>
+        <fieldset id="view-visibility" class="map-scope">
+          <legend>Who can see it</legend>
+          <label class="checkbox-label"
+            ><input type="radio" name="view-visibility" value="private" checked /> Only you and
+            those you share it with</label
+          >
+          <label class="checkbox-label"
+            ><input type="radio" name="view-visibility" value="public" /> Everyone who can read the
+            timeline</label
+          >
+        </fieldset>
+        <label id="view-timeline-label">Timeline<select id="view-timeline"></select> </label>
+        <label id="view-replace-label" class="checkbox-label"
+          ><input type="checkbox" id="view-replace" /> Replace its separations with what is shown
+          now</label
+        >
+        <p id="view-edit-error" class="form-error" role="alert"></p>
+        <div class="dialog-actions">
+          <button id="view-edit-submit" class="button-primary" type="submit">Save</button
+          ><button type="button" data-close="view-edit-dialog">Cancel</button>
+        </div>
+      </form>
+    </dialog>
+    <dialog id="view-share-dialog" aria-labelledby="view-share-heading">
+      <form id="view-share-form">
+        <div class="dialog-heading">
+          <h2 id="view-share-heading">Share a view</h2>
+          <button type="button" data-close="view-share-dialog" aria-label="Close">×</button>
+        </div>
+        <fieldset class="map-scope">
+          <legend>Who can see it</legend>
+          <label class="checkbox-label"
+            ><input type="radio" name="view-share-visibility" value="private" /> Only you and those
+            you share it with</label
+          >
+          <label class="checkbox-label"
+            ><input type="radio" name="view-share-visibility" value="public" /> Everyone who can
+            read the timeline</label
+          >
+        </fieldset>
+        <label
+          >Link<span class="view-link"
+            ><input id="view-link" readonly /><button type="button" id="view-link-copy">
+              Copy
+            </button></span
+          ></label
+        >
+        <p class="field-hint">
+          The link opens the timeline in this view, for those who can see it.
+        </p>
+        <h3 class="view-members-heading">Shared with</h3>
+        <ul id="view-members" class="view-members" aria-label="Shared with"></ul>
+        <div class="view-member-add">
+          <input
+            id="view-member-name"
+            placeholder="Username"
+            autocomplete="off"
+            aria-label="Username"
+          />
+          <select id="view-member-role" aria-label="Role">
+            <option value="viewer">Viewer</option>
+            <option value="editor">Editor</option>
+          </select>
+          <button type="submit" id="view-member-add">Share</button>
+        </div>
+        <p id="view-share-error" class="form-error" role="alert"></p>
+        <div class="dialog-actions">
+          <button type="button" data-close="view-share-dialog">Done</button>
         </div>
       </form>
     </dialog>

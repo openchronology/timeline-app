@@ -38,8 +38,51 @@ export function tagSeparation(tracks: SeparationTrack[] | string[][]): ViewSepar
     return { separations: list.map((t) => ({ ...t, tags: [...t.tags] })) };
   return list.length === 1 ? { tags: [...list[0].tags] } : { groups: list.map((t) => [...t.tags]) };
 }
+/**
+ * A timeline's default view: its separation, and when it is one of the timeline's saved views
+ * (#550), that view's ID: a server's saved view, or an entry of a file's `views`. The
+ * separation is then a copy: a server shows the view as it is now, and the copy only once the
+ * view is gone.
+ */
 export interface TimelineView {
+  id?: string;
   separation: ViewSeparation;
+}
+/** A saved view's ID: a server's (a UUID) or a file's own. */
+const VIEW_ID = /^[A-Za-z0-9_.:-]{1,128}$/;
+/** A view saved in a file (#550): its ID, its title and description, and its separation. */
+export interface SavedViewEntry {
+  id: string;
+  title: string;
+  description?: string;
+  separation: ViewSeparation;
+}
+/** The most views a file keeps. */
+export const SAVED_VIEW_LIMIT = 100;
+/** Validates a saved view's title (1–200 characters, trimmed) and description (≤ 2000). */
+export function validateViewText(title: unknown, description: unknown = '') {
+  if (typeof title !== 'string' || !title.trim() || title.trim().length > 200)
+    throw new Error('A view’s title is 1–200 characters.');
+  if (typeof description !== 'string' || description.length > 2000)
+    throw new Error('A view’s description is at most 2,000 characters.');
+  return { title: title.trim(), description: description.trim() };
+}
+/** Validates the views a file keeps: each with a unique ID, a title and a separation. */
+export function validateSavedViews(value: unknown): SavedViewEntry[] {
+  if (!Array.isArray(value) || value.length > SAVED_VIEW_LIMIT)
+    throw new Error(`A file keeps at most ${SAVED_VIEW_LIMIT} views.`);
+  const ids = new Set<string>();
+  return value.map((raw) => {
+    const v = raw as Record<string, unknown> | null;
+    if (!v || typeof v !== 'object' || Array.isArray(v))
+      throw new Error('A view is its ID, title and separation.');
+    if (typeof v.id !== 'string' || !VIEW_ID.test(v.id) || ids.has(v.id))
+      throw new Error('Each view has an ID of its own.');
+    ids.add(v.id);
+    const { title, description } = validateViewText(v.title, v.description ?? '');
+    const { separation } = validateTimelineView({ separation: v.separation });
+    return { id: v.id, title, ...(description ? { description } : {}), separation };
+  });
 }
 /**
  * Validates a timeline's default view, returning it normalized: tags as entity tags are (one to
@@ -49,9 +92,17 @@ export interface TimelineView {
 export function validateTimelineView(value: unknown): TimelineView {
   const object = (v: unknown): v is Record<string, unknown> =>
     !!v && typeof v === 'object' && !Array.isArray(v);
-  if (!object(value) || Object.keys(value).some((k) => k !== 'separation'))
-    throw new Error('A timeline’s default view has only a separation.');
-  const s = value.separation;
+  if (!object(value) || Object.keys(value).some((k) => k !== 'separation' && k !== 'id'))
+    throw new Error('A timeline’s default view has only a separation, and the view’s ID.');
+  if (value.id !== undefined && (typeof value.id !== 'string' || !VIEW_ID.test(value.id)))
+    throw new Error('A default view names a saved view by its ID.');
+  const id = value.id === undefined ? {} : { id: value.id as string };
+  return { ...id, ...validateViewSeparation(value.separation) };
+}
+/** Validates a default view's separation, as `{separation}`. */
+function validateViewSeparation(s: unknown): { separation: ViewSeparation } {
+  const object = (v: unknown): v is Record<string, unknown> =>
+    !!v && typeof v === 'object' && !Array.isArray(v);
   if (object(s) && 'tags' in s) {
     if (Object.keys(s).length !== 1)
       throw new Error('A default separation by tags has only its tags.');

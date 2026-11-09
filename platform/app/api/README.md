@@ -19,3 +19,4 @@ The HTTP API at `/api/…`. Most of its routes hand the request, as it is, to th
 | [`reports/`](reports/README.md)           | `POST /api/reports`: reporting something to the administrators.  |
 | [`session/`](session/README.md)           | `GET /api/session`: who is signed in and what the server offers. |
 | [`timelines/`](timelines/README.md)       | `/api/timelines`: timelines, their contents and collaboration.   |
+| [`views/`](views/README.md)               | `/api/views/…`: saved views (#550).                              |

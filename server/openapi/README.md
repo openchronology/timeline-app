@@ -15,3 +15,4 @@ The HTTP API's description (#178) in OpenAPI 3.1, written as JavaScript modules:
 | [`index.mjs`](index.mjs)                 | Assembles the whole OpenAPI document from the areas, with this build's version.                                                              |
 | [`passkeys.mjs`](passkeys.mjs)           | Describes passkeys: adding, renaming and removing them, confirming with one, the two-factor step and signing in with one.                    |
 | [`timelines.mjs`](timelines.mjs)         | Describes creating, reading, querying, saving, sharing and deleting timelines, file exchange, live updates and oEmbed.                       |
+| [`views.mjs`](views.mjs)                 | Describes saved views: listing, saving, changing, deleting, sharing, forking and duplicating them.                                           |

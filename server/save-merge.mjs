@@ -51,7 +51,8 @@ export function saveBase(value) {
     }
     return seen;
   };
-  const settings = value.settings ?? {};
+  // A file's own views (#550) are a setting the editor keeps; a server keeps none.
+  const { views: _views, ...settings } = value.settings ?? {};
   if (
     typeof settings !== 'object' ||
     Array.isArray(settings) ||

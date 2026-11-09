@@ -150,17 +150,16 @@ export function keyRequestRead(pathname, method) {
   );
 }
 /**
- * Limits an API-key session to `/api/timelines` and below, and to its scopes: `timelines:read`
- * for reads (keyRequestRead), `timelines:write` for anything else. Other sessions pass through.
- * The path check is written so `/api/timelinesX` does not pass as a prefix match. Throws 403.
+ * Limits an API-key session to `/api/timelines` and `/api/views` (saved views, #550, so tools
+ * and AI assistants can make them) and below, and to its scopes: `timelines:read` for reads
+ * (keyRequestRead), `timelines:write` for anything else. Other sessions pass through. The path
+ * check is written so `/api/timelinesX` does not pass as a prefix match. Throws 403.
  */
 export function authorizeKey(session, pathname, method) {
   if (session?.kind !== 'api') return;
-  if (
-    !pathname.startsWith('/api/timelines') ||
-    (pathname !== '/api/timelines' && !pathname.startsWith('/api/timelines/'))
-  )
-    throw new HttpError(403, 'API keys are limited to timeline endpoints.');
+  const under = (root) => pathname === root || pathname.startsWith(root + '/');
+  if (!under('/api/timelines') && !under('/api/views'))
+    throw new HttpError(403, 'API keys are limited to timeline and view endpoints.');
   const read = keyRequestRead(pathname, method);
   if (!session.scopes.includes(read ? 'timelines:read' : 'timelines:write'))
     throw new HttpError(403, 'This API key does not have the required timeline scope.');

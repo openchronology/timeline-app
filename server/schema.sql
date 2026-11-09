@@ -2302,3 +2302,37 @@ CREATE TRIGGER oc_timeline_links_added AFTER INSERT ON oc_timeline_links
 DROP TRIGGER IF EXISTS oc_timeline_links_removed ON oc_timeline_links;
 CREATE TRIGGER oc_timeline_links_removed AFTER DELETE ON oc_timeline_links
   REFERENCING OLD TABLE AS changed FOR EACH STATEMENT EXECUTE FUNCTION oc_timeline_link_count();
+-- Saved views (#550; saved-views.mjs): named configurations of separations, each of one
+-- timeline (timeline_id; NULL once that timeline is deleted, until its owner reassigns it).
+--   separation: a default view's separation (src/default-view.ts), at most 64 KiB;
+--   visibility: private (its owner and members) or public (anyone who may read its
+--   timeline);
+--   upstream_id: the view it was forked from, while that one exists.
+-- A timeline's default view (oc_timelines.view) may name one by its ID; the timeline then
+-- opens as the view is now (PostgresStore.access), its own copy serving once the view is gone.
+-- Not oc_views, which are the derived indexes separations read.
+CREATE TABLE IF NOT EXISTS oc_saved_views (
+  id uuid PRIMARY KEY,
+  owner_id uuid NOT NULL REFERENCES oc_users ON DELETE CASCADE,
+  timeline_id uuid REFERENCES oc_timelines ON DELETE SET NULL,
+  title text NOT NULL CHECK(char_length(title) BETWEEN 1 AND 200),
+  description text NOT NULL DEFAULT '' CHECK(char_length(description)<=2000),
+  visibility text NOT NULL DEFAULT 'private' CHECK(visibility IN ('private','public')),
+  separation jsonb NOT NULL CHECK(octet_length(separation::text)<=65536),
+  upstream_id uuid REFERENCES oc_saved_views ON DELETE SET NULL,
+  created_at timestamptz NOT NULL DEFAULT now(),
+  updated_at timestamptz NOT NULL DEFAULT now()
+);
+-- A timeline's views, and an account's (listings; counting them against the limit).
+CREATE INDEX IF NOT EXISTS oc_saved_views_timeline ON oc_saved_views(timeline_id);
+CREATE INDEX IF NOT EXISTS oc_saved_views_owner ON oc_saved_views(owner_id);
+CREATE INDEX IF NOT EXISTS oc_saved_views_upstream ON oc_saved_views(upstream_id);
+-- Those a view's owner shares it with: viewers read it; editors also change its title,
+-- description and separation, and reassign it. The owner is no member.
+CREATE TABLE IF NOT EXISTS oc_saved_view_members (
+  view_id uuid NOT NULL REFERENCES oc_saved_views ON DELETE CASCADE,
+  user_id uuid NOT NULL REFERENCES oc_users ON DELETE CASCADE,
+  role text NOT NULL CHECK(role IN ('viewer','editor')),
+  PRIMARY KEY(view_id,user_id)
+);
+CREATE INDEX IF NOT EXISTS oc_saved_view_members_user ON oc_saved_view_members(user_id);

@@ -98,6 +98,11 @@ export async function llmsText() {
       'every operation, who may call it, and example bodies',
     ),
     line('OpenAPI 3.1 description', at('/api/openapi.json'), 'the same, as JSON'),
+    line(
+      'Making views',
+      at('/help/views#the-api-making-views-from-scripts-and-ai-assistants'),
+      'saved views of a timeline (separations, disjoins and unions) made with an API key: the JSON to send, with examples',
+    ),
     '',
   );
   if (timelines.length) {

@@ -19,6 +19,7 @@ import { checkDescriptionMarkdown } from './description-markdown-browser.mjs';
 import { checkEllipseShape } from './ellipse-shape-browser.mjs';
 import { checkSuites } from './suites-browser.mjs';
 import { checkTags } from './tags-browser.mjs';
+import { checkViews } from './views-browser.mjs';
 import { checkRelationships } from './relationships-browser.mjs';
 import { checkRelationshipArrows } from './relationship-arrows-browser.mjs';
 import { checkDenseDurations } from './dense-durations-browser.mjs';
@@ -352,6 +353,7 @@ try {
   await checkLogSeverity(page, document);
   await checkSuites(page, document);
   await checkTags(page, document);
+  await checkViews(page, document);
   await checkRelationships(page, document);
   await checkRelationshipArrows(page, document);
   await checkDenseDurations(page, document);

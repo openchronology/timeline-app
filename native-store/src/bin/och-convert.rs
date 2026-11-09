@@ -37,6 +37,8 @@ struct RawDocument {
     assets: Option<Value>,
     #[serde(default)]
     view: Option<Value>,
+    #[serde(default)]
+    views: Option<Value>,
     events: Vec<RawEvent>,
     #[serde(default)]
     durations: Vec<Duration>,
@@ -92,6 +94,7 @@ fn run() -> Result<(), String> {
                 tags: raw.tags,
                 assets: raw.assets,
                 view: raw.view,
+                views: raw.views,
                 events: Vec::new(),
                 durations: raw.durations,
                 relationships: raw.relationships,

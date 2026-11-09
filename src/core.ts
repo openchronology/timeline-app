@@ -111,8 +111,8 @@ export * from './timeline-image.js';
 import { validateTimelineImage } from './timeline-image.js';
 import type { TimelineImage } from './timeline-image.js';
 export * from './default-view.js';
-import { validateTimelineView } from './default-view.js';
-import type { TimelineView } from './default-view.js';
+import { validateSavedViews, validateTimelineView } from './default-view.js';
+import type { SavedViewEntry, TimelineView } from './default-view.js';
 export * from './drafts.js';
 export { stackWindow, scaleTimeline } from './stack-layout.js';
 import { parseTimestamp } from './calendar.js';
@@ -230,6 +230,8 @@ export interface TimelineDocument {
   image?: TimelineImage;
   /** How it opens for readers, embeds and shared links (#416): separated, by tags or links. */
   view?: TimelineView;
+  /** Views saved in a file (#550); a server keeps its saved views apart. */
+  views?: SavedViewEntry[];
   assets?: Record<string, string>;
   events: PointEvent[];
   durations?: Duration[];
@@ -428,6 +430,7 @@ export function validateDocument(value: unknown, partial = false): TimelineDocum
     ...(doc.tags === undefined ? {} : { tags: validateTags(doc.tags) }),
     ...(doc.image == null ? {} : { image: validateTimelineImage(doc.image) }),
     ...(doc.view == null ? {} : { view: validateTimelineView(doc.view) }),
+    ...(doc.views == null ? {} : { views: validateSavedViews(doc.views) }),
     ...(doc.assets === undefined ? {} : { assets: validateAssets(doc.assets) }),
     events: legacy.events,
     ...(durations.length ? { durations } : {}),
@@ -473,12 +476,14 @@ export class TimelineIndex {
   tags?: string[];
   image?: TimelineImage;
   view?: TimelineView;
+  views?: SavedViewEntry[];
   assets?: Record<string, string>;
   constructor(document: TimelineDocument) {
     // Server metadata reports unset settings as null; treat them as absent.
     this.tags = document.tags == null ? undefined : validateTags(document.tags);
     this.image = document.image == null ? undefined : validateTimelineImage(document.image);
     this.view = document.view == null ? undefined : validateTimelineView(document.view);
+    this.views = document.views == null ? undefined : validateSavedViews(document.views);
     this.assets = document.assets == null ? undefined : validateAssets(document.assets);
     this.title = document.title;
     this.description = document.description;
@@ -729,6 +734,7 @@ export class TimelineIndex {
       ...(this.tags === undefined ? {} : { tags: this.tags }),
       ...(this.image === undefined ? {} : { image: this.image }),
       ...(this.view === undefined ? {} : { view: this.view }),
+      ...(this.views === undefined ? {} : { views: this.views }),
       ...(this.assets === undefined ? {} : { assets: this.assets }),
       events: [...this.points].flatMap(([, bucket]) => [...bucket]),
       ...(durations.length ? { durations } : {}),
