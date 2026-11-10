@@ -14,6 +14,8 @@ import {
   validateDocument,
   validateDuration,
   measuresCompatible,
+  addTotals,
+  negateTotals,
   resolveDuration,
   isOngoing,
   relationshipKey,
@@ -243,7 +245,9 @@ export async function applyIncrementally(c, t, patch) {
   const moments = new PersistentTree(c, MOMENT_TREE, 'oc_nodes', t, t.root, index);
   const removals = [],
     insertions = [],
-    edited = []; // moments changed in place, whose nodes a fork makes its own
+    edited = [], // moments changed in place, whose nodes a fork makes its own
+    revalued = []; // moments changed in place whose measure values changed (#574)
+  const valuesOf = (event) => event?.metadata?.measures;
 
   for (const [momentId, event] of momentChanges) {
     const before = saved.get(momentId);
@@ -251,21 +255,30 @@ export async function applyIncrementally(c, t, patch) {
     if (!before) added = true;
     storage += (event ? bytes(event) + 1 : 0) - (before ? bytes(before) + 1 : 0);
     if (before && (!event || event.time !== before.time)) {
-      removals.push({ time: before.time, id: momentId });
+      removals.push({ time: before.time, id: momentId, values: valuesOf(before) });
       moved.add(momentId);
     }
     if (event && (!before || event.time !== before.time))
-      insertions.push({ time: event.time, id: momentId });
+      insertions.push({ time: event.time, id: momentId, values: valuesOf(event) });
+    else if (event && canonical(valuesOf(before) ?? {}) !== canonical(valuesOf(event) ?? {}))
+      revalued.push({
+        time: event.time,
+        id: momentId,
+        change: addTotals(valuesOf(event), negateTotals(valuesOf(before))),
+      });
     else if (event && index.depth) edited.push({ time: event.time, id: momentId });
   }
-  await moments.prefetch([...removals, ...insertions, ...edited]);
+  await moments.prefetch([...removals, ...insertions, ...edited, ...revalued]);
   for (const r of removals)
     await moments.remove(r, (n) => {
       n.ids = n.ids.filter((x) => x !== r.id);
+      n.own = addTotals(n.own, negateTotals(r.values));
       return n.ids.length > 0;
     });
   for (const i of insertions) await moments.insert(i, i);
   for (const e of edited) await moments.own(e);
+  // The bucket's values change, and the totals of every node above it.
+  for (const v of revalued) await moments.adjust(v, (n) => (n.own = addTotals(n.own, v.change)));
   const momentCount = await moments.size;
   if (!withinEntryLimit(momentCount)) fail(`A timeline holds at most ${entryLimitText()} moments.`);
   const upserted = [...momentChanges].filter(([, e]) => e);

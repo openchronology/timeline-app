@@ -55,6 +55,7 @@ export {
   entityCount,
   frameWithOngoing,
   addTotals,
+  negateTotals,
 } from './summaries.js';
 export {
   anchorOf,

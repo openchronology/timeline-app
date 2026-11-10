@@ -1078,6 +1078,11 @@ export const schemas = {
                 metadata: { type: 'object' },
                 durationCount: COUNT,
                 duration: ref('DurationBand'),
+                totals: {
+                  ...ref('MeasureValues'),
+                  description:
+                    'The exact totals of the timeline’s measures over the group’s moments (#574), by name; zeros, and the field when all are zero, are left out.',
+                },
               },
             },
           },
