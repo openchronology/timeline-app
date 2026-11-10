@@ -333,3 +333,67 @@ test('the receiver rewrites a plan when a roadmap date changes', async () => {
     null,
   );
 });
+
+test('a Microsoft Project file: plans, what happened, phases, people and predecessors', async () => {
+  const { readMsProject } = await import('../server/msproject-source.mjs');
+  const { cardChanges, boardEntityId } = await import('../server/board-source.mjs');
+  const { eventKinds } = await import('../server/github-events.mjs');
+  const xml = `<?xml version="1.0"?><Project xmlns="http://schemas.microsoft.com/project">
+<Name>house.xml</Name><Title>Build &amp; move</Title><GUID>{6F1C2D3E-4A5B-4C6D-8E7F-90A1B2C3D4E5}</GUID>
+<Tasks>
+<Task><UID>0</UID><Name>Project summary</Name><OutlineLevel>0</OutlineLevel><Summary>1</Summary></Task>
+<Task><UID>1</UID><WBS>1</WBS><Name>Foundations</Name><OutlineLevel>1</OutlineLevel><Summary>1</Summary><Start>2026-11-02T08:00:00</Start><Finish>2026-11-13T17:00:00</Finish></Task>
+<Task><UID>2</UID><WBS>1.1</WBS><Name>Dig</Name><OutlineLevel>2</OutlineLevel><Type>1</Type><Start>2026-11-02T08:00:00</Start><Finish>2026-11-06T17:00:00</Finish>
+  <ActualStart>2026-11-03T08:00:00</ActualStart><ActualFinish>2026-11-07T12:00:00</ActualFinish><PercentComplete>100</PercentComplete><Notes>Mind the pipes</Notes>
+  <Baseline><Start>2026-10-01T08:00:00</Start></Baseline></Task>
+<Task><UID>3</UID><WBS>1.2</WBS><Name>Pour</Name><OutlineLevel>2</OutlineLevel><Start>2026-11-09T08:00:00</Start><Finish>2026-11-13T17:00:00</Finish><PercentComplete>0</PercentComplete>
+  <PredecessorLink><PredecessorUID>2</PredecessorUID><Type>1</Type></PredecessorLink></Task>
+<Task><UID>4</UID><IsNull>1</IsNull></Task>
+<Task><UID>5</UID><WBS>2</WBS><Name>Handover</Name><OutlineLevel>1</OutlineLevel><Milestone>1</Milestone><Start>2026-12-01T17:00:00</Start><Finish>2026-12-01T17:00:00</Finish></Task>
+</Tasks>
+<Resources><Resource><UID>1</UID><Name>Mona</Name></Resource></Resources>
+<Assignments><Assignment><TaskUID>2</TaskUID><ResourceUID>1</ResourceUID></Assignment></Assignments>
+</Project>`;
+  const read = readMsProject(xml, { zone: 'Europe/Paris' });
+  assert.equal(read.board.name, 'Build & move');
+  assert.equal(read.board.id, '6F1C2D3E-4A5B-4C6D-8E7F-90A1B2C3D4E5');
+  assert.deepEqual(
+    read.cards.map((c) => c.key),
+    ['1', '2', '3', '5'],
+    'the project summary and null tasks are left out',
+  );
+  const dig = read.cards[1];
+  assert.equal(dig.start, '2026-11-02T07:00:00.000Z', 'in Paris time, not the baseline');
+  assert.equal(dig.created, '2026-11-03T07:00:00.000Z');
+  assert.equal(dig.done, '2026-11-07T11:00:00.000Z');
+  assert.deepEqual(
+    [dig.assignees, dig.labels, dig.description],
+    [['Mona'], ['Foundations'], 'Mind the pipes'],
+  );
+  assert.deepEqual(
+    read.cards[2].links.map((l) => l.key),
+    ['2', '1'],
+    'its predecessor and its summary task',
+  );
+  const reference = `msproject:${read.board.id}`;
+  const source = { platform: 'msproject', name: read.board.name };
+  const pour = cardChanges(reference, source, read.cards[2], eventKinds());
+  assert.deepEqual(
+    pour.durations.map((d) => d.metadata.title),
+    ['Planned: Pour'],
+    'not begun: its plan alone',
+  );
+  const done = cardChanges(reference, source, dig, eventKinds());
+  assert.deepEqual(
+    done.durations.map((d) => d.metadata.title),
+    ['Dig', 'Planned: Dig'],
+  );
+  assert.ok(done.durations[0].metadata.tags.includes('label:foundations'));
+  assert.deepEqual(
+    done.moments.map((m) => m.metadata.title),
+    ['Completed: Dig'],
+  );
+  const handover = cardChanges(reference, source, read.cards[3], eventKinds());
+  assert.equal(handover.moments[0].id, boardEntityId(reference, '5', 'milestone'));
+  assert.equal(handover.moments[0].time, at('2026-12-01T16:00:00Z'));
+});

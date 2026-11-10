@@ -48,6 +48,20 @@ import { loadConfiguration } from './env-file.mjs';
 import { readProjectPlans } from './github-projects.mjs';
 import { boardChanges, boardClient, platformName, readBoard } from './board-import.mjs';
 import { parseBoard } from './board-source.mjs';
+import { readMsProject } from './msproject-source.mjs';
+import { parseZone } from './log-time.mjs';
+import { readFile } from 'node:fs/promises';
+
+/** A Microsoft Project XML file's tasks, as readBoard returns a board's. */
+function planFile(xml, zone) {
+  const read = readMsProject(xml, { zone });
+  return {
+    reference: `msproject:${read.board.id}`,
+    source: { platform: 'msproject', name: read.board.name },
+    board: read.board,
+    cards: read.cards,
+  };
+}
 
 const sleep = (ms) => new Promise((resume) => setTimeout(resume, ms));
 /** The longest it waits for GitHub's rate limit to reset before giving up. */
@@ -327,10 +341,12 @@ const USAGE = `Usage: och-import-github --repo <repository> --timeline <uuid>
   [--only <kinds>] [--except <kinds>] [--since <ISO time>] [--no-branch-view] [--dry-run]
        och-import-github --board <board> --timeline <uuid>
   [--only <kinds>] [--except <kinds>] [--since <ISO time>] [--done <lists>] [--dry-run]
+       och-import-github --plan <file.xml> --timeline <uuid> [--time-zone <zone>] [--dry-run]
 
 A board is trello:<board ID or short link>, jira:<host>/<project key>, planner:<plan ID> or
 openproject:<host>/<project identifier> (docs/boards.md). --done names the Trello lists whose
-cards are done (by default, lists named like "Done").
+cards are done (by default, lists named like "Done"). --plan reads a Microsoft Project XML
+file (also saved by ProjectLibre and GanttProject), its times in --time-zone (UTC by default).
 
 Imports one repository into one timeline. A repository is owner/name on github.com, or
 <platform>:<host>/<path> elsewhere, such as forgejo:codeberg.org/acme/app.
@@ -357,6 +373,8 @@ export async function main(argv = process.argv.slice(2), env = process.env, out 
       options: {
         repo: { type: 'string', multiple: true },
         board: { type: 'string', multiple: true },
+        plan: { type: 'string', multiple: true },
+        'time-zone': { type: 'string' },
         done: { type: 'string' },
         timeline: { type: 'string', multiple: true },
         only: { type: 'string' },
@@ -375,7 +393,7 @@ export async function main(argv = process.argv.slice(2), env = process.env, out 
     out.log(USAGE);
     return 0;
   }
-  if (options.board) return importBoard(options, env, out);
+  if (options.board || options.plan) return importBoard(options, env, out);
   // One repository, into one timeline.
   if ((options.repo?.length ?? 0) > 1 || (options.timeline?.length ?? 0) > 1) {
     out.error('Import one repository into one timeline at a time.\n' + USAGE);
@@ -515,9 +533,17 @@ const timelineOption = (options) => {
 
 /** `--board`: one board or plan into one timeline (docs/boards.md). */
 async function importBoard(options, env, out) {
-  const reference = options.board[0];
+  // A plan file stands in for a board: its reference comes from the file once read.
+  const reference = options.plan ? 'msproject:file' : options.board[0];
   const board = parseBoard(reference);
-  if (options.board.length > 1 || options.repo || !board || board.board === '*') {
+  if (
+    (options.plan && options.board) ||
+    (options.board?.length ?? 0) > 1 ||
+    (options.plan?.length ?? 0) > 1 ||
+    options.repo ||
+    !board ||
+    board.board === '*'
+  ) {
     out.error(
       'Name one board: --board trello:<board ID>, jira:<host>/<project key>, planner:<plan ID> or openproject:<host>/<project>.\n' +
         USAGE,
@@ -536,7 +562,9 @@ async function importBoard(options, env, out) {
   let kinds, reader;
   try {
     kinds = selectKinds({ only: options.only, except: options.except });
-    reader = boardClient(reference, env, { log: out });
+    // A plan file is read from disk; a board through its platform's API.
+    reader = options.plan ? { requests: 0 } : boardClient(reference, env, { log: out });
+    if (options['time-zone']) parseZone(options['time-zone']);
   } catch (error) {
     out.error(error.message);
     return 2;
@@ -559,17 +587,19 @@ async function importBoard(options, env, out) {
           `timeline ${timeline} needs the Gregorian time display, for open cards to end "now"`,
         );
     }
-    read = await readBoard(reader, reference, {
-      since: options.since ? new Date(options.since).toISOString() : undefined,
-      done: options.done
-        ?.split(',')
-        .map((d) => d.trim())
-        .filter(Boolean),
-      start: env.JIRA_START_FIELD || undefined,
-    });
+    read = options.plan
+      ? planFile(await readFile(options.plan[0], 'utf8'), options['time-zone'])
+      : await readBoard(reader, reference, {
+          since: options.since ? new Date(options.since).toISOString() : undefined,
+          done: options.done
+            ?.split(',')
+            .map((d) => d.trim())
+            .filter(Boolean),
+          start: env.JIRA_START_FIELD || undefined,
+        });
     changes = boardChanges(read, kinds);
   } catch (error) {
-    out.error(`${reference}: ${error.message}`);
+    out.error(`${options.plan?.[0] ?? reference}: ${error.message}`);
     return 1;
   }
   const open = read.cards.filter((c) => !c.done).length;

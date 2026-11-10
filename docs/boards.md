@@ -1,13 +1,14 @@
 # Boards and plans to timelines
 
-<!-- description: Mirror Trello, Jira, Microsoft Planner and OpenProject cards, columns and Gantt plans into timelines, by webhook, polling or import. -->
+<!-- description: Mirror Trello, Jira, Planner, OpenProject and Microsoft Project cards, columns and Gantt plans into timelines, by webhook, polling or import. -->
 
 OpenChronology can aggregate the work your boards and plans record, as it does for [GitHub, GitLab and Forgejo](github.md) (#538):
 
 - **Trello** boards;
 - **Jira** projects, on Jira Cloud or Data Center;
 - **Microsoft Planner** plans;
-- **OpenProject** projects, including their Gantt charts.
+- **OpenProject** projects, including their Gantt charts;
+- **Microsoft Project** plans, and those ProjectLibre and GanttProject save as Microsoft Project XML ([below](#microsoft-project-files)).
 
 Each card, issue, task or work package becomes a **duration**:
 
@@ -192,6 +193,23 @@ Planner keeps no history and sends no webhooks, so the receiver reads each route
 
   Its deliveries send each work package as it is, so the receiver compares it with what it saw before to tell what changed. The receiver takes the host from the first `openproject:` route, or from `OPENPROJECT_HOST`.
 
+## Microsoft Project files
+
+A Gantt chart drawn in Microsoft Project, ProjectLibre or GanttProject can be imported from its **Microsoft Project XML** file (MSPDI: **Save As → XML** in Microsoft Project; **File → Save As → MS Project XML** in ProjectLibre; **Project → Export → Microsoft Project** in GanttProject):
+
+```sh
+och-import-github --plan house.xml --timeline 0b7e… --time-zone Europe/Paris
+```
+
+- **The plan:** each task's start and finish are its planned duration, `Planned: Dig`. A milestone is a `milestone` moment.
+- **What happened:** a task's actual start and finish are a duration of its own, ongoing while it is under way. A task not begun has only its plan.
+- **Completion:** a finished task (100%) gets a `completed` moment, and its progress is tagged on its plan as `progress:<n>%`.
+- **People:** each task's resources are its people, `msproject/<name>`.
+- **Phases:** the summary tasks above a task are its labels, `label:<phase>`.
+- **Links:** its predecessors, and its summary task.
+
+Tasks are tagged `msproject/<WBS>`, such as `msproject/1.2`. The files' times have no zone, so `--time-zone` says which they are in, as a name such as `Europe/Paris` or an offset such as `+02:00`. UTC is the default. A file is a snapshot with no history, so run the import again after saving the plan. Tasks keep their IDs (from the project's GUID and each task's UID), so a new import updates the same entities, while tasks deleted from the plan stay on the timeline until you delete them there.
+
 ## Importing what exists
 
 ```sh
@@ -209,6 +227,8 @@ och-import-github --board openproject:op.example.com/house --timeline 0b7e… --
 | `--only`, `--except` | The kinds to import, as for repositories.                         |
 | `--since <time>`     | Only cards changed since then.                                    |
 | `--done <lists>`     | Trello's done lists, comma-separated.                             |
+| `--plan <file.xml>`  | A Microsoft Project XML file, in place of `--board`.              |
+| `--time-zone <zone>` | The zone of a plan file's times (UTC by default).                 |
 | `--dry-run`          | Read the board and report what would be written, without writing. |
 
 **Requests:** Trello costs four requests plus one per thousand card actions. Jira costs one per hundred issues, plus one per issue whose changelog is longer than Jira returns with the search. OpenProject costs one per two hundred work packages, plus one per work package for its activity. Planner costs one per hundred tasks, plus one per person named.
