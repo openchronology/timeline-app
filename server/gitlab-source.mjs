@@ -14,6 +14,7 @@ import {
   closesLink,
   entityId,
   itemDuration,
+  itemPlan,
   itemId,
   parseRepository,
   repositoryReference,
@@ -29,6 +30,7 @@ import {
   milestoneChanges,
   pushChanges,
   releaseMoment,
+  stintsFromMoves,
   timelineEvent,
 } from './github-events.mjs';
 import { relationshipKey } from '../dist/core.mjs';
@@ -71,6 +73,8 @@ export function gitlabItem(object, mergeRequest, extra = {}) {
     assignees: (extra.assignees ?? object.assignees ?? []).map(user).filter(Boolean),
     labels: labelNames(extra.labels ?? object.labels).map((name) => ({ name })),
     ...(object.milestone?.title ? { milestone: { title: object.milestone.title } } : {}),
+    // Its due date (issues), for its planned duration.
+    ...(object.due_date ? { due_on: object.due_date } : {}),
     ...(mergeRequest
       ? { merge_request: true, pull_request: { merged_at: merged }, merged_at: merged }
       : {}),
@@ -172,11 +176,50 @@ export function resourceEvent(kind, entry) {
 
 /** The kinds that need each item read, and which of its listings each needs. */
 const LISTINGS = {
-  label: ['labels'],
+  // Label events are also moves on the project's issue boards, whose lists are labels.
+  label: ['labels', 'status'],
   milestone: ['milestones'],
   state: ['state'],
   notes: ['assignments', 'reviews', 'renames', 'mentions', 'relations', 'other'],
 };
+
+/**
+ * An issue's moves on the project's issue boards (`boards`: `[{name, lists: [label names]}]`),
+ * from its label events: a board's lists are labels, so adding a list's label moves the issue
+ * into that list, and removing it (with no other list's label left) back to Open. Each move is
+ * `{project, column, time, actor}`; the issue starts in Open when it is created. Labels changed
+ * at the same moment count as one move.
+ */
+export function boardMoves(item, events, boards) {
+  const labelEvents = events
+    .filter((e) => e && (e.event === 'labeled' || e.event === 'unlabeled') && e.label?.name)
+    .sort((a, b) => Date.parse(a.created_at) - Date.parse(b.created_at));
+  const moves = [];
+  for (const board of boards) {
+    const lists = board.lists.map((l) => l.toLowerCase());
+    const on = new Set();
+    const columnOf = () => {
+      const listed = lists.filter((l) => on.has(l));
+      return listed.length ? board.lists[lists.indexOf(listed.at(-1))] : 'Open';
+    };
+    let column = 'Open';
+    moves.push({ project: board.name, column, time: item.created_at, initial: true });
+    for (let i = 0; i < labelEvents.length;) {
+      const time = labelEvents[i].created_at;
+      let actor = null;
+      for (; i < labelEvents.length && labelEvents[i].created_at === time; i++) {
+        const name = labelEvents[i].label.name.toLowerCase();
+        if (!lists.includes(name)) continue;
+        if (labelEvents[i].event === 'labeled') on.add(name);
+        else on.delete(name);
+        actor = labelEvents[i].actor ?? actor;
+      }
+      const now = columnOf();
+      if (now !== column) moves.push({ project: board.name, column: (column = now), time, actor });
+    }
+  }
+  return moves;
+}
 
 /**
  * Reads one GitLab project into timeline changes, as readRepository (import-github.mjs) does a
@@ -211,6 +254,19 @@ export async function readGitlab(reader, repository, { since, kinds = eventKinds
     return entries;
   };
   const perItem = Object.values(LISTINGS).flat();
+  // The project's issue boards and their lists' labels, read once if moves are kept.
+  let boards = null;
+  const issueBoards = async () =>
+    (boards ??=
+      keeps(kinds, 'moved') || keeps(kinds, 'in column')
+        ? (await all('Issue boards', `${project}/boards`)).map((board) => ({
+            name: board.name || 'Development',
+            lists: (board.lists ?? [])
+              .sort((a, b) => (a.position ?? 0) - (b.position ?? 0))
+              .map((list) => list.label?.name)
+              .filter(Boolean),
+          }))
+        : []).filter((board) => board.lists.length);
   if (kinds.has('items') || perItem.some((k) => kinds.has(k)))
     for (const [kind, mr] of [
       ['issues', false],
@@ -225,6 +281,8 @@ export async function readGitlab(reader, repository, { since, kinds = eventKinds
         const item = gitlabItem(object, mr);
         items.push(item);
         if (keeps(kinds, 'item')) durations.push(itemDuration(repository, item));
+        const plan = keeps(kinds, 'planned') ? itemPlan(repository, item) : null;
+        if (plan) durations.push(plan);
       }
   for (const item of items) {
     const kind = item.merge_request ? 'merge_requests' : 'issues';
@@ -252,6 +310,26 @@ export async function readGitlab(reader, repository, { since, kinds = eventKinds
       if (!changes) continue;
       moments.push(...changes.moments);
       links.push(...changes.links);
+    }
+    // Moves on the issue boards: moments, and the time in each list (from all its moves).
+    if (!item.merge_request && (await issueBoards()).length) {
+      const moves = boardMoves(item, events, await issueBoards());
+      for (const move of moves) {
+        if (move.initial || !after(move.time)) continue;
+        const changes = timelineEvent(
+          repository,
+          item,
+          {
+            event: 'moved_columns_in_project',
+            created_at: move.time,
+            actor: move.actor,
+            project_card: { column_name: move.column },
+          },
+          kinds,
+        );
+        if (changes) moments.push(...changes.moments);
+      }
+      if (keeps(kinds, 'in column')) durations.push(...stintsFromMoves(repository, item, moves));
     }
   }
   // Commits, the default branch's first; then each other branch until it meets history read.
@@ -319,7 +397,7 @@ export async function readGitlab(reader, repository, { since, kinds = eventKinds
   if (keeps(kinds, 'milestone'))
     for (const milestone of await all('Milestones', `${project}/milestones`)) {
       if (!after(milestone.updated_at)) continue;
-      const changes = milestoneChanges(repository, gitlabMilestone(milestone));
+      const changes = milestoneChanges(repository, gitlabMilestone(milestone), kinds);
       durations.push(...changes.durations);
       moments.push(...changes.moments);
       removedMoments.push(...changes.removedMoments);
@@ -378,6 +456,7 @@ export function gitlabMilestone(milestone) {
     updated_at: milestone.updated_at,
     closed_at: closed ? milestone.updated_at : null,
     due_on: milestone.due_date ? `${milestone.due_date}T00:00:00Z` : null,
+    start_on: milestone.start_date ?? null,
     html_url: milestone.web_url,
   };
 }
@@ -514,7 +593,10 @@ export function gitlabDeliveryChanges(event, payload, kinds = eventKinds()) {
     happened.push(as('reviewed', { state: 'approved', user: actor, submitted_at: time }));
   const own = {
     ...none,
-    durations: keeps(kinds, 'item') ? [itemDuration(repository, item)] : [],
+    durations: [
+      ...(keeps(kinds, 'item') ? [itemDuration(repository, item)] : []),
+      ...(keeps(kinds, 'planned') ? [itemPlan(repository, item)].filter(Boolean) : []),
+    ],
     moments: happened.flatMap((h) => h?.moments ?? []),
     links: [],
   };

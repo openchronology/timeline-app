@@ -20,6 +20,7 @@ import {
   mentionChanges,
   milestoneChanges,
   milestoneId,
+  milestonePlanId,
   releaseId,
   releaseMoment,
   subIssueChanges,
@@ -196,6 +197,64 @@ export function itemDuration(repository, item) {
       ...(notes ? { description: notes } : {}),
       ...(item.html_url ? { url: item.html_url } : {}),
       tags: [...new Set(tags)].slice(0, 40),
+    },
+  };
+}
+
+/** A date or date-time as an ISO time; a plain due date (`2026-11-20`) ends with its day. */
+export function planTime(value, { end = false } = {}) {
+  if (!value) return null;
+  const text = String(value);
+  const ms = Date.parse(
+    /^\d{4}-\d{2}-\d{2}$/.test(text) ? `${text}T${end ? '23:59:59' : '00:00:00'}Z` : text,
+  );
+  return Number.isFinite(ms) ? new Date(ms).toISOString() : null;
+}
+/** An item's planned duration's ID, per project board for GitHub Projects' dates. */
+export const planId = (repository, item, project) =>
+  entityId(repository, ...itemKey(item), 'planned', ...(project ? [slugPart(project)] : []));
+const slugPart = (text) => {
+  const plain = String(text);
+  const safe = plain.replace(/[^A-Za-z0-9_.-]+/g, '-').slice(0, 32);
+  return safe === plain && safe
+    ? safe
+    : safe + '-' + createHash('sha256').update(plain).digest('hex').slice(0, 8);
+};
+/**
+ * An item's plan, as a Gantt chart draws it: from its start date (or, without one, its
+ * creation) until its due date, titled `Planned: #12 …` and tagged `planned`, with the item's
+ * own tags and its assignees. GitLab and Forgejo issues have due dates (`due_on` or
+ * `due_date`); GitHub Projects' date fields give `start` and `due` for one `project`. Null
+ * without a due date, or with one before the start.
+ */
+export function itemPlan(repository, item, { start, due, project } = {}) {
+  const until = planTime(due ?? item.due_on ?? item.due_date, { end: true });
+  const from = planTime(start ?? item.start_on) ?? planTime(item.created_at);
+  if (!until || !from || Date.parse(until) < Date.parse(from)) return null;
+  const mr = !!item.merge_request;
+  const assignees = item.assignees ?? (item.assignee ? [item.assignee] : []);
+  return {
+    id: planId(repository, item, project),
+    start: seconds(from),
+    end: seconds(until),
+    metadata: {
+      title: clip(`Planned: ${mr ? '!' : '#'}${item.number} ${item.title ?? ''}`.trim(), 300),
+      ...(item.html_url ? { url: item.html_url } : {}),
+      tags: [
+        ...new Set(
+          [
+            platformOf(repository),
+            repositoryTag(repository),
+            itemTag(repository, item.number, mr),
+            'planned',
+            ...(project ? ['project:' + project] : []),
+            ...(assignees.length ? ['assigned'] : []),
+            ...assignees.map((user) => personTag(user.login, repository)),
+          ]
+            .map(tag)
+            .filter(Boolean),
+        ),
+      ].slice(0, 40),
     },
   };
 }
@@ -422,12 +481,15 @@ export function deliveryChanges(event, payload, kinds = eventKinds()) {
         {
           ...none,
           repository,
-          removed: [milestoneId(repository, payload.milestone)],
+          removed: [
+            milestoneId(repository, payload.milestone),
+            milestonePlanId(repository, payload.milestone),
+          ],
           removedMoments: milestoneChanges(repository, { ...payload.milestone, due_on: null })
             .removedMoments,
         },
       ];
-    return [{ ...none, repository, ...milestoneChanges(repository, payload.milestone) }];
+    return [{ ...none, repository, ...milestoneChanges(repository, payload.milestone, kinds) }];
   }
   const mentions = (source, text, by) =>
     keeps(kinds, 'mentioned')
@@ -466,7 +528,10 @@ export function deliveryChanges(event, payload, kinds = eventKinds()) {
   const items = keeps(kinds, 'item');
   const own = {
     repository,
-    durations: items ? [itemDuration(repository, item)] : [],
+    durations: [
+      ...(items ? [itemDuration(repository, item)] : []),
+      ...(keeps(kinds, 'planned') ? [itemPlan(repository, item)].filter(Boolean) : []),
+    ],
     moments: happened.moments,
     removed: [],
     links: items ? links : [],

@@ -72,6 +72,25 @@ export function forgejoTimelineEvent(entry, host) {
       return { ...base, event: 'unlocked' };
     case 'pin':
       return { ...base, event: 'pinned' };
+    case 'add_dependency':
+    case 'remove_dependency': {
+      // This item depends on (is blocked by) the one named.
+      const other = entry.dependent_issue;
+      const repository = other?.repository?.full_name
+        ? repositoryReference('forgejo', host, other.repository.full_name)
+        : null;
+      return other?.number && repository
+        ? {
+            ...base,
+            event: entry.type === 'add_dependency' ? 'blocked_by_added' : 'blocked_by_removed',
+            blocking_issue: {
+              number: other.number,
+              title: other.title,
+              repository: { full_name: repository },
+            },
+          }
+        : null;
+    }
     case 'issue_ref':
     case 'pull_ref':
     case 'comment_ref': {

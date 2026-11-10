@@ -20,6 +20,7 @@ import {
   isPullRequest,
   itemDuration,
   itemId,
+  itemPlan,
   entityId,
   parseRepository,
   repositoryName,
@@ -44,6 +45,7 @@ import {
 import { relationshipKey } from '../dist/core.mjs';
 import { branchView, readBranchRequests, saveBranchView } from './branch-view.mjs';
 import { loadConfiguration } from './env-file.mjs';
+import { readProjectPlans } from './github-projects.mjs';
 import { boardChanges, boardClient, platformName, readBoard } from './board-import.mjs';
 import { parseBoard } from './board-source.mjs';
 
@@ -180,7 +182,7 @@ export async function readRepository(reader, repository, { since, kinds = eventK
     removedMoments = [],
     links = [],
     numbers = new Map();
-  if (ITEM_KINDS.some((kind) => kinds.has(kind)))
+  if (ITEM_KINDS.some((kind) => kinds.has(kind)) || kinds.has('schedule'))
     for await (const item of reader.list(`/repos/${path}/issues`, {
       state: 'all',
       sort: 'created',
@@ -188,6 +190,9 @@ export async function readRepository(reader, repository, { since, kinds = eventK
       since,
     })) {
       if (keeps(kinds, 'item')) durations.push(itemDuration(repository, item));
+      // Forgejo's and Gitea's issues have due dates: their plans.
+      const plan = keeps(kinds, 'planned') ? itemPlan(repository, item) : null;
+      if (plan) durations.push(plan);
       numbers.set(item.number, item);
     }
   if (ITEM_KINDS.slice(1).some((kind) => kinds.has(kind)))
@@ -207,6 +212,15 @@ export async function readRepository(reader, repository, { since, kinds = eventK
       // Its time in each board column, from all its moves (not only those since `since`).
       if (moves.length && keeps(kinds, 'in column'))
         durations.push(...stintsFromMoves(repository, item, moves));
+    }
+  // GitHub Projects' roadmaps: each item's start and target dates on each project (GraphQL,
+  // so with a token). A token that cannot read the projects leaves them out, with a warning.
+  const warnings = [];
+  if (platform === 'github' && keeps(kinds, 'planned') && reader.token)
+    try {
+      durations.push(...(await readProjectPlans(reader, repository, path)));
+    } catch (error) {
+      warnings.push(`project dates left out: ${error.message}`);
     }
   // Commits, branch by branch: the default branch's first.
   const commitIds = new Set();
@@ -275,7 +289,7 @@ export async function readRepository(reader, repository, { since, kinds = eventK
   if (keeps(kinds, 'milestone'))
     for await (const milestone of reader.list(`/repos/${path}/milestones`, { state: 'all' })) {
       if (!after(milestone.updated_at)) continue;
-      const changes = milestoneChanges(repository, milestone);
+      const changes = milestoneChanges(repository, milestone, kinds);
       durations.push(...changes.durations);
       moments.push(...changes.moments);
       removedMoments.push(...changes.removedMoments);
@@ -305,6 +319,7 @@ export async function readRepository(reader, repository, { since, kinds = eventK
     commits: commitIds.size,
     main,
     branches: branchTimes,
+    warnings,
   };
 }
 

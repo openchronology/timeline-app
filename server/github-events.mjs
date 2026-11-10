@@ -25,6 +25,7 @@ import {
   repositoryTag,
   seconds,
   tag as lowerTag,
+  planTime,
 } from './github-source.mjs';
 
 /**
@@ -56,6 +57,8 @@ export const EVENT_KINDS = {
     'parent issue removed',
     'marked as duplicate',
     'unmarked as duplicate',
+    'dependency added',
+    'dependency removed',
     'linked',
   ],
   status: ['moved', 'in column'],
@@ -297,6 +300,9 @@ const VERB_OF = {
   sub_issue_removed: 'sub-issue removed',
   parent_issue_added: 'parent issue added',
   parent_issue_removed: 'parent issue removed',
+  // An issue another blocks: Forgejo's and Gitea's dependencies (forgejo-source.mjs).
+  blocked_by_added: 'dependency added',
+  blocked_by_removed: 'dependency removed',
   moved_columns_in_project: 'moved',
   added_to_project: 'moved',
   project_v2_item_status_changed: 'moved',
@@ -431,8 +437,10 @@ export function timelineEvent(repository, item, event, kinds = ALL_KINDS) {
     case 'sub_issue_added':
     case 'sub_issue_removed':
     case 'parent_issue_added':
-    case 'parent_issue_removed': {
-      const other = event.sub_issue ?? event.parent_issue;
+    case 'parent_issue_removed':
+    case 'blocked_by_added':
+    case 'blocked_by_removed': {
+      const other = event.sub_issue ?? event.parent_issue ?? event.blocking_issue;
       const repo = other?.repository?.full_name ?? repository;
       const ref = other?.number ? `${repo}#${other.number}` : '';
       return {
@@ -690,7 +698,7 @@ export const releaseId = (repository, release) =>
  * ongoing while open; and, when it has a due date, a moment then. Tagged `milestone`,
  * `milestone:<title>` (as its items are) and its state.
  */
-export function milestoneChanges(repository, milestone) {
+export function milestoneChanges(repository, milestone, kinds = ALL_KINDS) {
   const tags = [
     platformOf(repository),
     repositoryTag(repository),
@@ -730,12 +738,30 @@ export function milestoneChanges(repository, milestone) {
         },
       }
     : null;
+  // Its plan: from its start date (GitLab's), or its creation, until its due date.
+  const until = planTime(milestone.due_on, { end: true }),
+    from = planTime(milestone.start_on) ?? planTime(milestone.created_at);
+  const plan =
+    keeps(kinds, 'planned') && until && from && Date.parse(until) >= Date.parse(from)
+      ? {
+          id: milestonePlanId(repository, milestone),
+          start: seconds(from),
+          end: seconds(until),
+          metadata: {
+            title: clip(`Planned: milestone ${milestone.title}`, 300),
+            ...(milestone.html_url ? { url: milestone.html_url } : {}),
+            tags: [...new Set([...tags.slice(0, 4), 'planned'].map(lowerTag))],
+          },
+        }
+      : null;
   return {
-    durations: [duration],
+    durations: plan ? [duration, plan] : [duration],
     moments: due ? [due] : [],
     removedMoments: due ? [] : [dueId(repository, milestone)],
   };
 }
+export const milestonePlanId = (repository, milestone) =>
+  entityId(repository, 'milestone', String(milestone.number), 'planned');
 export const milestoneId = (repository, milestone) =>
   entityId(repository, 'milestone', String(milestone.number));
 const dueId = (repository, milestone) =>

@@ -25,6 +25,7 @@ import {
 import { jiraDelivery, validJiraSignature } from './jira-source.mjs';
 import { openprojectDelivery, validOpenProjectSignature } from './openproject-source.mjs';
 import { boardClient, readBoard } from './board-import.mjs';
+import { projectDateChange } from './github-projects.mjs';
 import { dirname, join } from 'node:path';
 
 /** A delivery's JSON body, or null when it is not JSON. */
@@ -416,6 +417,24 @@ export class GithubIngest {
   }
   /** A checked delivery, in GitHub's shape: queued (202) or not kept (204). */
   handle(event, payload) {
+    if (
+      event === 'projects_v2_item' &&
+      String(payload?.changes?.field_value?.field_type ?? '').toLowerCase() === 'date'
+    ) {
+      // A roadmap's date changed: the item's plan on that project, read again.
+      if (!this.token || !keeps(this.routes.kinds, 'planned')) {
+        this.stats.ignored++;
+        return 204;
+      }
+      const resolving = projectDateChange(payload, this.token, this.fetcher, this.githubApi)
+        .then((change) => {
+          if (!change || !this.queue(change)) this.stats.ignored++;
+        })
+        .catch((error) => this.log.error('github: a project date change:', error.message))
+        .finally(() => this.resolving.delete(resolving));
+      this.resolving.add(resolving);
+      return 202;
+    }
     if (event === 'projects_v2_item') {
       // A board's status change names its issue by node ID: resolved, then queued.
       if (!this.token || !keeps(this.routes.kinds, 'moved')) {

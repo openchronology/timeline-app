@@ -726,6 +726,8 @@ test('the importer reads every page of issues and their timelines, and links wha
       ['#3 in In progress', 'closed'],
       ['#3 in Review', 'open'],
       ['Milestone v1', 'closed'],
+      // Its plan, from its creation to its due date (#538).
+      ['Planned: milestone v1', 'closed'],
       ['Milestone v2', 'open'],
     ],
   );
@@ -807,7 +809,7 @@ test('the command imports one repository into one timeline, of the kinds asked f
     assert.equal(await run('--repo', 'acme/app', '--timeline', TIMELINE, '--dry-run'), 0);
     assert.match(
       lines.join('\n'),
-      /acme\/app → .*: would import 3 issues and pull requests \(2 open\), 5 commits, 12 other events, 4 other durations, 2 links\./,
+      /acme\/app → .*: would import 3 issues and pull requests \(2 open\), 5 commits, 12 other events, 5 other durations, 2 links\./,
     );
     // The Branches view (#557): feat/new_feature, which has commits of its own and is not
     // merged; old has none.
@@ -1032,7 +1034,17 @@ test('releases and milestones arrive as moments and durations, and leave when de
   assert.deepEqual(created.durations[0].end, { ongoing: true });
   assert.equal(created.moments[0].metadata.title, 'Due: milestone v1');
   const [gone] = deliveryChanges('milestone', { action: 'deleted', milestone, repository });
-  assert.deepEqual(gone.removed, ['gh:acme:app:milestone:5']);
+  assert.deepEqual(gone.removed, ['gh:acme:app:milestone:5', 'gh:acme:app:milestone:5:planned']);
+  // A milestone with a due date is planned from its creation until the end of that day.
+  const plan = created.durations.find((d) => d.id === 'gh:acme:app:milestone:5:planned');
+  assert.equal(plan.metadata.title, 'Planned: milestone v1');
+  assert.deepEqual(
+    [plan.start, plan.end],
+    [
+      String(Date.parse('2026-10-01T00:00:00Z') / 1000),
+      String(Date.parse('2026-11-01T00:00:00Z') / 1000),
+    ],
+  );
   assert.deepEqual(gone.removedMoments, ['gh:acme:app:milestone:5:due']);
   assert.deepEqual(
     deliveryChanges(
