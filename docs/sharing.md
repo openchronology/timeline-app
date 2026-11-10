@@ -1,6 +1,6 @@
 # Sharing timelines
 
-<!-- description: Share timelines: their addresses, links to events and views, the share dialog, link previews, what search engines get, embedding on other sites, and the <och-timeline> element for other pages and AI chats. -->
+<!-- description: Share timelines: their addresses, links, the share dialog, previews, search engines, embeds, and showing them in other pages and AI chats. -->
 
 Copyright (c) 2026 Athan Clark. SPDX-License-Identifier: GPL-3.0-only
 

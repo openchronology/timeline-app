@@ -99,7 +99,6 @@ the libraries inside the editor (`THIRD_PARTY.txt`). The source is at
 | File                           | What it is for                                                                                                    |
 | ------------------------------ | ----------------------------------------------------------------------------------------------------------------- |
 | [`package.json`](package.json) | The npm package; its version is set from the release tag when `scripts/timeline-package.mjs --version` builds it. |
-| [`README.md`](README.md)       | This page, also the package's page on npm.                                                                        |
 | [`src/`](src/README.md)        | The element's source.                                                                                             |
 
 `dist/timeline.js`, `LICENSE`, `NOTICE` and `THIRD_PARTY.txt` are written by
