@@ -386,6 +386,7 @@ Every point has a place. Explore the spaces between them.</textarea>
               </button>
               <button id="views-button" data-phone-menu>Views</button>
               <button id="presentation-button" data-phone-menu>Time display</button>
+              <button id="measures-button" data-phone-menu>Measures</button>
               <button id="plugins-button" data-phone-menu>Plugins</button>
               <button id="compare-button" data-phone-menu>Compare</button>
               <button id="zoom-out" aria-label="Zoom out">−</button
@@ -656,6 +657,7 @@ Every point has a place. Explore the spaces between them.</textarea>
             <label><input type="checkbox" value="violence" /> Graphic violence</label>
             <label><input type="checkbox" value="disturbing" /> Disturbing content</label>
           </fieldset>
+          <div id="event-measures" class="measure-fields" hidden></div>
           <div id="plugin-event-fields"></div>
           <section id="event-durations"></section>
           <section id="event-related" class="related-section"></section>
@@ -709,6 +711,7 @@ Every point has a place. Explore the spaces between them.</textarea>
             <label><input type="checkbox" value="violence" /> Graphic violence</label>
             <label><input type="checkbox" value="disturbing" /> Disturbing content</label>
           </fieldset>
+          <div id="duration-measures" class="measure-fields" hidden></div>
           <div id="plugin-duration-fields"></div>
           <section id="duration-related" class="related-section"></section>
           <details>
@@ -1394,6 +1397,31 @@ Every point has a place. Explore the spaces between them.</textarea>
         <label>Time display<select id="compare-format"></select></label>
         <button value="cancel">Cancel</button
         ><button value="apply" class="button-primary">Use this display</button>
+      </form>
+    </dialog>
+    <dialog id="measures-dialog" aria-labelledby="measures-heading">
+      <form id="measures-form">
+        <div class="dialog-heading">
+          <h2 id="measures-heading">Measures</h2>
+          <button type="button" data-close="measures-dialog" aria-label="Close">×</button>
+        </div>
+        <p class="field-hint">
+          Measures are exact quantities that events carry, such as a cost or hours worked. Each
+          event gives its own values, and every value is exact.
+        </p>
+        <div id="measures-list" class="measures-list"></div>
+        <p id="measures-empty" class="muted" hidden>This timeline has no measures yet.</p>
+        <button id="measures-add" type="button">Add a measure</button>
+        <p id="measures-summary" class="field-hint" role="status"></p>
+        <div id="measures-working" hidden>
+          <progress id="measures-progress"></progress>
+          <span id="measures-status" role="status"></span>
+        </div>
+        <div id="measures-error" class="form-error" role="alert"></div>
+        <div class="dialog-commit">
+          <button type="button" data-close="measures-dialog">Cancel</button
+          ><button id="measures-save" class="button-primary">Save measures</button>
+        </div>
       </form>
     </dialog>
     <dialog id="presentation-dialog">

@@ -27,6 +27,25 @@ export function entityCount(group: FrameGroup): bigint {
  * already maximal never merge with each other, so this coalesces duration clusters into
  * nearby moment groups and coarsens cached summaries.
  */
+/** Two groups' measure totals added (#574): canonical text by name, zeros left out. */
+export function addTotals(
+  a: Record<string, string> | undefined,
+  b: Record<string, string> | undefined,
+): Record<string, string> | undefined {
+  if (!a) return b;
+  if (!b) return a;
+  const sum: Record<string, string> = { ...a };
+  for (const [name, text] of Object.entries(b)) {
+    const value =
+      sum[name] === undefined
+        ? Q.parse(asFraction(text))
+        : Q.parse(asFraction(sum[name])).add(Q.parse(asFraction(text)));
+    if (value.numerator === 0n) delete sum[name];
+    else sum[name] = value.denominator === 1n ? value.numerator.toString() : value.toString();
+  }
+  return Object.keys(sum).length ? sum : undefined;
+}
+const asFraction = (text: string) => (text.includes('/') ? text : text + '/1');
 export function coalesceGroups(groups: readonly FrameGroup[], threshold: Q): FrameGroup[] {
   const out: FrameGroup[] = [];
   const ordered = [...groups].sort(
@@ -43,6 +62,7 @@ export function coalesceGroups(groups: readonly FrameGroup[], threshold: Q): Fra
         Q.parse(group.last).sub(Q.parse(prev.first)).compare(threshold) < 0)
     ) {
       const durations = BigInt(prev.durationCount ?? '0') + BigInt(group.durationCount ?? '0');
+      const totals = addTotals(prev.totals, group.totals);
       out[out.length - 1] = {
         first: prev.first,
         last: Q.parse(group.last).compare(Q.parse(prev.last)) > 0 ? group.last : prev.last,
@@ -52,6 +72,7 @@ export function coalesceGroups(groups: readonly FrameGroup[], threshold: Q): Fra
           group.distinct -
           (prev.distinct && group.distinct && prev.last === group.first ? 1 : 0),
         ...(durations ? { durationCount: durations.toString() } : {}),
+        ...(totals ? { totals } : {}),
       };
     } else out.push(group);
   }

@@ -9,6 +9,8 @@ import { entityTags } from './tags.js';
 import { localSource } from './local-files.js';
 import { localFileItem } from './local-file-links.js';
 import type { InstalledPlugin } from './plugins.js';
+import { measureRows } from './measure-ui.js';
+import type { Measures } from './measures.js';
 
 export interface ReaderEntity {
   kind: 'moment' | 'duration';
@@ -19,6 +21,8 @@ export interface ReaderEntity {
   when: string;
   /** Notes are Markdown: the timeline has the rich-text plugin on, for moments or durations. */
   markdown: boolean;
+  /** The timeline's measures (#573), whose values it shows. */
+  measures?: Measures;
 }
 
 /** The host an image URL names, credited under its image. */
@@ -162,6 +166,8 @@ export function renderReader(host: HTMLElement, entity: ReaderEntity) {
   }
   const flagged = flags(plugins, metadata);
   if (flagged) host.append(flagged);
+  const measured = measureRows(entity.measures, metadata);
+  if (measured) host.append(measured);
 
   const description = textOf(metadata.description);
   if (description) host.append(notes(description, entity.markdown));
