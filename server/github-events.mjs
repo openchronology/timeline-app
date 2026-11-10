@@ -39,7 +39,7 @@ export const EVENT_KINDS = {
   assignments: ['assigned', 'unassigned'],
   labels: ['labeled', 'unlabeled'],
   milestones: ['milestoned', 'demilestoned', 'milestone', 'due'],
-  state: ['closed', 'reopened', 'merged'],
+  state: ['closed', 'reopened', 'merged', 'completed'],
   renames: ['renamed'],
   reviews: [
     'review requested',
@@ -56,8 +56,12 @@ export const EVENT_KINDS = {
     'parent issue removed',
     'marked as duplicate',
     'unmarked as duplicate',
+    'linked',
   ],
   status: ['moved', 'in column'],
+  // Boards and plans (board-source.mjs): planned durations, milestones' dates, new dates and
+  // progress.
+  schedule: ['planned', 'rescheduled', 'progress'],
   releases: ['released'],
   other: ['locked', 'unlocked', 'pinned', 'unpinned', 'transferred'],
 };

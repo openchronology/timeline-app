@@ -232,6 +232,20 @@ services:
       GITHUB_STATE: /var/lib/openchronology-github/github-state.json
       GITHUB_TOKEN: ${GITHUB_TOKEN:-}
       GITHUB_API_URL: ${GITHUB_API_URL:-}
+      # Boards and plans (docs/boards.md), each used only when set.
+      TRELLO_KEY: ${TRELLO_KEY:-}
+      TRELLO_TOKEN: ${TRELLO_TOKEN:-}
+      TRELLO_SECRET: ${TRELLO_SECRET:-}
+      TRELLO_CALLBACK_URL: ${TRELLO_CALLBACK_URL:-}
+      JIRA_EMAIL: ${JIRA_EMAIL:-}
+      JIRA_TOKEN: ${JIRA_TOKEN:-}
+      JIRA_WEBHOOK_SECRET: ${JIRA_WEBHOOK_SECRET:-}
+      JIRA_START_FIELD: ${JIRA_START_FIELD:-}
+      PLANNER_TENANT: ${PLANNER_TENANT:-}
+      PLANNER_CLIENT_ID: ${PLANNER_CLIENT_ID:-}
+      PLANNER_CLIENT_SECRET: ${PLANNER_CLIENT_SECRET:-}
+      OPENPROJECT_TOKEN: ${OPENPROJECT_TOKEN:-}
+      OPENPROJECT_WEBHOOK_SECRET: ${OPENPROJECT_WEBHOOK_SECRET:-}
     volumes:
       - ${GITHUB_ROUTES_FILE:-./github-routes.json}:/config/github-routes.json:ro
       - github-state:/var/lib/openchronology-github

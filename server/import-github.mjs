@@ -44,6 +44,8 @@ import {
 import { relationshipKey } from '../dist/core.mjs';
 import { branchView, readBranchRequests, saveBranchView } from './branch-view.mjs';
 import { loadConfiguration } from './env-file.mjs';
+import { boardChanges, boardClient, platformName, readBoard } from './board-import.mjs';
+import { parseBoard } from './board-source.mjs';
 
 const sleep = (ms) => new Promise((resume) => setTimeout(resume, ms));
 /** The longest it waits for GitHub's rate limit to reset before giving up. */
@@ -308,6 +310,12 @@ export async function readRepository(reader, repository, { since, kinds = eventK
 
 const USAGE = `Usage: och-import-github --repo <repository> --timeline <uuid>
   [--only <kinds>] [--except <kinds>] [--since <ISO time>] [--no-branch-view] [--dry-run]
+       och-import-github --board <board> --timeline <uuid>
+  [--only <kinds>] [--except <kinds>] [--since <ISO time>] [--done <lists>] [--dry-run]
+
+A board is trello:<board ID or short link>, jira:<host>/<project key>, planner:<plan ID> or
+openproject:<host>/<project identifier> (docs/boards.md). --done names the Trello lists whose
+cards are done (by default, lists named like "Done").
 
 Imports one repository into one timeline. A repository is owner/name on github.com, or
 <platform>:<host>/<path> elsewhere, such as forgejo:codeberg.org/acme/app.
@@ -321,7 +329,9 @@ the timeline has its own. --no-branch-view leaves views alone.
 Environment: OCH_API_URL and OCH_API_KEY (not needed for --dry-run); GITHUB_TOKEN, or
 FORGEJO_TOKEN for Forgejo and Gitea, GITLAB_TOKEN for GitLab (recommended; needed for
 private repositories);
-GITHUB_API_URL (GitHub Enterprise; default https://api.github.com).`;
+GITHUB_API_URL (GitHub Enterprise; default https://api.github.com).
+Boards: TRELLO_KEY and TRELLO_TOKEN; JIRA_TOKEN (and JIRA_EMAIL on Jira Cloud), JIRA_START_FIELD;
+PLANNER_TENANT, PLANNER_CLIENT_ID and PLANNER_CLIENT_SECRET; OPENPROJECT_TOKEN.`;
 
 /** The command: exit 0 imported, 1 something failed, 2 a usage error. */
 export async function main(argv = process.argv.slice(2), env = process.env, out = console) {
@@ -331,6 +341,8 @@ export async function main(argv = process.argv.slice(2), env = process.env, out 
       args: argv,
       options: {
         repo: { type: 'string', multiple: true },
+        board: { type: 'string', multiple: true },
+        done: { type: 'string' },
         timeline: { type: 'string', multiple: true },
         only: { type: 'string' },
         except: { type: 'string' },
@@ -348,6 +360,7 @@ export async function main(argv = process.argv.slice(2), env = process.env, out 
     out.log(USAGE);
     return 0;
   }
+  if (options.board) return importBoard(options, env, out);
   // One repository, into one timeline.
   if ((options.repo?.length ?? 0) > 1 || (options.timeline?.length ?? 0) > 1) {
     out.error('Import one repository into one timeline at a time.\n' + USAGE);
@@ -477,6 +490,111 @@ export async function main(argv = process.argv.slice(2), env = process.env, out 
     return 1;
   }
 }
+/** The timeline an option names, or null. */
+const timelineOption = (options) => {
+  const timeline = String(options.timeline?.[0] ?? '').toLowerCase();
+  return /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/.test(timeline)
+    ? timeline
+    : null;
+};
+
+/** `--board`: one board or plan into one timeline (docs/boards.md). */
+async function importBoard(options, env, out) {
+  const reference = options.board[0];
+  const board = parseBoard(reference);
+  if (options.board.length > 1 || options.repo || !board || board.board === '*') {
+    out.error(
+      'Name one board: --board trello:<board ID>, jira:<host>/<project key>, planner:<plan ID> or openproject:<host>/<project>.\n' +
+        USAGE,
+    );
+    return 2;
+  }
+  const timeline = timelineOption(options);
+  if (!timeline || (options.timeline?.length ?? 0) > 1) {
+    out.error('Name the timeline to import into: --timeline <uuid>.\n' + USAGE);
+    return 2;
+  }
+  if (options.since !== undefined && !Number.isFinite(Date.parse(options.since))) {
+    out.error('--since takes an ISO 8601 time, such as 2026-01-01.');
+    return 2;
+  }
+  let kinds, reader;
+  try {
+    kinds = selectKinds({ only: options.only, except: options.except });
+    reader = boardClient(reference, env, { log: out });
+  } catch (error) {
+    out.error(error.message);
+    return 2;
+  }
+  let writer = null;
+  if (!options['dry-run'])
+    try {
+      writer = new TimelineWriter({ api: env.OCH_API_URL, key: env.OCH_API_KEY });
+    } catch (error) {
+      out.error(error.message);
+      return 2;
+    }
+  let read, changes;
+  try {
+    if (writer) {
+      const { status, state } = await writer.load(timeline);
+      if (!state) throw new Error(`timeline ${timeline} cannot be read with this key (${status})`);
+      if (state.settings.presentation?.mode !== 'gregorian')
+        throw new Error(
+          `timeline ${timeline} needs the Gregorian time display, for open cards to end "now"`,
+        );
+    }
+    read = await readBoard(reader, reference, {
+      since: options.since ? new Date(options.since).toISOString() : undefined,
+      done: options.done
+        ?.split(',')
+        .map((d) => d.trim())
+        .filter(Boolean),
+      start: env.JIRA_START_FIELD || undefined,
+    });
+    changes = boardChanges(read, kinds);
+  } catch (error) {
+    out.error(`${reference}: ${error.message}`);
+    return 1;
+  }
+  const open = read.cards.filter((c) => !c.done).length;
+  const summary = [
+    `${read.cards.length} cards (${open} open)`,
+    `${changes.durations.length} durations`,
+    `${changes.moments.length} moments`,
+    `${changes.links.length} links`,
+  ].join(', ');
+  out.log(`Requests: ${reader.requests}.`);
+  const name = `${platformName(reference)} "${read.board.name}"`;
+  if (!writer) {
+    out.log(`${name} → ${timeline}: would import ${summary}.`);
+    for (const d of [...changes.durations, ...changes.moments].slice(0, 3))
+      out.log('  ' + JSON.stringify(d));
+    return 0;
+  }
+  try {
+    await writer.send(timeline, { durations: changes.durations, moments: changes.moments });
+    // Links together, or, when the server refuses them (one names a card not on the
+    // timeline, say, after --since), one at a time, so only those are left out.
+    let refused = 0;
+    if (changes.links.length)
+      await writer.send(timeline, { links: changes.links }).catch(async (error) => {
+        if (!error.status || error.status >= 500 || error.status === 429) throw error;
+        for (const link of changes.links)
+          await writer.send(timeline, { links: [link] }).catch(() => refused++);
+      });
+    out.log(
+      `${name} → ${timeline}: imported ${summary}${refused ? ` (${refused} links refused)` : ''}.`,
+    );
+    return 0;
+  } catch (error) {
+    out.error(
+      `${reference}: ${error.status ? error.status + ' ' : ''}${error.value?.error ?? error.message}`,
+    );
+    return 1;
+  }
+}
+
 const invoked = (() => {
   try {
     return process.argv[1] && import.meta.url === pathToFileURL(realpathSync(process.argv[1])).href;
