@@ -408,6 +408,9 @@ ALTER TABLE oc_timelines ADD COLUMN IF NOT EXISTS image jsonb;
 -- view: how the timeline opens for readers, embeds and shared links (#416), from its document's
 -- settings: {"separation": {"tags": [...]}} or {"separation": {"related": ref, "depth": ...}}.
 ALTER TABLE oc_timelines ADD COLUMN IF NOT EXISTS view jsonb;
+-- measures: the quantities its moments and durations carry (#572), from its document's settings:
+-- {name: {type: "mpz" | "mpq", label?}}. Entities keep their values in metadata.measures.
+ALTER TABLE oc_timelines ADD COLUMN IF NOT EXISTS measures jsonb;
 ALTER TABLE oc_timelines ADD COLUMN IF NOT EXISTS assets jsonb;
 ALTER TABLE oc_timelines ADD COLUMN IF NOT EXISTS featured boolean NOT NULL DEFAULT false;
 ALTER TABLE oc_timelines ADD COLUMN IF NOT EXISTS event_text text NOT NULL DEFAULT '';

@@ -12,7 +12,8 @@
 //!
 //! - `timeline_meta`, `timeline_settings`, `timeline_plugins`, `timeline_extras`: one-row
 //!   tables (`singleton=1`) for the title and description, presentation settings JSON, plugin
-//!   list JSON, and `{"tags","assets","view","views"}` JSON. The last four may be missing from older files.
+//!   list JSON, and `{"tags","assets","view","views","measures"}` JSON. The last three may be
+//!   missing from older files, and their keys from older extras.
 //! - `events`: the moments, one row each, with their metadata JSON. Indexed by time.
 //! - `points`: a `rational_index` virtual table (shadow tables `points_nodes`, `points_meta`)
 //!   with one row per distinct moment time, weighted by how many moments share it. Its
@@ -85,6 +86,10 @@ pub struct Document {
     /// Views saved in the file (#550), kept as they are here.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub views: Option<Value>,
+    /// The quantities its entities carry (#572): `{name: {"type", "label"?}}`, validated by
+    /// the editor (src/measures.ts) and kept as it is here.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub measures: Option<Value>,
     pub events: Vec<Event>,
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub durations: Vec<Duration>,
@@ -474,7 +479,7 @@ fn write<'a>(
         db.execute("DELETE FROM timeline_extras", &[])?;
         // Always written, with nulls when absent; settings and plugins rows are written only
         // when present, and a missing row reads back as None.
-        let extras = serde_json::json!({"tags": doc.tags, "assets": doc.assets, "view": doc.view, "views": doc.views})
+        let extras = serde_json::json!({"tags": doc.tags, "assets": doc.assets, "view": doc.view, "views": doc.views, "measures": doc.measures})
             .to_string();
         if extras.len() > 10 * 1024 * 1024 {
             return Err("Timeline extras exceed 10 MiB".into());
@@ -666,6 +671,7 @@ fn read_document(path: &Path, include_events: bool) -> Result<Document, String> 
         assets: extras.get("assets").filter(|v| !v.is_null()).cloned(),
         view: extras.get("view").filter(|v| !v.is_null()).cloned(),
         views: extras.get("views").filter(|v| !v.is_null()).cloned(),
+        measures: extras.get("measures").filter(|v| !v.is_null()).cloned(),
         format: "openchronology".into(),
         version: 1,
         title: meta[0].clone().ok_or("Missing title")?,
@@ -1187,6 +1193,7 @@ mod tests {
             assets: None,
             view: None,
             views: None,
+            measures: None,
             events: vec![
                 Event {
                     id: "first".into(),
@@ -1393,6 +1400,8 @@ mod tests {
         document.views = Some(
             serde_json::json!([{"id":"v1","title":"Science","separation":{"tags":["science"]}}]),
         );
+        // Measures (#572) are kept as the editor sent them.
+        document.measures = Some(serde_json::json!({"cost":{"type":"mpz","label":"Cost"}}));
         save(&path, &document).unwrap();
         let reopened = open(&path).unwrap();
         assert_eq!(reopened.tags, document.tags);
@@ -1400,6 +1409,7 @@ mod tests {
         assert_eq!(reopened.plugins, document.plugins);
         assert_eq!(reopened.view, document.view);
         assert_eq!(reopened.views, document.views);
+        assert_eq!(reopened.measures, document.measures);
         {
             let db = Connection::open(&path, true).unwrap();
             db.execute("DROP TABLE timeline_extras", &[]).unwrap();
@@ -1408,6 +1418,7 @@ mod tests {
         assert_eq!(legacy.tags, None);
         assert_eq!(legacy.assets, None);
         assert_eq!(legacy.view, None);
+        assert_eq!(legacy.measures, None);
         fs::remove_file(path).unwrap();
     }
     #[test]

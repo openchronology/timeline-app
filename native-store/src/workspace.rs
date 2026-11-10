@@ -1470,7 +1470,7 @@ fn apply_changes(
     db.execute("DELETE FROM timeline_extras", &[])?;
     db.execute(
         "INSERT INTO timeline_extras VALUES(1,?)",
-        &[&json!({"tags":patch.settings.tags,"assets":patch.settings.assets,"view":patch.settings.view,"views":patch.settings.views}).to_string()],
+        &[&json!({"tags":patch.settings.tags,"assets":patch.settings.assets,"view":patch.settings.view,"views":patch.settings.views,"measures":patch.settings.measures}).to_string()],
     )?;
     intervals::set_layout(db, token)
 }

@@ -154,3 +154,31 @@ export function parseSI(text: string, unit = ''): Q {
   }
   return parseNumber(quantity).mul(power(exponent));
 }
+/**
+ * A server's limit on the digits of a time, as an exact fraction in lowest terms: its numerator
+ * and its denominator. Times far larger than any timeline needs cost far more to read, compare
+ * and summarize: on a shared server, a few moments with thousand-digit denominators keep its
+ * index busy for minutes. So a server sets one (TIME_DIGIT_LIMIT, 1000/65 unless its operator
+ * says otherwise: from 10^-64 to below 10^1000 of the timeline's unit), while the editor, the
+ * desktop app and the offline file keep times unbounded, as rationals are. The largest real
+ * timelines use 18 and 7 digits.
+ */
+export const DEFAULT_TIME_DIGITS = Object.freeze({ numerator: 1000, denominator: 65 });
+/** Unbounded: no limit on either. */
+export const UNBOUNDED_TIME_DIGITS = Object.freeze({ numerator: Infinity, denominator: Infinity });
+export interface TimeDigits {
+  numerator: number;
+  denominator: number;
+}
+// Kept on the global object, so every copy of this module a bundler makes reads the limit the
+// server set at startup.
+const TIME_DIGITS_KEY = Symbol.for('openchronology.timeDigits');
+const timeDigitStore = globalThis as unknown as Record<symbol, TimeDigits | undefined>;
+/** The limit on times' digits in this process: unbounded unless a server set one. */
+export function timeDigitLimit(): TimeDigits {
+  return timeDigitStore[TIME_DIGITS_KEY] ?? UNBOUNDED_TIME_DIGITS;
+}
+/** Sets the limit on times' digits for this process (a server, at startup). */
+export function setTimeDigitLimit(limit: TimeDigits) {
+  timeDigitStore[TIME_DIGITS_KEY] = Object.freeze({ ...limit });
+}

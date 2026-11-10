@@ -268,6 +268,7 @@ export const HELP_SECTIONS = [
       'comparison',
       'file-populator',
       'time-mapping',
+      'measures',
       'plugins',
       'capacity',
       'guest-editing',
