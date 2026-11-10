@@ -31,6 +31,12 @@ export interface EdgeBand {
   aIn?: boolean;
   bIn?: boolean;
   /**
+   * In a separation's tracks read together (#564), the first separated track each end is on
+   * (an index of the separation's tracks), or null for the rest.
+   */
+  aTrack?: number | null;
+  bTrack?: number | null;
+  /**
    * In a comparison, a link between entities on two of its timelines (#422): the source key
    * of each end's timeline, and each end's title (the view holds neither entity by these IDs).
    */

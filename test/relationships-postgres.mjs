@@ -185,6 +185,47 @@ try {
     arcs: false,
   });
   assert.deepEqual(none.edges, []);
+  // A separation's tracks read together (#564): each window as its own overview, and the arcs
+  // once, on the first track's, each end naming the first track it is on (null: the rest).
+  const trackFilters = [
+    { tags: ['war'], mode: 'any' },
+    { related: { moment: 'm0' }, depth: 'direct', mode: 'any' },
+    { tags: ['war'], mode: 'none' },
+  ];
+  const window = { lower: '100/1', upper: '700/1', threshold: '1/1' };
+  const { frames } = await store.queryTracks(timeline.id, user, {
+    tracks: trackFilters,
+    windows: [
+      { track: 2, ...window },
+      { track: 0, ...window },
+      { track: 1, ...window },
+    ],
+  });
+  const alone = [];
+  for (const filter of trackFilters)
+    alone.push(await store.query(timeline.id, user, { kind: 'overview', ...window, filter }));
+  const content = ({ groups, durations }) => JSON.stringify({ groups, durations });
+  assert.equal(content(frames[0]), content(alone[2]));
+  assert.equal(content(frames[1]), content(alone[0]));
+  assert.equal(content(frames[2]), content(alone[1]));
+  assert.deepEqual(frames[0].edges, []);
+  assert.deepEqual(frames[2].edges, []);
+  const second = new Map(alone[1].edges.map((e) => [e.id, e]));
+  const expectedTrack = (first, end) =>
+    first[end + 'In'] !== false ? 0 : second.get(first.id)[end + 'In'] !== false ? 1 : null;
+  assert.deepEqual(
+    frames[1].edges.map((e) => `${e.id} ${e.aTrack} ${e.bTrack}`).sort(),
+    alone[0].edges.map((e) => `${e.id} ${expectedTrack(e, 'a')} ${expectedTrack(e, 'b')}`).sort(),
+  );
+  assert(frames[1].edges.length && frames[1].edges.every((e) => e.aIn === undefined));
+  assert(
+    frames[1].edges.some((e) => e.aTrack === 1 || e.bTrack === 1),
+    'some ends on track 1',
+  );
+  assert(
+    frames[1].edges.some((e) => e.aTrack === null || e.bTrack === null),
+    'some on the rest',
+  );
   // Sparse saves add and remove links; deleting a moment removes its links.
   timeline = await store.save(timeline.id, user, timeline.revision, undefined, {
     settings: { ...doc, events: [], durations: undefined, relationships: undefined },
@@ -196,7 +237,7 @@ try {
   assert(!links.some((r) => r.a.moment === 'm0' || r.b.moment === 'm0'));
   assert(links.some((r) => r.a.moment === 'm1' && r.b.moment === 'm2'));
   console.log(
-    `PASS PostgreSQL relationships: arcs match the browser index over 30 views, ${checked} related listings with exact counts, relationship separations, their arcs marked by side, and sparse link edits.`,
+    `PASS PostgreSQL relationships: arcs match the browser index over 30 views, ${checked} related listings with exact counts, relationship separations, their arcs marked by side, tracks read together, and sparse link edits.`,
   );
 } finally {
   if (timeline) await pool.query('DELETE FROM oc_timelines WHERE id=$1', [timeline.id]);

@@ -65,17 +65,21 @@ export async function checkFollowLatest(browser) {
     if (path === `/api/timelines/${id}/query`) {
       const data = route.request().postDataJSON();
       if (data.kind === 'tags') return route.fulfill({ json: { tags: [], revision } });
-      const view = new Viewport(Q.parse(data.lower), Q.parse(data.upper).sub(Q.parse(data.lower)));
-      return route.fulfill({
-        json: {
+      const overview = ({ lower, upper, threshold }) => {
+        const view = new Viewport(Q.parse(lower), Q.parse(upper).sub(Q.parse(lower)));
+        return {
           ...index.frame(
             view,
             1000,
-            Q.parse(data.threshold).div(view.span).toApproximateNumber() * 1000,
+            Q.parse(threshold).div(view.span).toApproximateNumber() * 1000,
           ),
           revision,
-        },
-      });
+        };
+      };
+      // A separation's tracks are read together (#564), here each as the whole timeline.
+      if (data.kind === 'tracks')
+        return route.fulfill({ json: { frames: data.windows.map(overview), revision } });
+      return route.fulfill({ json: overview(data) });
     }
     if (path.startsWith('/api/'))
       return route.fulfill({ status: 404, json: { error: 'Unused route' } });

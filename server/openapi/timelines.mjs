@@ -238,6 +238,12 @@ export const schemas = {
           'In an overview with a `filter`: whether `a` is in that view (otherwise it is on the other side of the separation).',
       },
       bIn: { type: 'boolean', description: 'Likewise for `b`.' },
+      aTrack: {
+        type: ['integer', 'null'],
+        description:
+          'In a `tracks` read: the first separated track `a` is on (an index into `tracks`), or null for the rest.',
+      },
+      bTrack: { type: ['integer', 'null'], description: 'Likewise for `b`.' },
     },
   },
   TimePresentation: {
@@ -827,6 +833,49 @@ export const schemas = {
       },
       {
         type: 'object',
+        title: 'A separation’s tracks',
+        description:
+          'Overviews of several tracks of one separation in one read: each window is answered as an overview with its track’s `filter` would be, except that the arcs come once, on track 0’s window, each end marked with the first separated track it is on (`aTrack`, `bTrack`). Each window past the first counts as a query toward the limit without an account.',
+        required: ['kind', 'tracks', 'windows'],
+        properties: {
+          kind: { const: 'tracks' },
+          revision: ref('Revision'),
+          tracks: {
+            type: 'array',
+            minItems: 2,
+            maxItems: 8,
+            items: ref('ViewFilter'),
+            description: 'Every track’s filter in order, the rest of the timeline last.',
+          },
+          windows: {
+            type: 'array',
+            minItems: 1,
+            maxItems: 8,
+            description: 'The windows to read, at most one per track.',
+            items: {
+              type: 'object',
+              required: ['track', 'lower', 'upper', 'threshold'],
+              properties: {
+                track: { type: 'integer', minimum: 0, description: 'An index into `tracks`.' },
+                lower: ref('Rational'),
+                upper: ref('Rational'),
+                threshold: {
+                  ...ref('Rational'),
+                  description: 'The grouping distance; nonnegative.',
+                },
+              },
+            },
+          },
+          plugins: {
+            type: 'array',
+            maxItems: 256,
+            items: { type: 'object' },
+            description: 'As for an overview.',
+          },
+        },
+      },
+      {
+        type: 'object',
         title: 'Durations in a range',
         description: 'Durations wholly inside the range, in start order.',
         required: ['kind', 'lower', 'upper'],
@@ -923,6 +972,18 @@ export const schemas = {
   TimelineQueryResult: {
     description: 'What the query `kind` reads. Each carries the timeline’s `revision`.',
     oneOf: [
+      {
+        type: 'object',
+        title: 'A separation’s tracks',
+        properties: {
+          frames: {
+            type: 'array',
+            description:
+              'An overview per window, in order; only track 0’s carries arcs. Each carries its `revision`.',
+            items: { type: 'object' },
+          },
+        },
+      },
       {
         type: 'object',
         title: 'Moments in a range',
@@ -1748,7 +1809,7 @@ export const paths = {
       tags: ['Timeline data'],
       summary: 'Read part of a timeline',
       description:
-        'Reads a bounded part of a timeline, by `kind`: moments in a range a page at a time, an overview of a range for drawing it, durations in a range, one event, the entities related to one, a search of its moments and durations, or the tags it uses. A read, so API keys need only `timelines:read` and sessions no CSRF token. Comparisons are read through their sources (409). The body is at most 1 MiB and 64 KiB (an overview may carry a comparison’s plugins, at most 1 MiB of them; 413 beyond). Without an account, at most 600 queries a minute per address (an IPv6 address counts by its /64; 429 beyond). A separation (`filter`) not built yet for the current revision is built first: at most 20 a minute per address without an account and 60 per account (429 beyond), two at once per server process with up to 16 waiting (503 beyond). Only the filter’s tags the timeline has count, so tags it lacks build nothing new.',
+        'Reads a bounded part of a timeline, by `kind`: moments in a range a page at a time, an overview of a range for drawing it (or of several tracks of a separation at once), durations in a range, one event, the entities related to one, a search of its moments and durations, or the tags it uses. A read, so API keys need only `timelines:read` and sessions no CSRF token. Comparisons are read through their sources (409). The body is at most 1 MiB and 64 KiB (an overview may carry a comparison’s plugins, at most 1 MiB of them; 413 beyond). Without an account, at most 600 queries a minute per address (an IPv6 address counts by its /64; 429 beyond). A separation (`filter`) not built yet for the current revision is built first: at most 20 a minute per address without an account and 60 per account (429 beyond), two at once per server process with up to 16 waiting (503 beyond). Only the filter’s tags the timeline has count, so tags it lacks build nothing new.',
       security: TIMELINE_READ,
       requestBody: body(ref('TimelineQuery')),
       responses: {
