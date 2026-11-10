@@ -2247,6 +2247,77 @@ export class PostgresStore {
     });
   }
   /**
+   * Reads the windows of a separation's tracks in one request (#564): `tracks` is every
+   * track's filter in order, the rest last, and `windows` the windows to read, each
+   * `{track, lower, upper, threshold}`. Answers a frame per window, in order, each as an
+   * overview query on its track would, but with the timeline's arcs only once, on the first
+   * track's window: each end is marked with the first separated track it is on (`aTrack`,
+   * `bTrack`, a track index), or null for the rest, so no other track reads them. Every read
+   * is at `revision` when given (409 otherwise), so their answers agree.
+   */
+  async queryTracks(id, userId, { tracks, windows, revision, plugins }, { beforeBuild } = {}) {
+    const frames = [];
+    for (const w of windows) {
+      const frame = await this.query(
+        id,
+        userId,
+        {
+          kind: 'overview',
+          lower: w.lower,
+          upper: w.upper,
+          threshold: w.threshold,
+          filter: tracks[w.track],
+          ...(w.track === 0 ? {} : { arcs: false }),
+          ...(revision ? { revision } : {}),
+          ...(plugins !== undefined ? { plugins } : {}),
+        },
+        { beforeBuild },
+      );
+      revision ??= frame.revision;
+      if (w.track !== 0) {
+        frames.push({ ...frame, edges: [], edgesTruncated: false });
+        continue;
+      }
+      const edges = frame.edges ?? [];
+      // The first track's answer marked its own ends (aIn, bIn; absent when its side is the
+      // whole timeline); each further separated track is looked up in its view.
+      const on = edges.map((e) => ({
+        a: e.aIn === false ? null : 0,
+        b: e.bIn === false ? null : 0,
+      }));
+      for (
+        let track = 1;
+        track < tracks.length - 1 && on.some((o) => o.a === null || o.b === null);
+        track++
+      ) {
+        const view = await this.view(id, userId, tracks[track], { beforeBuild });
+        const inside = await this.transaction(async (c) => {
+          const t = await this.access(id, userId, c);
+          if (t.revision !== revision)
+            throw new HttpError(
+              409,
+              'The server timeline changed. Save or export your edits before reloading.',
+            );
+          // Its side is the whole timeline: every end is on it.
+          return view === null ? null : endsInView(c, view, edges);
+        });
+        edges.forEach((e, i) => {
+          if (on[i].a === null && (!inside || inside.has(refKey(e.a)))) on[i].a = track;
+          if (on[i].b === null && (!inside || inside.has(refKey(e.b)))) on[i].b = track;
+        });
+      }
+      frames.push({
+        ...frame,
+        edges: edges.map(({ aIn: _a, bIn: _b, ...e }, i) => ({
+          ...e,
+          aTrack: on[i].a,
+          bTrack: on[i].b,
+        })),
+      });
+    }
+    return { frames };
+  }
+  /**
    * Answers one read of timeline `id` for `userId` (a validated `query`, by `query.kind`):
    * - 'overview': the window [lower, upper] summarized at a grouping threshold (at least
    *   the span / 1,024): moment groups, bands (durations at least the threshold long) and
@@ -2400,27 +2471,7 @@ export class PostgresStore {
               );
         const edges = arcs.rows.slice(0, 256).map((r) => arcFromBand(r.band));
         if (view && edges.length) {
-          // Which ends are in the view: at most 512 lookups by primary key in its moments,
-          // and by ID in its duration tree (oc_view_duration_nodes_id), never the timeline.
-          const ends = edges.flatMap((e) => [e.a, e.b]),
-            moments = ends.filter((r) => 'moment' in r).map((r) => r.moment),
-            spans = ends.filter((r) => 'duration' in r).map((r) => r.duration);
-          const inside = new Set([
-            ...(moments.length
-              ? await c.query(
-                  'SELECT id FROM oc_view_moments WHERE timeline_id=$1 AND id=ANY($2::text[])',
-                  [view, moments],
-                )
-              : { rows: [] }
-            ).rows.map((r) => 'm:' + r.id),
-            ...(spans.length
-              ? await c.query(
-                  "SELECT band->>'id' AS id FROM oc_view_duration_nodes WHERE timeline_id=$1 AND band->>'id'=ANY($2::text[])",
-                  [view, spans],
-                )
-              : { rows: [] }
-            ).rows.map((r) => 'd:' + r.id),
-          ]);
+          const inside = await endsInView(c, view, edges);
           for (const edge of edges) {
             edge.aIn = inside.has(refKey(edge.a));
             edge.bIn = inside.has(refKey(edge.b));
@@ -2843,6 +2894,32 @@ async function writeDurationNodes(client, table, id, document) {
     id,
     durationTree(document.durations ?? [], (moment) => times.get(moment)),
   );
+}
+/**
+ * The ends of `edges` (relationship arcs) that are in separation view `view`, as reference
+ * keys: at most 512 lookups by primary key in its moments, and by ID in its duration tree
+ * (oc_view_duration_nodes_id), never the timeline.
+ */
+async function endsInView(c, view, edges) {
+  const ends = edges.flatMap((e) => [e.a, e.b]),
+    moments = ends.filter((r) => 'moment' in r).map((r) => r.moment),
+    spans = ends.filter((r) => 'duration' in r).map((r) => r.duration);
+  return new Set([
+    ...(moments.length
+      ? await c.query(
+          'SELECT id FROM oc_view_moments WHERE timeline_id=$1 AND id=ANY($2::text[])',
+          [view, moments],
+        )
+      : { rows: [] }
+    ).rows.map((r) => 'm:' + r.id),
+    ...(spans.length
+      ? await c.query(
+          "SELECT band->>'id' AS id FROM oc_view_duration_nodes WHERE timeline_id=$1 AND band->>'id'=ANY($2::text[])",
+          [view, spans],
+        )
+      : { rows: [] }
+    ).rows.map((r) => 'd:' + r.id),
+  ]);
 }
 /**
  * Relationship arcs placed between their endpoints' times (a duration's start), written as

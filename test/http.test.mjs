@@ -106,6 +106,52 @@ test('query validation rejects bad bounds, search text and duration IDs before a
     { kind: 'search', text: 'harbor', page: 1, only: 'duration' },
     { kind: 'duration' },
     { kind: 'duration', id: 'bad id' },
+    // A separation's tracks read together (#564): two to eight filters, a window per track.
+    {
+      kind: 'tracks',
+      tracks: [{ tags: ['war'], mode: 'any' }],
+      windows: [{ track: 0, lower: '0', upper: '1', threshold: '1' }],
+    },
+    {
+      kind: 'tracks',
+      tracks: [{ tags: ['war'], mode: 'any' }, null],
+      windows: [{ track: 0, lower: '0', upper: '1', threshold: '1' }],
+    },
+    {
+      kind: 'tracks',
+      tracks: [
+        { tags: ['war'], mode: 'any' },
+        { tags: ['war'], mode: 'any' },
+      ],
+      windows: [],
+    },
+    {
+      kind: 'tracks',
+      tracks: [
+        { tags: ['war'], mode: 'any' },
+        { tags: ['war'], mode: 'any' },
+      ],
+      windows: [{ track: 2, lower: '0', upper: '1', threshold: '1' }],
+    },
+    {
+      kind: 'tracks',
+      tracks: [
+        { tags: ['war'], mode: 'any' },
+        { tags: ['war'], mode: 'any' },
+      ],
+      windows: [
+        { track: 1, lower: '0', upper: '1', threshold: '1' },
+        { track: 1, lower: '0', upper: '1', threshold: '1' },
+      ],
+    },
+    {
+      kind: 'tracks',
+      tracks: [
+        { tags: ['war'], mode: 'any' },
+        { tags: ['war'], mode: 'any' },
+      ],
+      windows: [{ track: 0, lower: '0', upper: '1', threshold: '-1' }],
+    },
   ])
     assert.equal((await request(app, path, 'POST', headers, input)).status, 400);
 });
