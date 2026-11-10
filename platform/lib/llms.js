@@ -103,6 +103,11 @@ export async function llmsText() {
       at('/help/views#the-api-making-views-from-scripts-and-ai-assistants'),
       'saved views of a timeline (separations, disjoins and unions) made with an API key: the JSON to send, with examples',
     ),
+    line(
+      'Showing a timeline in a chat reply or a page',
+      at('/help/sharing#in-other-pages-and-ai-chats'),
+      'the <och-timeline> element (npm @openchronology/timeline): a timeline written as JSON inside it opens in the editor, with no server',
+    ),
     '',
   );
   if (timelines.length) {

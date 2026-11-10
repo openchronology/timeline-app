@@ -27,6 +27,8 @@
     "build:source": "node scripts/source.mjs",
     "build:source:desktop": "node scripts/source.mjs --desktop",
     "build:editor": "node scripts/build.mjs",
+    "build:timeline": "node scripts/timeline-package.mjs",
+    "test:timeline:browser": "node test/timeline-package-browser.mjs",
     "test:platform": "node test/next-platform.mjs",
     "test:platform:postgres": "node test/next-postgres.mjs",
     "test:versioning:postgres": "node test/versioning-postgres.mjs",

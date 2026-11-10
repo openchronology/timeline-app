@@ -27,3 +27,8 @@ server-artifacts
 # Nix build output links (nix build without --no-link; docs/nix.md).
 /result
 /result-*
+
+# Copied in by scripts/timeline-package.mjs.
+packages/timeline/LICENSE
+packages/timeline/NOTICE
+packages/timeline/THIRD_PARTY.txt

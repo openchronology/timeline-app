@@ -1,0 +1,34 @@
+{
+  "name": "@openchronology/timeline",
+  "version": "0.0.0",
+  "description": "The OpenChronology timeline editor as an <och-timeline> element for any page, chat reply or artifact",
+  "type": "module",
+  "main": "dist/timeline.js",
+  "browser": "dist/timeline.js",
+  "jsdelivr": "dist/timeline.js",
+  "unpkg": "dist/timeline.js",
+  "files": [
+    "dist/timeline.js",
+    "README.md",
+    "LICENSE",
+    "NOTICE",
+    "THIRD_PARTY.txt"
+  ],
+  "sideEffects": true,
+  "keywords": [
+    "timeline",
+    "chronology",
+    "web-component",
+    "custom-element",
+    "openchronology"
+  ],
+  "homepage": "https://github.com/openchronology/timeline-app/tree/main/packages/timeline#readme",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/openchronology/timeline-app.git",
+    "directory": "packages/timeline"
+  },
+  "bugs": "https://github.com/openchronology/timeline-app/issues",
+  "license": "GPL-3.0-only",
+  "author": "Athan Clark"
+}
