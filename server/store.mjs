@@ -2466,22 +2466,26 @@ export class PostgresStore {
             : {}),
         };
         // Ongoing durations (#537): their placeholders out, resolved at the server's clock in.
-        return frameWithOngoing(
-          {
-            ...bands,
-            edges,
-            edgesTruncated: arcs.rows.length > 256,
-            revision: t.revision,
-            threshold,
-            groups: durationClusters.length
-              ? coalesceGroups([...momentGroups, ...durationClusters], Q.parse(threshold))
-              : momentGroups,
-            visitedNodes: rows.at(-1)?.visited_nodes ?? 0,
-          },
-          await ongoing(),
-          Q.parse(query.lower),
-          Q.parse(query.upper),
-          Q.parse(threshold),
+        // Bands leave out their notes unless a plugin shows them (#565): opening one reads it.
+        return lighterBands(
+          frameWithOngoing(
+            {
+              ...bands,
+              edges,
+              edgesTruncated: arcs.rows.length > 256,
+              revision: t.revision,
+              threshold,
+              groups: durationClusters.length
+                ? coalesceGroups([...momentGroups, ...durationClusters], Q.parse(threshold))
+                : momentGroups,
+              visitedNodes: rows.at(-1)?.visited_nodes ?? 0,
+            },
+            await ongoing(),
+            Q.parse(query.lower),
+            Q.parse(query.upper),
+            Q.parse(threshold),
+          ),
+          query.plugins ?? t.plugins,
         );
       }
       if (query.kind === 'related') {
@@ -2843,6 +2847,24 @@ async function writeDurationNodes(client, table, id, document) {
     id,
     durationTree(document.durations ?? [], (moment) => times.get(moment)),
   );
+}
+/**
+ * `frame` with its duration bands' notes left out (#565), unless an enabled plugin among
+ * `plugins` shows them on the timeline (a hover card or sources): a window is drawn from
+ * titles, and opening a duration reads it whole. A band's notes were most of its size.
+ */
+function lighterBands(frame, plugins) {
+  if (plugins?.some((p) => p.enabled && (p.manifest?.hover || p.manifest?.source))) return frame;
+  const lighter = (band) => {
+    if (band?.metadata?.description === undefined) return band;
+    const { description: _notes, ...metadata } = band.metadata;
+    return { ...band, metadata };
+  };
+  return {
+    ...frame,
+    ...(frame.durations ? { durations: frame.durations.map(lighter) } : {}),
+    groups: frame.groups.map((g) => (g.duration ? { ...g, duration: lighter(g.duration) } : g)),
+  };
 }
 /**
  * Relationship arcs placed between their endpoints' times (a duration's start), written as

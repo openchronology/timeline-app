@@ -41,6 +41,7 @@ for (const s of [child.stdout, child.stderr])
   s.on('data', (c) => (logs = (logs + c).slice(-12000)));
 child.on('exit', () => (exited = true));
 
+const NOTES = 'Campaign notes. '.repeat(150);
 const suffix = Date.now().toString(36),
   id = randomUUID(),
   username = 'arcs_' + suffix;
@@ -83,6 +84,15 @@ try {
           },
         },
         { id: 'harvest', time: '85/1', metadata: { title: 'Harvest' } },
+      ],
+      // A duration on the "war" track whose notes are longer than a band's preview (#565).
+      durations: [
+        {
+          id: 'campaign',
+          start: '5/1',
+          end: '70/1',
+          metadata: { title: 'Campaign', tags: ['war'], description: NOTES },
+        },
       ],
       relationships: [
         { a: { moment: 'siege' }, b: { moment: 'battle' } },
@@ -203,6 +213,15 @@ try {
     await page.screenshot({ path: resolve(process.env.SCREENSHOT_DIR, 'separated-arcs-dark.png') });
     await page.emulateMedia({ colorScheme: 'light' });
   }
+  // The window's band has no notes (#565); opened from its track, the duration is read whole.
+  await frame.locator('.duration-band', { hasText: 'Campaign' }).click();
+  await frame.locator('#duration-description').waitFor({ state: 'visible' });
+  await editor.waitForFunction(
+    (notes) => document.getElementById('duration-description').value === notes,
+    NOTES,
+  );
+  await frame.locator('#duration-description').press('Escape');
+  await frame.locator('#duration-description').waitFor({ state: 'hidden' });
   // Rejoined, the same four arcs over one axis.
   await frame.locator('#separation-rejoin').click();
   await frame.locator('#separation-settings').waitFor({ state: 'hidden' });
@@ -213,7 +232,7 @@ try {
   );
   assert.deepEqual(errors, []);
   console.log(
-    'PASS separated arcs in a browser: within each track and between them, with arrowheads; the lower track asks for none.',
+    'PASS separated arcs in a browser: within each track and between them, with arrowheads; the lower track asks for none; a band opened from its track is read whole.',
   );
 } finally {
   await browser?.close();
