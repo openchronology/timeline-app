@@ -50,7 +50,10 @@ const browser = await { chromium, firefox, webkit }[engine].launch();
 try {
   const tab = await browser.newPage({ viewport: { width: 1100, height: 800 } });
   const errors = [];
-  tab.on('pageerror', (error) => errors.push(error.message));
+  tab.on('pageerror', (error) => {
+    // WebKit reports the sandbox check below refusing the parent, as it should, as an error.
+    if (!/lacks the "allow-same-origin" flag/.test(error.message)) errors.push(error.message);
+  });
   await tab.goto(`${origin}/inline`);
   const frame = tab.frameLocator('och-timeline iframe');
   await frame.locator('#timeline-title').waitFor();
