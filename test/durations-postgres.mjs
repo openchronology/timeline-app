@@ -7,7 +7,7 @@ import { randomUUID } from 'node:crypto';
 import { readFile } from 'node:fs/promises';
 import assert from 'node:assert/strict';
 import { PostgresStore, convertLegacyDurations } from '../server/store.mjs';
-import { TimelineIndex, Viewport, Q } from '../dist/core.mjs';
+import { TimelineIndex, Viewport, Q, FOCUS_ON_HOVER } from '../dist/core.mjs';
 if (!process.env.DATABASE_URL) throw new Error('Use a dedicated PostgreSQL test database.');
 const pool = new pg.Pool({ connectionString: process.env.DATABASE_URL });
 const user = randomUUID();
@@ -246,8 +246,53 @@ try {
   } finally {
     await pool.query('DELETE FROM oc_timelines WHERE id=$1', [dense.id]);
   }
+  // A window's bands leave out their notes (#565) unless a plugin shows them; a lookup by ID
+  // reads them whole.
+  const noted = await store.create(user, {
+    format: 'openchronology',
+    version: 1,
+    title: 'Notes',
+    description: '',
+    events: [],
+    durations: [
+      {
+        id: 'long',
+        start: '0/1',
+        end: '100/1',
+        metadata: { title: 'Long', description: 'Notes '.repeat(50), tags: ['kept'] },
+      },
+      {
+        id: 'short',
+        start: '10/1',
+        end: '11/1',
+        metadata: { title: 'Short', description: 'A short one.' },
+      },
+    ],
+  });
+  try {
+    const overview = (plugins) =>
+      store.query(noted.id, user, {
+        kind: 'overview',
+        lower: '0/1',
+        upper: '100/1',
+        threshold: '5/1',
+        ...(plugins ? { plugins } : {}),
+      });
+    const plain = await overview();
+    const long = plain.durations.find((b) => b.id === 'long');
+    assert.deepEqual(long.metadata, { title: 'Long', tags: ['kept'] });
+    const summarized = plain.groups.find((g) => g.duration?.id === 'short');
+    assert(summarized, 'the short duration summarized');
+    assert.equal(summarized.duration.metadata.description, undefined);
+    const hover = await overview([{ manifest: FOCUS_ON_HOVER, enabled: true }]);
+    assert.match(hover.durations.find((b) => b.id === 'long').metadata.description, /^Notes /);
+    const whole = await store.query(noted.id, user, { kind: 'duration', id: 'long' });
+    assert.equal(whole.duration.metadata.description, 'Notes '.repeat(50));
+  } finally {
+    await pool.query('DELETE FROM oc_timelines WHERE id=$1', [noted.id]);
+  }
   console.log(
-    'PASS PostgreSQL durations: standalone definitions, anchored and fixed endpoints, bounded frames, sparse edits, pinned deletions, immutable history and legacy conversion.',
+    'PASS PostgreSQL durations: standalone definitions, anchored and fixed endpoints, bounded frames without notes, sparse edits, pinned deletions, immutable history and legacy conversion.',
   );
 } finally {
   if (timeline) await pool.query('DELETE FROM oc_timelines WHERE id=$1', [timeline.id]);

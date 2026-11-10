@@ -182,7 +182,8 @@ export const schemas = {
     },
   },
   DurationBand: {
-    description: 'A duration placed on the timeline: its definition with both ends resolved.',
+    description:
+      'A duration placed on the timeline: its definition with both ends resolved. In an overview its metadata is a bounded projection, without its notes unless an enabled plugin shows them; a `duration` lookup reads it whole.',
     allOf: [
       ref('Duration'),
       {

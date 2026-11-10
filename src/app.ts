@@ -8869,11 +8869,29 @@ function createDuration(start: DurationEndpoint, end: DurationEndpoint) {
   showDuration(duration, false, true);
 }
 /** Full metadata is local for complete timelines and fetched for indexed ones. */
+/**
+ * A compared or separated track's band with its whole metadata, read from its timeline: a
+ * server's windows leave out notes (#565). Kept as it is when it can't be read, or for a
+ * timeline held here, whose bands have them.
+ */
+async function wholeBand(band: DurationBand): Promise<DurationBand> {
+  const source = comparison?.tracks.find((t) => t.source.key === band.sourceKey)?.source;
+  if (!source?.query) return band;
+  const id = band.id.slice(band.sourceKey!.length + 1);
+  try {
+    const { duration } = (await source.query({ kind: 'duration', id })) as unknown as {
+      duration: Duration | null;
+    };
+    return duration ? { ...band, metadata: duration.metadata } : band;
+  } catch {
+    return band;
+  }
+}
 async function openDurationById(id: string, known?: DurationBand) {
   const band = known ?? frame.durations?.find((b) => b.id === id);
   if (band?.sourceKey) {
     // A separated track's duration is the open timeline's own (#345), read as it keeps it.
-    if (!separation || !reading()) return showDuration(band, true);
+    if (!separation || !reading()) return showDuration(await wholeBand(band), true);
     id = band.id.slice(band.sourceKey.length + 1);
   }
   let duration = model?.durations.get(id);
