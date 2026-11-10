@@ -49,7 +49,13 @@ export {
   crossArrowheadPath,
 } from './relationships.js';
 export type { EdgeBand, EntityRef, Relationship } from './relationships.js';
-export { durationGroups, coalesceGroups, entityCount, frameWithOngoing } from './summaries.js';
+export {
+  durationGroups,
+  coalesceGroups,
+  entityCount,
+  frameWithOngoing,
+  addTotals,
+} from './summaries.js';
 export {
   anchorOf,
   durationOverview,
@@ -117,7 +123,9 @@ import { validateSavedViews, validateTimelineView } from './default-view.js';
 import type { SavedViewEntry, TimelineView } from './default-view.js';
 export * from './measures.js';
 export * from './measure-presentation.js';
-import { normalizeMeasureMetadata, validateMeasures } from './measures.js';
+import { measureValue, normalizeMeasureMetadata, validateMeasures } from './measures.js';
+import { MeasureTree } from './measure-tree.js';
+export { MeasureTree } from './measure-tree.js';
 import type { Measures } from './measures.js';
 export * from './drafts.js';
 export { stackWindow, scaleTimeline } from './stack-layout.js';
@@ -262,6 +270,11 @@ export interface FrameGroup {
   metadata?: Metadata;
   /** Collapsed durations summarized in this group (durations shorter than the threshold). */
   durationCount?: string;
+  /**
+   * The totals of the timeline's measures over what the group summarizes (#574): canonical
+   * text by name, zeros left out; absent when all are zero or the timeline has none.
+   */
+  totals?: Record<string, string>;
   /** The duration, when the group is exactly one collapsed duration and no moments. */
   duration?: DurationBand;
 }
@@ -474,7 +487,17 @@ export class TimelineIndex {
   image?: TimelineImage;
   view?: TimelineView;
   views?: SavedViewEntry[];
-  measures?: Measures;
+  #measures?: Measures;
+  /** Moments' measure totals by time (#574): built when first read, then kept up to date. */
+  #momentTotals: MeasureTree | null = null;
+  get measures(): Measures | undefined {
+    return this.#measures;
+  }
+  set measures(value: Measures | undefined) {
+    if (JSON.stringify(value ?? {}) !== JSON.stringify(this.#measures ?? {}))
+      this.#momentTotals = null;
+    this.#measures = value;
+  }
   assets?: Record<string, string>;
   constructor(document: TimelineDocument) {
     // Server metadata reports unset settings as null; treat them as absent.
@@ -649,6 +672,12 @@ export class TimelineIndex {
   }
   /** Counts a moment in (or, -1, out of) the first chart series that holds one of its tags. */
   private tally(event: PointEvent, change: 1 | -1) {
+    const totals = this.#momentTotals;
+    if (totals) {
+      const values = totals.names.map((name) => measureValue(event.metadata, name));
+      if (change > 0) totals.add(Q.parse(event.time), values);
+      else totals.remove(Q.parse(event.time), values);
+    }
     if (!this.charted) return;
     const tags = entityTags(event.metadata),
       i = this.charted.wanted.findIndex((wanted) => tags.some((tag) => wanted.has(tag)));
@@ -760,15 +789,18 @@ export class TimelineIndex {
       includeUpper: true,
     });
     const collapsed = threshold.compare(Q.zero) > 0 ? threshold : null;
+    const totals = this.momentTotals();
     const moments = result.groups.map((group) => {
       const first = group.firstTime.toString(),
         only = group.entryCount === 1n ? this.points.get(group.firstTime)![0] : undefined;
+      const sums = totals?.named(totals.sum(group.firstTime, group.lastTime));
       return {
         first,
         last: group.lastTime.toString(),
         count: group.entryCount.toString(),
         distinct: group.distinctCount,
         ...(only ? { id: only.id, title: only.metadata.title ?? '' } : {}),
+        ...(sums ? { totals: sums } : {}),
       };
     });
     const arcs = durationWindow(this.edges, viewport.left, viewport.right, 256, collapsed);
@@ -806,6 +838,27 @@ export class TimelineIndex {
           )
         : moments,
     };
+  }
+  /** The moments' measure totals by time (#574), or null when the timeline has no measures. */
+  momentTotals(): MeasureTree | null {
+    const names = Object.keys(this.#measures ?? {});
+    if (!names.length) return null;
+    this.#momentTotals ??= MeasureTree.of(
+      names,
+      [...this.byId.values()].map((event) => [
+        Q.parse(event.time),
+        names.map((name) => measureValue(event.metadata, name)),
+      ]),
+    );
+    return this.#momentTotals;
+  }
+  /**
+   * The totals of the timeline's measures over moments from `lower` to `upper`, both included
+   * (#574): canonical text by name, zeros left out.
+   */
+  measureTotals(lower?: Q, upper?: Q): Record<string, string> {
+    const totals = this.momentTotals();
+    return totals?.named(totals.sum(lower, upper)) ?? {};
   }
   /**
    * The current time as a stored coordinate, where the timeline has one: under the Gregorian
