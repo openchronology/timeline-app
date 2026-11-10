@@ -8761,6 +8761,7 @@ void (async () => {
       setDashboard(false);
     }
   }
+  if (offlineHtml) await openInlineDocument();
   await route();
   // Started from the help (/editor?tour=1).
   if (new URLSearchParams(location.search).get('tour') === '1') tour();
@@ -8770,6 +8771,25 @@ void (async () => {
   // it opened.
   .finally(() => (document.documentElement.dataset.settled = ''));
 
+/**
+ * A timeline written into the offline file's page, opened in place of a new one: how the
+ * @openchronology/timeline element (packages/timeline) shows a timeline in another page.
+ * `<script type="application/json" id="och-document" data-mode="view">` holds the .ochx;
+ * data-mode="view" opens it in view mode, for this page only.
+ */
+async function openInlineDocument() {
+  const source = document.getElementById('och-document');
+  const text = source?.textContent?.trim();
+  if (!source || !text) return;
+  const doc = validateDocument(JSON.parse(text));
+  document.body.dataset.inline = 'true';
+  if (source.dataset.mode === 'view') {
+    viewMode = true;
+    input('view-mode').checked = true;
+  }
+  loadDocument(doc, null);
+  await openDefaultView(doc.view);
+}
 /** What a summary's menu item opening its details says: what the summary holds. */
 function viewGroupLabel(group: FrameGroup) {
   const moments = BigInt(group.count) > 0n,

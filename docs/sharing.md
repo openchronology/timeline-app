@@ -1,6 +1,6 @@
 # Sharing timelines
 
-<!-- description: Share timelines: their addresses, links to events and views, the share dialog, link previews, what search engines get, and embedding on other sites. -->
+<!-- description: Share timelines: their addresses, links to events and views, the share dialog, link previews, what search engines get, embedding on other sites, and the <och-timeline> element for other pages and AI chats. -->
 
 Copyright (c) 2026 Athan Clark. SPDX-License-Identifier: GPL-3.0-only
 
@@ -276,6 +276,43 @@ including comparisons, the legal pages and pages that don't exist, refuses to be
 (`frame-ancestors 'none'`), and sends no referrer to other sites; only the site's own pages
 frame the editor (`/editor/frame`). Over https, embeds and the editor's frame ask browsers to
 keep to https (HSTS), as every other page does.
+
+### In other pages and AI chats
+
+A timeline doesn't need to be on a server to be shown elsewhere. The `<och-timeline>` element,
+published on npm as [`@openchronology/timeline`](https://github.com/openchronology/timeline-app/tree/main/packages/timeline#readme), is the
+[offline editor](guide.md#the-desktop-app-and-the-offline-file) in a frame of its own, opened at a timeline written inside it as
+`.ochx` JSON. Pages, documentation sites and the HTML an AI chat writes into a reply or an
+artifact can use it, loading it from jsDelivr or unpkg:
+
+```html
+<script src="https://cdn.jsdelivr.net/npm/@openchronology/timeline@<version>/dist/timeline.js"></script>
+<och-timeline mode="view" height="480">
+  <script type="application/json">
+    {
+      "title": "Moon landings",
+      "presentation": "gregorian",
+      "events": [
+        { "id": "luna9", "time": "-123379200/1", "metadata": { "title": "Luna 9 lands" } },
+        { "id": "apollo11", "time": "-14182940/1", "metadata": { "title": "Apollo 11 lands" } }
+      ]
+    }
+  </script>
+</och-timeline>
+```
+
+- **What it shows:** the timeline and its tools, without the editor's header. A timeline with a
+  default `view` opens at it. `mode="view"` opens it in [View mode](guide.md#reading-a-timeline); without it, it
+  opens for editing.
+- **What leaves it:** nothing is saved. **Export** downloads the timeline as an `.ochx` file,
+  which opens on this site (**Import**), in the desktop app or in the offline file.
+- **What it fills in:** the format, version and an empty description when left out, and a
+  `presentation` named only by its mode (`"gregorian"`, where times are seconds from 1970).
+- **What it can reach:** nothing. Its frame is sandboxed in an origin of its own and makes no
+  network requests, so neither the page nor the timeline can reach the other.
+
+Its attributes (`height`, `theme`, `src`) and script use are in the
+[package's README](https://github.com/openchronology/timeline-app/tree/main/packages/timeline#readme).
 
 ### oEmbed
 

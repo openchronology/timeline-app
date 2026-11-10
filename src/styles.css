@@ -2771,6 +2771,67 @@ body[data-embed] .legal-notices {
   padding: 4px 8px;
   font-size: 11px;
 }
+/*
+ * A timeline written into the offline file's page (the <och-timeline> element, packages/timeline):
+ * a frame in someone else's page, often a chat reply, so the timeline and its controls only, with
+ * Export to take it away.
+ */
+body[data-inline] .app-header,
+body[data-inline] .memory-notice,
+body[data-inline] .breadcrumbs,
+body[data-inline] .document-tags,
+body[data-inline] .timeline-actions,
+body[data-inline] .document-meta,
+body[data-inline] .description-input,
+body[data-inline] .description-view,
+body[data-inline] .description-more,
+body[data-inline] #new-button,
+body[data-inline] #import-button,
+body[data-inline] #och-import,
+body[data-inline] #och-export,
+body[data-inline] #sqlite-open,
+body[data-inline] #sqlite-save,
+body[data-inline] #sqlite-save-as,
+body[data-inline] #populate-button,
+body[data-inline] #publish-button {
+  display: none !important;
+}
+body[data-inline] main {
+  padding: 0 8px;
+}
+body[data-inline] .app-layout {
+  min-height: 0;
+}
+/* The title and the file actions share a row. */
+body[data-inline] main {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+}
+body[data-inline] main > * {
+  grid-column: 1 / -1;
+}
+body[data-inline] .document-toolbar {
+  grid-column: 2;
+  grid-row: 1;
+  align-self: center;
+  margin: 0;
+  padding: 6px 0;
+  border: 0;
+}
+body[data-inline] .document-heading {
+  grid-column: 1;
+  grid-row: 1;
+  padding: 6px 0;
+  margin: 0;
+}
+body[data-inline] .title-input {
+  font-size: 22px;
+}
+body[data-inline] .legal-notices {
+  margin: 0;
+  padding: 4px 8px;
+  font-size: 11px;
+}
 .embed-open {
   font-size: 13px;
   white-space: nowrap;
