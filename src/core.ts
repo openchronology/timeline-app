@@ -116,6 +116,7 @@ export * from './default-view.js';
 import { validateSavedViews, validateTimelineView } from './default-view.js';
 import type { SavedViewEntry, TimelineView } from './default-view.js';
 export * from './measures.js';
+export * from './measure-presentation.js';
 import { normalizeMeasureMetadata, validateMeasures } from './measures.js';
 import type { Measures } from './measures.js';
 export * from './drafts.js';

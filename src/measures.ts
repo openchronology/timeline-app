@@ -7,6 +7,8 @@
 // (remeasuredEntities), as one save.
 import { Rational as Q } from 'rational-ordered-map';
 import { timeDigitLimit } from './numeric.js';
+import { createMeasurePresenter, validateMeasurePresentation } from './measure-presentation.js';
+import type { MeasurePresentation, MeasurePresenter } from './measure-presentation.js';
 
 /** `mpz`: unbounded integers; `mpq`: unbounded rationals. Both total exactly. */
 export type MeasureType = 'mpz' | 'mpq';
@@ -14,6 +16,8 @@ export interface MeasureDeclaration {
   type: MeasureType;
   /** What the editor calls it, such as "Cost"; the name otherwise. */
   label?: string;
+  /** How its values and totals are written and read (#573); exact when absent. */
+  presentation?: MeasurePresentation;
 }
 export type Measures = Record<string, MeasureDeclaration>;
 /** An entity's values: canonical text by measure name, never zero. */
@@ -47,8 +51,10 @@ export function validateMeasures(value: unknown): Measures {
         `Measure names are lowercase letters, digits and underscores, starting with a letter, up to 40: ${JSON.stringify(name.slice(0, 50))}.`,
       );
     const d = value[name];
-    if (!plain(d) || Object.keys(d).some((k) => k !== 'type' && k !== 'label'))
-      throw new Error(`Measure ${name} must be {"type": "mpz" | "mpq", "label"?}.`);
+    if (!plain(d) || Object.keys(d).some((k) => !['type', 'label', 'presentation'].includes(k)))
+      throw new Error(
+        `Measure ${name} must be {"type": "mpz" | "mpq", "label"?, "presentation"?}.`,
+      );
     if (d.type !== 'mpz' && d.type !== 'mpq')
       throw new Error(`Measure ${name}'s type must be "mpz" (whole numbers) or "mpq" (fractions).`);
     if (
@@ -56,9 +62,20 @@ export function validateMeasures(value: unknown): Measures {
       (typeof d.label !== 'string' || !d.label.trim() || d.label.length > MEASURE_LABEL_LIMIT)
     )
       throw new Error(`Measure ${name}'s label must be text of 1 to ${MEASURE_LABEL_LIMIT}.`);
+    let presentation: MeasurePresentation | undefined;
+    try {
+      presentation =
+        d.presentation === undefined ? undefined : validateMeasurePresentation(d.presentation);
+    } catch (error) {
+      throw new Error(`Measure ${name}: ${(error as Error).message}`);
+    }
     measures[name] = {
       type: d.type,
       ...(d.label === undefined ? {} : { label: (d.label as string).trim() }),
+      // Exact with nothing else is what no presentation means.
+      ...(presentation && (presentation.mode !== 'exact' || Object.keys(presentation).length > 1)
+        ? { presentation }
+        : {}),
     };
   }
   return measures;
@@ -248,4 +265,33 @@ export function remeasuredEntities<E extends Entity, D extends Entity>(
     if (next) durations.push(next);
   }
   return { events, durations };
+}
+
+/** What the editor calls measure `name`: its label, or its name. */
+export function measureLabel(measures: Measures | undefined, name: string): string {
+  return (measures && own(measures, name) ? measures[name].label : undefined) ?? name;
+}
+/** The printer and parser of measure `name` as `measures` declares it (#573). */
+export function measurePresenter(measures: Measures, name: string): MeasurePresenter {
+  const d = measures[name];
+  return createMeasurePresenter(d.type, d.presentation, d.label ?? name);
+}
+/** An entity's values as `[name, label, printed value]`, in declaration order; zeros left out. */
+export function printedMeasures(
+  measures: Measures | undefined,
+  metadata: Record<string, unknown> | undefined,
+  purpose: 'value' | 'tooltip' = 'value',
+): [string, string, string][] {
+  if (!measures) return [];
+  const rows: [string, string, string][] = [];
+  for (const name of Object.keys(measures)) {
+    const value = measureValue(metadata, name);
+    if (value.numerator === 0n) continue;
+    rows.push([
+      name,
+      measureLabel(measures, name),
+      measurePresenter(measures, name).print(value, purpose),
+    ]);
+  }
+  return rows;
 }

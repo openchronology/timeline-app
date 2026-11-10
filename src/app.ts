@@ -48,6 +48,7 @@ import {
   draftDocument,
 } from './drafts.js';
 import type { DraftWrite } from './drafts.js';
+import { addMeasureRow, readMeasureRows, renderMeasureFields } from './measure-ui.js';
 import type { Advice, Measurements, Platform } from './capacity.js';
 import { createHoverPreview } from './hover-preview.js';
 import { renderReader } from './event-reader.js';
@@ -79,6 +80,10 @@ import {
   validateSeparations,
   validateTimelineImage,
   validateMeasures,
+  normalizeMeasureMetadata,
+  measureLabel,
+  measuresCompatible,
+  remeasuredEntities,
   validateTimelineView,
   validateSavedViews,
   validateViewText,
@@ -629,7 +634,11 @@ function flushEventEdit() {
   if (!pendingEventEdit || !editable() || el('event-form').hidden) return;
   try {
     if (!el<HTMLFormElement>('event-form').checkValidity())
-      throw new Error('Complete valid time and plugin fields to apply these edits.');
+      throw new Error(
+        // A measure's parser says what is wrong with its value (#573).
+        el('event-measures').querySelector<HTMLInputElement>(':invalid')?.validationMessage ||
+          'Complete valid time and plugin fields to apply these edits.',
+      );
     const metadata = JSON.parse(el<HTMLTextAreaElement>('event-metadata').value);
     if (!metadata || typeof metadata !== 'object' || Array.isArray(metadata))
       throw new Error('Additional metadata must be a JSON object.');
@@ -647,6 +656,8 @@ function flushEventEdit() {
         ...(labels.length ? { [CONTENT_LABELS_KEY]: labels } : {}),
       },
     };
+    // Values only of the timeline's measures (#572), in canonical form.
+    normalizeMeasureMetadata(point.metadata, timelineMeasures() ?? {});
     pendingEventEdit = false;
     // A new moment stays in the dialog until Save adds it.
     if (momentSession?.isNew) {
@@ -922,7 +933,11 @@ function clearGroupPage() {
 type EventEdit = { before?: PointEvent; after?: PointEvent };
 type LinkEdit = { link: Relationship; related: boolean };
 /** Several edits undone and redone as one, such as deleting everything in a view. */
-type GroupEdit = { group: (EventEdit | DurationEdit)[] };
+type GroupEdit = {
+  group: (EventEdit | DurationEdit)[];
+  /** The timeline's measures before and after, when the edit changed them (#573). */
+  measures?: { before?: Measures; after?: Measures };
+};
 /**
  * A change made at once to a large desktop file's native baseline (#179): undo and redo take
  * the baseline back and forward, until the file is saved.
@@ -3706,6 +3721,14 @@ async function route(force = false) {
     await community.dashboard();
   }
 }
+/**
+ * The open timeline's measures (#572), also while it is separated into tracks; a comparison
+ * of timelines has none of its own.
+ */
+function timelineMeasures(): Measures | undefined {
+  if (comparison && !separation) return undefined;
+  return model ? model.measures : remote?.measures;
+}
 function installedPlugins(): InstalledPlugin[] {
   if (comparison) return comparison.plugins;
   return model ? (model.plugins ?? []) : (remote?.plugins ?? []);
@@ -3729,6 +3752,25 @@ function refreshPluginFields() {
   try {
     const metadata = JSON.parse(el<HTMLTextAreaElement>('event-metadata').value);
     if (!metadata || typeof metadata !== 'object' || Array.isArray(metadata)) return;
+    renderMeasureFields(
+      el('event-measures'),
+      timelineMeasures(),
+      metadata,
+      editable(),
+      (values, error) => {
+        if (error) return text('event-error', error);
+        try {
+          const current = JSON.parse(el<HTMLTextAreaElement>('event-metadata').value);
+          if (values) current.measures = values;
+          else delete current.measures;
+          el<HTMLTextAreaElement>('event-metadata').value = JSON.stringify(current, null, 2);
+          queueEventEdit();
+          text('event-error', '');
+        } catch (error) {
+          text('event-error', error instanceof Error ? error.message : String(error));
+        }
+      },
+    );
     renderPluginFields(
       el('plugin-event-fields'),
       activePlugins(),
@@ -4348,6 +4390,7 @@ function showReader(
     plugins: kind === 'moment' ? momentPlugins(plugins) : durationPlugins(plugins),
     when,
     markdown: pluginRichText(plugins),
+    measures: timelineMeasures(),
   });
   sensitiveNote('reader-sensitive', contentLabels(metadata[CONTENT_LABELS_KEY]));
   renderRelated(el('reader-related'), kind === 'moment' ? { moment: id } : { duration: id }, true);
@@ -5695,6 +5738,7 @@ const viewTools = toolbarMenu({
       'clear-selection',
       'separate-button',
       'presentation-button',
+      'measures-button',
       'plugins-button',
       'compare-button',
       'center-vertical',
@@ -6789,6 +6833,233 @@ async function mapOnServer(mapping: TimeMapping, filter: ViewFilter | null) {
   }
   return result.moved;
 }
+/**
+ * The Measures dialog (#573): the timeline's measures, how each is shown, and changes to them.
+ * Adding, relabelling, restyling and widening one are settings edits, saved with the timeline
+ * and undone like others. Renaming, removing or narrowing one rewrites values too (#572): at
+ * once in this page, in a large desktop file's store, or on the server as one save.
+ */
+let measuresRunning = false;
+function measuresEditable() {
+  return editable() && !!model && (!comparison || !!separation) && !workingProposal;
+}
+function describeMeasures() {
+  const before = timelineMeasures() ?? {};
+  el('measures-empty').hidden = !!el('measures-list').childElementCount;
+  try {
+    const { measures, renames } = readMeasureRows(el('measures-list'));
+    const renamed = Object.entries(renames).map(
+      ([from, to]) => `${measureLabel(before, from)} becomes ${measures[to].label ?? to}`,
+    );
+    const removed = Object.keys(before)
+      .filter((name) => !(name in measures) && !(name in renames))
+      .map((name) => measureLabel(before, name));
+    const origin = new Map(Object.entries(renames).map(([from, to]) => [to, from]));
+    const narrowed = Object.keys(measures).filter((name) => {
+      const was = before[origin.get(name) ?? name];
+      return was?.type === 'mpq' && measures[name].type === 'mpz';
+    });
+    const parts = [
+      ...(renamed.length ? [`its values move: ${renamed.join(', ')}`] : []),
+      ...(removed.length ? [`the values of ${removed.join(', ')} are deleted`] : []),
+      ...(narrowed.length
+        ? [
+            `${narrowed.map((n) => measureLabel(measures, n)).join(', ')} must hold only whole numbers`,
+          ]
+        : []),
+    ];
+    text(
+      'measures-summary',
+      parts.length
+        ? `Saving changes values: ${parts.join('; ')}.` +
+            (sparseWorkspace() && !local
+              ? ' It is saved on the server at once, as one version.'
+              : ' You can undo it.')
+        : '',
+    );
+    text('measures-error', '');
+  } catch (error) {
+    text('measures-summary', '');
+    text('measures-error', error instanceof Error ? error.message : String(error));
+  }
+}
+el('measures-button').onclick = () => {
+  if (comparison && !separation)
+    return toast('Measures belong to each timeline: open one to see or change its measures.');
+  const measures = timelineMeasures(),
+    list = el('measures-list'),
+    can = measuresEditable();
+  list.replaceChildren();
+  for (const name of Object.keys(measures ?? {}))
+    addMeasureRow(list, measures, name, describeMeasures);
+  for (const control of list.querySelectorAll<
+    HTMLInputElement | HTMLSelectElement | HTMLButtonElement
+  >('input, select, button'))
+    control.disabled = !can;
+  el('measures-add').hidden = !can;
+  el('measures-save').hidden = !can;
+  el('measures-working').hidden = true;
+  describeMeasures();
+  el<HTMLDialogElement>('measures-dialog').showModal();
+};
+el('measures-add').onclick = () => {
+  const row = addMeasureRow(el('measures-list'), timelineMeasures(), null, describeMeasures);
+  row.querySelector<HTMLInputElement>('.measure-label')?.focus();
+};
+function setMeasuresBusy(busy: boolean) {
+  measuresRunning = busy;
+  for (const control of el('measures-form').querySelectorAll<HTMLInputElement | HTMLButtonElement>(
+    'input, select, button',
+  ))
+    control.disabled = busy;
+  el('measures-working').hidden = !busy;
+}
+function measuresStep(done: number | null, total: number | null, status: string) {
+  const bar = el<HTMLProgressElement>('measures-progress');
+  if (done === null || !total) bar.removeAttribute('value');
+  else {
+    bar.max = total;
+    bar.value = done;
+  }
+  text('measures-status', status);
+}
+/** Changes the measures of the timeline in this page, values and all, as one undoable edit. */
+function measuresHere(after: Measures | undefined, renames: Record<string, string>) {
+  const index = model!;
+  const before = index.measures;
+  const { events, durations } = remeasuredEntities(index.document(), after ?? {}, renames);
+  const group: GroupEdit['group'] = [];
+  for (const event of events) {
+    group.push({ before: index.byId.get(event.id), after: event });
+    index.put(event);
+  }
+  for (const duration of durations) {
+    group.push({ duration: true, before: index.durations.get(duration.id), after: duration });
+    index.putDuration(duration);
+  }
+  index.measures = after;
+  record({ group, measures: { before, after } });
+  changed();
+}
+/** Changes a large desktop file's measures and values at once, unsaved and undoable (#179). */
+async function measuresOnDesktop(after: Measures | undefined, renames: Record<string, string>) {
+  measuresStep(null, null, 'Reading the timeline…');
+  const saved = await window.__TAURI__!.core.invoke<TimelineDocument>('desktop_document', {
+    generation: local!.generation,
+  });
+  const { events, durations } = remeasuredEntities(saved, after ?? {}, renames);
+  const index = sparseWorkspace()!;
+  const before = index.measures;
+  // The staged baseline carries the workspace's settings: the new measures with it.
+  index.measures = after;
+  try {
+    const staged = await stageOnDesktop(
+      events.map((event) => ({ id: event.id, event })),
+      durations.map((duration) => ({ id: duration.id, duration })),
+      (done, total) =>
+        measuresStep(
+          done,
+          total,
+          `Changing ${done.toLocaleString()} of ${total.toLocaleString()}…`,
+        ),
+    );
+    if (!staged) index.measures = before;
+  } catch (error) {
+    index.measures = before;
+    throw error;
+  }
+}
+/** Changes a server timeline's measures and values as one save, showing its progress. */
+async function measuresOnServer(after: Measures | undefined, renames: Record<string, string>) {
+  const id = remote!.id,
+    request = documentRequest;
+  await requestProgress<
+    { changed: { moments: number; durations: number } },
+    { reading?: boolean; rebuilding?: string; done?: number; total?: number }
+  >(
+    `timelines/${id}/measures`,
+    { revision: remote!.revision, measures: after ?? {}, renames },
+    session.csrf,
+    (step) => {
+      if (step.reading) measuresStep(null, null, 'Reading the timeline…');
+      else if (step.rebuilding)
+        measuresStep(
+          step.done ?? null,
+          step.total ?? null,
+          `Rebuilding the timeline: ${step.rebuilding}…`,
+        );
+      else if (step.total !== undefined)
+        measuresStep(
+          step.done ?? 0,
+          step.total,
+          `Saving ${(step.done ?? 0).toLocaleString()} of ${step.total.toLocaleString()} changes…`,
+        );
+    },
+  );
+  if (remote?.id === id && request === documentRequest) {
+    const view = viewport.clone();
+    await openRemote(id, false);
+    viewport = view;
+  }
+}
+el<HTMLFormElement>('measures-form').onsubmit = (event) => {
+  event.preventDefault();
+  if (measuresRunning || !measuresEditable()) return;
+  let next: Measures | undefined, renames: Record<string, string>;
+  try {
+    const read = readMeasureRows(el('measures-list'));
+    next = Object.keys(read.measures).length ? read.measures : undefined;
+    renames = read.renames;
+  } catch (error) {
+    text('measures-error', error instanceof Error ? error.message : String(error));
+    return;
+  }
+  const before = timelineMeasures();
+  if (JSON.stringify(before ?? {}) === JSON.stringify(next ?? {})) {
+    el<HTMLDialogElement>('measures-dialog').close();
+    return;
+  }
+  // Open forms show the old measures' fields.
+  el<HTMLDialogElement>('inspector').close();
+  if (!Object.keys(renames).length && measuresCompatible(before, next)) {
+    // A settings edit: saved with the timeline, undone like others.
+    model!.measures = next;
+    record({ group: [], measures: { before, after: next } });
+    changed();
+    el<HTMLDialogElement>('measures-dialog').close();
+    return;
+  }
+  try {
+    if (local ? sparseWorkspace() && !desktopSettled() : sparseWorkspace() && dirty)
+      throw new Error(
+        local
+          ? 'Save your changes first: this changes the whole file at once.'
+          : 'Save your changes first: this is saved on the server at once.',
+      );
+    if (!sparseWorkspace()) {
+      measuresHere(next, renames);
+      el<HTMLDialogElement>('measures-dialog').close();
+      return;
+    }
+  } catch (error) {
+    text('measures-error', error instanceof Error ? error.message : String(error));
+    return;
+  }
+  setMeasuresBusy(true);
+  measuresStep(null, null, 'Working…');
+  void (async () => {
+    try {
+      if (local) await measuresOnDesktop(next, renames);
+      else await measuresOnServer(next, renames);
+      el<HTMLDialogElement>('measures-dialog').close();
+      requestRender();
+    } catch (error) {
+      text('measures-error', error instanceof Error ? error.message : String(error));
+    } finally {
+      setMeasuresBusy(false);
+    }
+  })();
+};
 el<HTMLFormElement>('map-form').onsubmit = (event) => {
   event.preventDefault();
   if (mapRunning) return;
@@ -6925,8 +7196,10 @@ function applyEdit(redo: boolean) {
       if (to) index.put(to);
     }
   };
-  if ('group' in edit) for (const one of redo ? edit.group : [...edit.group].reverse()) apply(one);
-  else apply(edit);
+  if ('group' in edit) {
+    if (edit.measures) index.measures = redo ? edit.measures.after : edit.measures.before;
+    for (const one of redo ? edit.group : [...edit.group].reverse()) apply(one);
+  } else apply(edit);
   (redo ? history : future).push(edit);
   selected = null;
   selectedGroup = null;
@@ -9017,6 +9290,7 @@ function durationFromForm(): Duration {
       },
     },
     parseTime,
+    timelineMeasures() ?? {},
   );
 }
 /**
@@ -9177,6 +9451,25 @@ function requestDurationDelete() {
 function renderDurationPluginFields() {
   const current = openDuration;
   if (!current) return;
+  renderMeasureFields(
+    el('duration-measures'),
+    timelineMeasures(),
+    current.duration.metadata,
+    durationEditable(),
+    (values, error) => {
+      if (error) return text('duration-error', error);
+      try {
+        const metadata = JSON.parse(el<HTMLTextAreaElement>('duration-metadata').value);
+        if (values) metadata.measures = values;
+        else delete metadata.measures;
+        el<HTMLTextAreaElement>('duration-metadata').value = JSON.stringify(metadata, null, 2);
+        text('duration-error', '');
+        flushDurationEdit();
+      } catch (error) {
+        text('duration-error', error instanceof Error ? error.message : String(error));
+      }
+    },
+  );
   renderPluginFields(
     el('plugin-duration-fields'),
     durationPlugins(installedPlugins()),

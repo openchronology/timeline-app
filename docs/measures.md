@@ -6,7 +6,22 @@ Copyright (c) 2026 Athan Clark. SPDX-License-Identifier: GPL-3.0-only
 
 A **measure** is a named quantity that a timeline's events (moments and durations) carry, such as an invoice's cost or the hours a task took ([#570](https://github.com/openchronology/timeline-app/issues/570)). A timeline declares its measures, and each event gives its own values. Values are exact, never rounded, so totals always add up to the cent.
 
-This page covers declaring measures and giving values ([#572](https://github.com/openchronology/timeline-app/issues/572)). Showing values and typing them in the editor, and totals in summaries, come next ([#573](https://github.com/openchronology/timeline-app/issues/573), [#574](https://github.com/openchronology/timeline-app/issues/574)).
+This page covers declaring measures, giving values and how they're shown ([#572](https://github.com/openchronology/timeline-app/issues/572), [#573](https://github.com/openchronology/timeline-app/issues/573)). Totals in summaries come next ([#574](https://github.com/openchronology/timeline-app/issues/574)).
+
+## In the editor
+
+**Measures** in the timeline's toolbar (under Tools on a phone) lists the timeline's measures. If you can edit the timeline, you can add, change and remove them there. For each measure you choose:
+
+- **Label:** what the editor calls it, such as Cost.
+- **Name in the data:** the key its values are stored under, filled in from the label.
+- **Holds:** whole numbers or fractions.
+- **Shown as:** see [How values are shown](#how-values-are-shown).
+
+The dialog shows an example as you go. When saving would change values, it says how first: a renamed measure's values move, a removed measure's values are deleted.
+
+Once a timeline has measures, a moment's or duration's details have a field for each one. You type a value as the measure shows it, such as `$1,234.56`, and it's stored exactly. Text that would have to be rounded is refused, with the reason, instead of being stored rounded. The reader lists an event's values the same way.
+
+Changes in the dialog are undone like other edits. Renaming, removing or narrowing a measure on a server timeline is saved at once, as one version, so save your other changes first.
 
 ## Declaring measures
 
@@ -49,6 +64,29 @@ An event gives its values under `measures` in its metadata, as text:
 - **Size:** values are bounded like times: at most 2,200 characters, and on a server the same digit limit as times (`TIME_DIGIT_LIMIT`).
 
 A value is exact, so `0.1` is exactly one tenth, not the closest binary fraction.
+
+## How values are shown
+
+Each measure has its own presentation, the counterpart of the [time display](time-presentation.md). It sets how values and totals are written, and how what you type is read. Both are exact: nothing passes through floating point.
+
+```json
+"cost": { "type": "mpz", "label": "Cost", "presentation": { "mode": "fixed", "scale": "1/100", "decimals": 2, "prefix": "$" } }
+```
+
+| Mode         | Shows                                                                    | Example (stored → shown)       |
+| ------------ | ------------------------------------------------------------------------ | ------------------------------ |
+| `exact`      | The value as it is: a whole number or a fraction. This is the default.   | `3/2` → `3/2`                  |
+| `fixed`      | A fixed number of decimal places (`decimals`, 2 by default), as money is | `123456` → `$1,234.56`         |
+| `decimal`    | `significantDigits` significant digits (6 by default)                    | `1/3` → `0.333333`             |
+| `scientific` | Scientific notation                                                      | `123456` → `1.23456e+5`        |
+| `si`         | SI prefixes before the unit                                              | `1500` (unit `Wh`) → `1.5 kWh` |
+
+- **`scale`:** the shown value is the stored value × scale, an exact number such as `1/100` (cents shown as dollars) or `1/3600` (seconds shown as hours). It is 1 by default.
+- **`prefix`:** written before the number, such as `$`.
+- **`unit`:** written after it, such as `h`.
+- **`grouping`:** separates thousands with commas in the `fixed` and `decimal` modes. Set it to `false` to turn that off.
+
+Typed values can be written with or without the prefix, unit and commas. With fixed decimals, a value with more decimal places than the measure shows (`$12.345`) is refused rather than rounded. So is a value of a whole-number measure that isn't a whole number of its steps, such as half a cent. Where a label rounds a fraction, its tooltip gives the exact value, and editing a field you haven't changed keeps the exact value.
 
 ## Changing declarations
 

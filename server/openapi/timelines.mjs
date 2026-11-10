@@ -146,6 +146,28 @@ export const schemas = {
       'The entity’s values of the timeline’s measures (#572), by name: exact integers, fractions or decimals as text, stored canonically (`"1250"`, `"3/2"`). Every name must be one the timeline declares, and a whole-number (`mpz`) measure’s value an integer. A measure without a value is zero; zeros are left out.',
     example: { cost: '1250', hours: '3/2' },
   },
+  MeasurePresentation: {
+    type: 'object',
+    required: ['mode'],
+    additionalProperties: false,
+    description:
+      'How a measure’s values and totals are written and read (#573), exactly: shown value = stored × `scale`. Exact when absent.',
+    properties: {
+      mode: { enum: ['exact', 'fixed', 'decimal', 'scientific', 'si'] },
+      scale: { type: 'string', description: 'A positive exact number, such as `1/100`.' },
+      decimals: { type: 'integer', minimum: 0, maximum: 30, description: '`fixed` only.' },
+      significantDigits: {
+        type: 'integer',
+        minimum: 1,
+        maximum: 30,
+        description: '`decimal`, `scientific` and `si`.',
+      },
+      prefix: { type: 'string', maxLength: 16, example: '$' },
+      unit: { type: 'string', maxLength: 40, example: 'h' },
+      grouping: { type: 'boolean', description: 'Thousands separated by commas; true by default.' },
+    },
+    example: { mode: 'fixed', scale: '1/100', decimals: 2, prefix: '$' },
+  },
   Measures: {
     type: 'object',
     maxProperties: 32,
@@ -160,6 +182,7 @@ export const schemas = {
           description: '`mpz`: whole numbers; `mpq`: fractions. Both are exact and unbounded.',
         },
         label: { type: 'string', minLength: 1, maxLength: 80 },
+        presentation: ref('MeasurePresentation'),
       },
     },
     description:

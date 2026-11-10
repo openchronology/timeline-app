@@ -4406,3 +4406,80 @@ body[data-warnings]:not([data-images-shown])
   width: auto;
   flex-shrink: 0;
 }
+/* Measures (#573): the dialog's rows, the forms' fields and the reader's list of values. */
+#measures-dialog {
+  min-width: min(620px, calc(100vw - 32px));
+  max-height: calc(100vh - 32px);
+  overflow: auto;
+}
+.measures-list {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  margin: 12px 0;
+}
+.measure-row {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  gap: 8px 12px;
+  margin: 0;
+  padding: 12px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+}
+.measure-row legend {
+  padding: 0 4px;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--label);
+}
+.measure-row label {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.measure-row .calendar-label {
+  flex-direction: row;
+  align-items: center;
+}
+.measure-row .measure-example,
+.measure-row .calendar-label {
+  grid-column: 1 / -1;
+  margin: 0;
+}
+.measure-row .measure-remove {
+  justify-self: start;
+}
+#measures-working {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.measure-fields {
+  border-top: 1px solid var(--line);
+  padding: 14px 0 4px;
+}
+.measure-fields h3 {
+  margin: 0 0 8px;
+  font-size: 14px;
+}
+.measure-fields label {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  margin-bottom: 8px;
+}
+.measure-list {
+  display: grid;
+  grid-template-columns: max-content 1fr;
+  gap: 4px 16px;
+  margin: 0 0 12px;
+  font-size: 14px;
+}
+.measure-list dt {
+  color: var(--muted);
+}
+.measure-list dd {
+  margin: 0;
+  font-variant-numeric: tabular-nums;
+}
