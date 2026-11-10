@@ -57,6 +57,9 @@ jobs:
         timeout-minutes: 15
         env:
           OCH_NODE_TARBALL: ${{ runner.temp }}/node-tarball/${{ steps.node-runtime.outputs.tarball }}
+          # The runners' own Ubuntu mirror: archive.ubuntu.com trickled one build's packages
+          # for 14 minutes, past this step's timeout.
+          OCH_UBUNTU_MIRROR: http://azure.archive.ubuntu.com/ubuntu
         run: node scripts/server-package.mjs "${{ matrix.target }}"
       - name: Install, run, upgrade and remove it in a fresh container
         timeout-minutes: 10
