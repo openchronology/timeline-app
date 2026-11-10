@@ -1,8 +1,9 @@
 // Copyright (c) 2026 Athan Clark. SPDX-License-Identifier: GPL-3.0-only
 // Relationship arcs on a separated server timeline, in a live browser (#415): separated by tags,
 // links within a track arc over its axis and links between the tracks cross the gap from one
-// event to the other, with the Relationship arrows plugin's arrowheads; only the upper track's
-// queries ask for arcs. SCREENSHOT_DIR, when set, keeps light and dark screenshots.
+// event to the other, with the Relationship arrows plugin's arrowheads; the tracks are read in
+// one request, with the arcs once (#564). SCREENSHOT_DIR, when set, keeps light and dark
+// screenshots.
 import assert from 'node:assert/strict';
 import { separateBy } from './tags-browser.mjs';
 import { spawn } from 'node:child_process';
@@ -73,7 +74,7 @@ try {
       plugins: [{ manifest: RELATIONSHIP_ARROWS, enabled: true }],
       events: [
         { id: 'siege', time: '10/1', metadata: { title: 'Siege', tags: ['war'] } },
-        { id: 'market', time: '30/1', metadata: { title: 'Market' } },
+        { id: 'market', time: '30/1', metadata: { title: 'Market', tags: ['trade'] } },
         {
           id: 'battle',
           time: '60/1',
@@ -126,10 +127,41 @@ try {
   await frame.locator('#apply-bounds').click();
   await frame.locator('.edge-arc').nth(3).waitFor({ state: 'attached' });
 
+  const editorFrame = () => page.frames().find((f) => f.url().includes('/editor'));
+  const measure = () =>
+    editorFrame().evaluate(() => {
+      const svg = document.getElementById('edge-arcs'),
+        box = svg.getBoundingClientRect(),
+        scale = box.width / parseFloat(svg.style.width);
+      const at = (p) => ({ x: box.x + p.x * scale, y: box.y + p.y * scale });
+      const marker = (name) => {
+        const r = document
+          .querySelector(`.event-marker[aria-label="${name}"]`)
+          .getBoundingClientRect();
+        return { x: r.x + r.width / 2, y: r.y + r.height / 2 };
+      };
+      return {
+        markers: Object.fromEntries(
+          ['Siege', 'Market', 'Battle', 'Harvest'].map((n) => [n, marker(n)]),
+        ),
+        arcs: [...svg.querySelectorAll('.edge-arc')].map((arc) => {
+          const next = arc.nextElementSibling;
+          return {
+            title: arc.querySelector('title').textContent,
+            between: arc.classList.contains('edge-arc-between'),
+            start: at(arc.getPointAtLength(0)),
+            end: at(arc.getPointAtLength(arc.getTotalLength())),
+            heads: next?.classList.contains('edge-arrows')
+              ? next.getAttribute('d').split('M').length - 1
+              : 0,
+          };
+        }),
+      };
+    });
   // Separate by "war".
   await separateBy(frame, ['war']);
   await frame.locator('#separation-settings').waitFor({ state: 'visible' });
-  const editor = page.frames().find((f) => f.url().includes('/editor'));
+  const editor = editorFrame();
   assert(editor, 'the editor frame');
   await editor.waitForFunction(
     () =>
@@ -143,35 +175,7 @@ try {
     return y('Siege') < y('Market') - 100 && y('Battle') < y('Harvest') - 100;
   });
   await delay(600);
-  const arcs = await editor.evaluate(() => {
-    const svg = document.getElementById('edge-arcs'),
-      box = svg.getBoundingClientRect(),
-      scale = box.width / parseFloat(svg.style.width);
-    const at = (p) => ({ x: box.x + p.x * scale, y: box.y + p.y * scale });
-    const marker = (name) => {
-      const r = document
-        .querySelector(`.event-marker[aria-label="${name}"]`)
-        .getBoundingClientRect();
-      return { x: r.x + r.width / 2, y: r.y + r.height / 2 };
-    };
-    return {
-      markers: Object.fromEntries(
-        ['Siege', 'Market', 'Battle', 'Harvest'].map((n) => [n, marker(n)]),
-      ),
-      arcs: [...svg.querySelectorAll('.edge-arc')].map((arc) => {
-        const next = arc.nextElementSibling;
-        return {
-          title: arc.querySelector('title').textContent,
-          between: arc.classList.contains('edge-arc-between'),
-          start: at(arc.getPointAtLength(0)),
-          end: at(arc.getPointAtLength(arc.getTotalLength())),
-          heads: next?.classList.contains('edge-arrows')
-            ? next.getAttribute('d').split('M').length - 1
-            : 0,
-        };
-      }),
-    };
-  });
+  const arcs = await measure();
   const near = (p, q) => Math.hypot(p.x - q.x, p.y - q.y) < 12;
   const byTitle = Object.fromEntries(arcs.arcs.map((a) => [a.title, a]));
   // Named by the link's ends in their stored order, with the arrow's direction when it has one.
@@ -199,10 +203,17 @@ try {
   // Battle's arrow points to Harvest, across the tracks.
   assert.equal(byTitle['Battle → Harvest'].heads, 1);
   assert.equal(byTitle['Market ↔ Siege'].heads, 0);
-  // Only the upper track asks for arcs; the lower track's overviews ask for none.
-  const overviews = queries.filter((q) => q.kind === 'overview' && q.filter);
-  assert(overviews.some((q) => q.filter.mode === 'any' && q.arcs === undefined));
-  assert(overviews.every((q) => (q.filter.mode === 'none') === (q.arcs === false)));
+  // The tracks are read together (#564), each request with both tracks' filters and the
+  // windows missing; no track is read on its own.
+  const reads = queries.filter((q) => q.kind === 'tracks');
+  assert(reads.length, 'the tracks read together');
+  assert(reads.some((q) => q.windows.length === 2));
+  for (const q of reads)
+    assert.deepEqual(
+      q.tracks.map((t) => t.mode),
+      ['any', 'none'],
+    );
+  assert(!queries.some((q) => q.kind === 'overview' && q.filter));
   if (process.env.SCREENSHOT_DIR) {
     await mkdir(process.env.SCREENSHOT_DIR, { recursive: true });
     await page.screenshot({
@@ -230,9 +241,43 @@ try {
       document.querySelectorAll('.edge-arc').length === 4 &&
       !document.querySelector('.edge-arc-between'),
   );
+  // Two separations, "war" and "trade" (#564): Market on a track of its own, between the
+  // others. Its ends are placed by the track the server names for them.
+  queries.length = 0;
+  await separateBy(frame, ['war'], ['trade']);
+  await frame.locator('#separation-settings').waitFor({ state: 'visible' });
+  await editor.waitForFunction(() => {
+    const y = (name) =>
+      document.querySelector(`.event-marker[aria-label="${name}"]`)?.getBoundingClientRect().y;
+    return (
+      document.querySelectorAll('.edge-arc-between').length === 3 &&
+      y('Siege') < y('Market') - 40 &&
+      y('Market') < y('Harvest') - 40
+    );
+  });
+  await delay(600);
+  const three = await measure();
+  for (const [title, a, b] of [
+    ['Battle ↔ Siege', 'Battle', 'Siege'],
+    ['Harvest ↔ Market', 'Harvest', 'Market'],
+    ['Market ↔ Siege', 'Market', 'Siege'],
+    ['Battle → Harvest', 'Battle', 'Harvest'],
+  ]) {
+    const arc = three.arcs.find((x) => x.title === title),
+      [p, q] = [three.markers[a], three.markers[b]];
+    assert(
+      (near(arc.start, p) && near(arc.end, q)) || (near(arc.start, q) && near(arc.end, p)),
+      `${title}: ${JSON.stringify(arc)} ${JSON.stringify(three.markers)}`,
+    );
+  }
+  const threeReads = queries.filter((q) => q.kind === 'tracks');
+  assert(threeReads.some((q) => q.windows.length === 3 && q.tracks.length === 3));
+  assert(!queries.some((q) => q.kind === 'overview' && q.filter));
+  await frame.locator('#separation-rejoin').click();
+  await frame.locator('#separation-settings').waitFor({ state: 'hidden' });
   assert.deepEqual(errors, []);
   console.log(
-    'PASS separated arcs in a browser: within each track and between them, with arrowheads; the lower track asks for none; a band opened from its track is read whole.',
+    'PASS separated arcs in a browser: within each track and between them, with arrowheads, for one separation and two; the tracks read in one request; a band opened from its track is read whole.',
   );
 } finally {
   await browser?.close();

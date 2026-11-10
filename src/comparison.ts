@@ -13,6 +13,7 @@ import type {
 import type { InstalledPlugin } from './plugins.js';
 import type { EdgeBand } from './relationships.js';
 import { ViewportCache, regroup } from './remote-cache.js';
+import type { WindowQuery } from './remote-cache.js';
 /**
  * Where a page of moments ends: the last moment's time (an exact rational as a string) and
  * ID. The next page starts strictly after it in (time, id) order; `null` means "from the
@@ -92,6 +93,11 @@ export type LinkQuery = (
   },
   signal?: AbortSignal,
 ) => Promise<Pick<Frame, 'edges' | 'edgesTruncated'>>;
+/** Reads several tracks' windows at once (ComparisonView.batch). */
+export type TrackBatch = (
+  windows: ({ track: number } & WindowQuery)[],
+  signal?: AbortSignal,
+) => Promise<Frame[]>;
 /** Links read for a window three views wide, at a threshold, reused while the view is in it. */
 interface LinkWindow {
   lower: Q;
@@ -156,6 +162,12 @@ export class ComparisonView {
   combined = false;
   /** Reads links between the server timelines, when the editor can (#422). */
   links: LinkQuery | null = null;
+  /**
+   * Reads several tracks' windows in one request (#564): each `{track, lower, upper,
+   * threshold}` (a track's index and its window), answered with a frame each, in order. Set
+   * for a separation of a server timeline; without it each remote track is read on its own.
+   */
+  batch: TrackBatch | null = null;
   private linkWindow: LinkWindow | null = null;
   /**
    * Starts every track unaligned (scale 1, offset 0) with an empty cache.
@@ -283,6 +295,23 @@ export class ComparisonView {
    */
   async frame(view: Viewport, width: number, pixels: number, signal?: AbortSignal): Promise<Frame> {
     const frames: Frame[] = [];
+    // A separation's tracks (#564): every window missing read at once, then drawn from the caches.
+    if (this.batch) {
+      const misses: { track: number; query: WindowQuery }[] = [];
+      this.tracks.forEach((track, i) => {
+        if (track.source.index) return;
+        const query = track.cache.plan(this.sourceView(track, view), width, pixels);
+        if (!track.cache.get(this.sourceView(track, view), query)) misses.push({ track: i, query });
+      });
+      if (misses.length) {
+        const answers = await this.batch(
+          misses.map(({ track, query }) => ({ track, ...query })),
+          signal,
+        );
+        if (signal?.aborted) throw new DOMException('Comparison cancelled', 'AbortError');
+        misses.forEach(({ track, query }, i) => this.tracks[track].cache.store(query, answers[i]));
+      }
+    }
     // Serial reads keep aggregate transient memory and database load bounded.
     for (const track of this.tracks) {
       if (signal?.aborted) throw new DOMException('Comparison cancelled', 'AbortError');
@@ -345,6 +374,10 @@ export class ComparisonView {
       links = this.linksFor(view, threshold);
     }
     return this.withLinks(this.join(frames, threshold), links ?? { edges: [], truncated: false });
+  }
+  /** The view in a track's own coordinates: original = (shared − offset) / scale. */
+  private sourceView(track: Track, view: Viewport) {
+    return new Viewport(view.left.sub(track.offset).div(track.scale), view.span.div(track.scale));
   }
   /** Whether links are drawn: read by the editor, between two server timelines or more. */
   private linking() {

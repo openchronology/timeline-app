@@ -1870,6 +1870,70 @@ export function createRequestHandler({
               }),
             );
           }
+          // A separation's tracks read together (#564): every track's filter, the rest last,
+          // and the windows wanted, each answered as an overview of its track would be, with
+          // the arcs once (store.queryTracks).
+          if (input.kind === 'tracks') {
+            if (
+              !Array.isArray(input.tracks) ||
+              input.tracks.length < 2 ||
+              input.tracks.length > 8 ||
+              !Array.isArray(input.windows) ||
+              !input.windows.length ||
+              input.windows.length > input.tracks.length
+            )
+              throw new HttpError(400, 'Tracks need two to eight filters and their windows.');
+            const tracks = input.tracks.map((f) => {
+              const filter = viewFilter(f);
+              if (!filter) throw new HttpError(400, 'Every track needs a filter.');
+              return filter;
+            });
+            const seen = new Set();
+            const windows = input.windows.map((w) => {
+              const lower = bound(w?.lower),
+                upper = bound(w?.upper),
+                threshold = bound(w?.threshold);
+              if (
+                !Number.isInteger(w?.track) ||
+                w.track < 0 ||
+                w.track >= tracks.length ||
+                seen.has(w.track) ||
+                lower === null ||
+                upper === null ||
+                threshold === null ||
+                Q.parse(threshold).compare(Q.zero) < 0
+              )
+                throw new HttpError(
+                  400,
+                  'Each window needs a track of its own, bounds and a nonnegative threshold.',
+                );
+              seen.add(w.track);
+              return { track: w.track, lower, upper, threshold };
+            });
+            // Each window past the first counts as a query of its own.
+            if (!session)
+              for (let i = 1; i < windows.length; i++)
+                auth.throttle(
+                  'query:' + limitAddress(req),
+                  GUEST_QUERIES,
+                  'Too many requests. Please wait a minute.',
+                );
+            return response(
+              res,
+              200,
+              await store.queryTracks(
+                id,
+                userId,
+                {
+                  tracks,
+                  windows,
+                  ...(input.revision ? { revision: input.revision } : {}),
+                  ...(input.plugins !== undefined ? { plugins: queryPlugins(input.plugins) } : {}),
+                },
+                building,
+              ),
+            );
+          }
           if (input.kind === 'overview') {
             const lower = bound(input.lower),
               upper = bound(input.upper),

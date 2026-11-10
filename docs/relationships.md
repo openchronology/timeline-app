@@ -43,6 +43,8 @@ The arcs are the whole timeline's, not each track's: the upper track's overview 
 
 Views already hold exactly the entities on their side, so looking an end up in the upper view answers the question for both tracks, whatever the separation.
 
+A separation of a server timeline reads all its tracks' windows in one request (`kind: "tracks"`, #564): every track's filter, the rest last, and the windows missing from the tracks' caches. The arcs come once, on the first track's window, each end naming the first separated track it is on (`aTrack`, `bTrack`, an index into the tracks; null for the rest), looked up in each track's view in turn until every end has one. The other tracks' windows carry none, so seven separations no longer read seven copies of the same arcs, nor wait for eight requests one after another. The desktop store and a timeline held in the browser still answer each track on its own.
+
 ## Links to other timelines
 
 A moment or duration on a server timeline can also link to a moment or duration on another

@@ -10,7 +10,7 @@ import { pluginExpand } from './plugins.js';
 import { browserEntryCount, BROWSER_COPY_MAX_EVENTS } from './browser-copy.js';
 import { liveUpdates } from './live-updates.js';
 import { ComparisonView } from './comparison.js';
-import type { ComparisonSource, ComparisonGroup, EventPage } from './comparison.js';
+import type { ComparisonSource, ComparisonGroup, EventPage, TrackBatch } from './comparison.js';
 import { collapseTrackSpans, shownTracks } from './track-summaries.js';
 import type { TrackSpan } from './track-summaries.js';
 import { comparisonUI } from './comparison-ui.js';
@@ -2368,10 +2368,15 @@ function describeOffsetUnits() {
   for (const field of document.querySelectorAll<HTMLInputElement>('.comparison-offset'))
     field.title = units;
 }
-function startComparison(sources: ComparisonSource[], presentation: TimePresentation) {
+function startComparison(
+  sources: ComparisonSource[],
+  presentation: TimePresentation,
+  batch: TrackBatch | null = null,
+) {
   cancelZoomAnimation();
   flushEventEdit();
   const view = new ComparisonView(sources, presentation);
+  view.batch = batch;
   // Arcs between entities on different timelines (#422) come from the server.
   if (!offlineHtml)
     view.links = (query, signal) =>
@@ -9749,9 +9754,26 @@ function startSeparation(by: SeparationTrack[] | Separation) {
         ),
     }));
   }
+  // A server timeline's tracks are read together, the arcs once (#564): the desktop's store
+  // and a timeline held here answer each track on their own.
+  const batch: TrackBatch | null =
+    !local && remote && sources.every((s) => s.query)
+      ? async (windows, signal) => {
+          const { frames } = await timelineQuery<{ frames: Frame[] }>(
+            {
+              kind: 'tracks',
+              tracks: tracks.map((t) => t.filter),
+              windows,
+              revision: remote!.revision,
+            },
+            signal,
+          );
+          return frames;
+        }
+      : null;
   const before = viewport.clone();
   separation = choice;
-  startComparison(sources, presentation);
+  startComparison(sources, presentation, batch);
   // Disjoins' times, from the moments they follow (#549): drawn once read.
   void resolveDisjoins(choice).catch((error) =>
     toast(
@@ -12496,6 +12518,8 @@ function arcAxes(): ((edge: EdgeBand, end: 'a' | 'b') => number) | null {
     // Each separated track's answer has every arc, its ends marked with whether they are on
     // that track: an end is drawn on the first track that has it, else on the last (the rest,
     // whose own answer has no arcs). An arc is drawn once, from the first track's answer.
+    // Tracks read together (#564) have the arcs on the first track's answer only, each end
+    // naming its track (aTrack, bTrack; null for the rest).
     const tracks = comparison.tracks.map((t) => t.source.key),
       rest = tracks[tracks.length - 1];
     const on = new Map<string, { a?: string; b?: string }>();
@@ -12503,6 +12527,12 @@ function arcAxes(): ((edge: EdgeBand, end: 'a' | 'b') => number) | null {
       const key = edge.sourceKey ?? '';
       const id = edge.id.slice(key.length + 1);
       const ends = on.get(id) ?? {};
+      if (edge.aTrack !== undefined || edge.bTrack !== undefined) {
+        ends.a ??= edge.aTrack == null ? rest : (tracks[edge.aTrack] ?? rest);
+        ends.b ??= edge.bTrack == null ? rest : (tracks[edge.bTrack] ?? rest);
+        on.set(id, ends);
+        continue;
+      }
       if (edge.aIn !== false && ends.a === undefined) ends.a = key;
       if (edge.bIn !== false && ends.b === undefined) ends.b = key;
       on.set(id, ends);
