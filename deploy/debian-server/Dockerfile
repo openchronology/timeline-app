@@ -12,6 +12,12 @@ RUN printf 'Acquire::Retries "3";\nAcquire::http::Timeout "30";\nAcquire::https:
 # curl (the Rust installer, pgmp, Node.js) retries too, giving up on an attempt that stalls below
 # 1 kB/s for 30 s or takes over 3 minutes (#367).
 RUN printf 'retry = 3\nretry-all-errors\nconnect-timeout = 30\nspeed-limit = 1024\nspeed-time = 30\nmax-time = 180\n' > /root/.curlrc
+# Another Ubuntu archive mirror, such as Azure's for GitHub's runners, where archive.ubuntu.com
+# can trickle packages for a quarter of an hour without ever stalling. Debian is unaffected.
+ARG UBUNTU_MIRROR=
+RUN if [ -n "$UBUNTU_MIRROR" ] && [ -f /etc/apt/sources.list.d/ubuntu.sources ]; then \
+      sed -i "s|http://archive.ubuntu.com/ubuntu/\?|$UBUNTU_MIRROR/|g" /etc/apt/sources.list.d/ubuntu.sources; \
+    fi
 
 # och-convert and pgmp, built on the target distribution against its own libraries.
 FROM base AS native

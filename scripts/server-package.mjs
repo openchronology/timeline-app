@@ -96,6 +96,10 @@ for (const name of chosen.length ? chosen : Object.keys(serverTargets)) {
           `PG_MAJOR=${target.pg}`,
           '--build-arg',
           `DEB_VERSION=${upstream}-1~${target.suffix}`,
+          // OCH_UBUNTU_MIRROR: an Ubuntu archive mirror closer than archive.ubuntu.com.
+          ...(process.env.OCH_UBUNTU_MIRROR
+            ? ['--build-arg', `UBUNTU_MIRROR=${process.env.OCH_UBUNTU_MIRROR}`]
+            : []),
         ];
   console.log(`Building openchronology-server ${upstream} for ${name} (${target.base})`);
   if (nodeTarball) console.log(`With Node.js from ${nodeTarball}`);
