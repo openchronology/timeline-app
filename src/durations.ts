@@ -7,6 +7,8 @@ import type { PointEvent, Metadata } from './core.js';
 import { normalizeEntityTags } from './tags.js';
 import { entryLimitText, withinEntryLimit } from './entry-limit.js';
 import { clip } from './clip.js';
+import { normalizeMeasureMetadata } from './measures.js';
+import type { Measures } from './measures.js';
 /**
  * An endpoint is an exact time, an anchor that follows a moment's time, or (an end only) the
  * current time, while the duration is ongoing (#537).
@@ -80,7 +82,7 @@ function endpoint(value: unknown, parse: (text: string) => Q, end = false): Dura
       : 'A duration start is an exact time or {"moment": "<moment id>"}.',
   );
 }
-function durationMetadata(value: unknown): Metadata {
+function durationMetadata(value: unknown, measures: Measures | null): Metadata {
   if (!value || typeof value !== 'object' || Array.isArray(value))
     throw new Error('Duration metadata must be a JSON object.');
   const metadata = JSON.parse(JSON.stringify(value)) as Metadata;
@@ -89,18 +91,32 @@ function durationMetadata(value: unknown): Metadata {
       throw new Error('Duration titles and notes must be text.');
   if (metadata.durations !== undefined) throw new Error('Durations cannot contain durations.');
   if (metadata.tags !== undefined) metadata.tags = normalizeEntityTags(metadata.tags);
-  return metadata;
+  return normalizeMeasureMetadata(metadata, measures);
 }
-export function validateDuration(value: unknown, parse: (text: string) => Q): Duration {
+/**
+ * A duration, validated and normalized. Its measure values (#572) are checked against
+ * `measures`, the timeline's declarations, or only for their form when null.
+ */
+export function validateDuration(
+  value: unknown,
+  parse: (text: string) => Q,
+  measures: Measures | null = null,
+): Duration {
   if (!value || typeof value !== 'object' || Array.isArray(value))
     throw new Error('Invalid duration.');
   const d = value as Record<string, unknown>;
   if (!identifier(d.id)) throw new Error('Duration IDs must be unique ASCII identifiers.');
+  let metadata: Metadata;
+  try {
+    metadata = durationMetadata(d.metadata ?? {}, measures);
+  } catch (error) {
+    throw new Error(`Duration ${d.id}: ${(error as Error).message}`);
+  }
   return {
     id: d.id,
     start: endpoint(d.start, parse),
     end: endpoint(d.end, parse, true),
-    metadata: durationMetadata(d.metadata ?? {}),
+    metadata,
   };
 }
 /**
@@ -111,13 +127,14 @@ export function validateDurations(
   value: unknown,
   moments: ReadonlySet<string> | null,
   parse: (text: string) => Q,
+  measures: Measures | null = null,
 ): Duration[] {
   if (value === undefined) return [];
   if (!Array.isArray(value) || !withinEntryLimit(value.length))
     throw new Error(`Use at most ${entryLimitText()} durations per timeline.`);
   const ids = new Set<string>();
   return value.map((raw) => {
-    const duration = validateDuration(raw, parse);
+    const duration = validateDuration(raw, parse, measures);
     if (ids.has(duration.id)) throw new Error('Duration IDs must be unique within a timeline.');
     ids.add(duration.id);
     if (moments)
@@ -151,7 +168,7 @@ export function convertLegacyDurations(events: PointEvent[]): {
         id: raw.id,
         start: { moment: event.id },
         end: { moment: raw.endId },
-        metadata: durationMetadata(raw.metadata),
+        metadata: durationMetadata(raw.metadata, null),
       });
     }
     const metadata = { ...event.metadata };

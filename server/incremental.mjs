@@ -13,6 +13,7 @@ import {
 import {
   validateDocument,
   validateDuration,
+  measuresCompatible,
   resolveDuration,
   isOngoing,
   relationshipKey,
@@ -57,6 +58,7 @@ export function timelineSettings(t) {
     ...(t.tags == null ? {} : { tags: t.tags }),
     ...(t.image ? { image: t.image } : {}),
     ...(t.view ? { view: t.view } : {}),
+    ...(t.measures ? { measures: t.measures } : {}),
     ...(t.assets ? { assets: t.assets } : {}),
     ...(t.comparison ? { comparison: t.comparison } : {}),
     events: [],
@@ -109,6 +111,8 @@ export function slicePatch(patch, size = PATCH_SLICE) {
   for (let start = 0; start < items.length || !slices.length; start += size) {
     const slice = {
       settings: patch.settings,
+      // A change of measures rewrites values across slices (measure-change.mjs).
+      ...(patch.remeasured ? { remeasured: true } : {}),
       changes: [],
       durationChanges: [],
       relationshipChanges: [],
@@ -159,6 +163,13 @@ export async function applyIncrementally(c, t, patch) {
     fail(error.message);
   }
   const previousSettings = settingsOnly(timelineSettings(t));
+  // Renaming, removing or narrowing a measure would leave values it no longer allows: such a
+  // change rewrites them (measure-change.mjs), which marks its patch `remeasured`.
+  if (!patch.remeasured && !measuresCompatible(previousSettings.measures, settings.measures))
+    throw new HttpError(
+      409,
+      'Renaming, removing or narrowing a measure changes its values: change measures with POST /api/timelines/{id}/measures.',
+    );
   // Moments: normalize exactly as a full save would.
   const momentChanges = new Map();
   for (const change of patch.changes) {
@@ -180,7 +191,7 @@ export async function applyIncrementally(c, t, patch) {
     else {
       let duration;
       try {
-        duration = validateDuration(change.duration, parseTime);
+        duration = validateDuration(change.duration, parseTime, settings.measures ?? {});
       } catch (error) {
         fail(error.message);
       }
@@ -594,6 +605,7 @@ export async function applyIncrementally(c, t, patch) {
     ['assets', settings.assets === undefined ? null : JSON.stringify(settings.assets), '::jsonb'],
     ['image', settings.image ? JSON.stringify(settings.image) : null, '::jsonb'],
     ['view', settings.view ? JSON.stringify(settings.view) : null, '::jsonb'],
+    ['measures', settings.measures ? JSON.stringify(settings.measures) : null, '::jsonb'],
     ['root', moments.root],
     ['event_count', momentCount],
     ['duration_root', durations.root],

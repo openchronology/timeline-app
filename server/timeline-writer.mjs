@@ -94,6 +94,7 @@ export class TimelineWriter {
       'tags',
       'image',
       'view',
+      'measures',
       'assets',
     ])
       if (value[key] !== null && value[key] !== undefined) settings[key] = value[key];

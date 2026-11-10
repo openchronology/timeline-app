@@ -114,7 +114,7 @@ export const schemas = {
   EntityMetadata: {
     type: 'object',
     description:
-      'What an event (a moment or a duration) says. The core reads `title`, `description`, `tags` and `content_labels`; plugins keep their own fields here, stored as given.',
+      'What an event (a moment or a duration) says. The core reads `title`, `description`, `tags`, `content_labels` and `measures`; plugins keep their own fields here, stored as given.',
     properties: {
       title: { type: 'string' },
       description: { type: 'string', description: 'Notes, in Markdown.' },
@@ -130,7 +130,41 @@ export const schemas = {
         items: { enum: ['nudity', 'violence', 'disturbing'] },
         description: 'Sensitive-content labels: readers are warned and its images blurred.',
       },
+      measures: ref('MeasureValues'),
     },
+  },
+  MeasureValues: {
+    type: 'object',
+    maxProperties: 32,
+    propertyNames: { pattern: '^[a-z][a-z0-9_]{0,39}$' },
+    additionalProperties: {
+      type: 'string',
+      pattern: '^[+-]?(?:\\d+(?:/\\d+)?|\\d+\\.\\d*|\\.\\d+)$',
+      maxLength: 2200,
+    },
+    description:
+      'The entity’s values of the timeline’s measures (#572), by name: exact integers, fractions or decimals as text, stored canonically (`"1250"`, `"3/2"`). Every name must be one the timeline declares, and a whole-number (`mpz`) measure’s value an integer. A measure without a value is zero; zeros are left out.',
+    example: { cost: '1250', hours: '3/2' },
+  },
+  Measures: {
+    type: 'object',
+    maxProperties: 32,
+    propertyNames: { pattern: '^[a-z][a-z0-9_]{0,39}$' },
+    additionalProperties: {
+      type: 'object',
+      required: ['type'],
+      additionalProperties: false,
+      properties: {
+        type: {
+          enum: ['mpz', 'mpq'],
+          description: '`mpz`: whole numbers; `mpq`: fractions. Both are exact and unbounded.',
+        },
+        label: { type: 'string', minLength: 1, maxLength: 80 },
+      },
+    },
+    description:
+      'The quantities the timeline’s moments and durations carry (#572), by name. A save may add measures, relabel them or widen `mpz` to `mpq`; renaming, removing or narrowing one goes through `POST /api/timelines/{id}/measures`, which rewrites the values.',
+    example: { cost: { type: 'mpz', label: 'Cost (cents)' }, hours: { type: 'mpq' } },
   },
   Moment: {
     type: 'object',
@@ -541,6 +575,7 @@ export const schemas = {
       },
       image: ref('TimelineImage'),
       view: ref('TimelineView'),
+      measures: ref('Measures'),
       views: {
         type: 'array',
         maxItems: 100,
@@ -576,6 +611,7 @@ export const schemas = {
       tags: { type: 'array', items: { type: 'string' }, maxItems: 40 },
       image: ref('TimelineImage'),
       view: ref('TimelineView'),
+      measures: ref('Measures'),
       assets: { type: 'object' },
     },
   },
@@ -608,6 +644,7 @@ export const schemas = {
       tags: { type: ['array', 'null'], items: { type: 'string' } },
       image: nullable(ref('TimelineImage')),
       view: nullable(ref('TimelineView')),
+      measures: nullable(ref('Measures')),
       assets: { type: ['object', 'null'] },
       comparison: nullable(ref('SavedComparison')),
       featured: { type: 'boolean' },
@@ -1950,6 +1987,61 @@ export const paths = {
               },
               example:
                 '{"progress":{"reading":true}}\n{"progress":{"done":5000,"total":20001}}\n{"result":{"moved":{"moments":20000,"durations":1},"timeline":{}}}\n',
+            },
+          },
+        },
+        ...errors(400, 401, 403, 404, 409, 413, 429, 503),
+        ...NOT_JSON,
+      },
+    },
+  },
+  '/api/timelines/{id}/measures': {
+    parameters: [timelineId],
+    post: {
+      operationId: 'changeTimelineMeasures',
+      tags: ['Timeline data'],
+      summary: 'Change measures and their values',
+      description:
+        'Sets the timeline’s measures (#572) as one save, for writers, rewriting the values that change with them: a renamed measure’s values move to its new name, a removed measure’s values are dropped, and narrowing a measure to whole numbers (`mpq` to `mpz`) is refused with 409 while any value is a fraction. A stale `revision` and comparisons are refused with 409. With `Accept: application/x-ndjson`, the reply streams progress as JSON lines, as `map-times` does.',
+      security: TIMELINE_WRITE,
+      requestBody: body({
+        type: 'object',
+        required: ['revision', 'measures'],
+        properties: {
+          revision: REVISION_BODY,
+          measures: ref('Measures'),
+          renames: {
+            type: 'object',
+            additionalProperties: { type: 'string' },
+            description: 'Old name to new name; each new name must be in `measures`.',
+            example: { cost: 'price' },
+          },
+        },
+      }),
+      responses: {
+        200: {
+          description: 'How many moments and durations changed, and the timeline as saved.',
+          content: {
+            'application/json': {
+              schema: {
+                type: 'object',
+                properties: {
+                  changed: {
+                    type: 'object',
+                    properties: {
+                      moments: { type: 'integer' },
+                      durations: { type: 'integer' },
+                    },
+                  },
+                  timeline: ref('TimelineMetadata'),
+                },
+              },
+            },
+            'application/x-ndjson': {
+              schema: {
+                type: 'string',
+                description: 'JSON lines: progress, then the result or an error.',
+              },
             },
           },
         },

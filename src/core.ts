@@ -115,10 +115,20 @@ import type { TimelineImage } from './timeline-image.js';
 export * from './default-view.js';
 import { validateSavedViews, validateTimelineView } from './default-view.js';
 import type { SavedViewEntry, TimelineView } from './default-view.js';
+export * from './measures.js';
+import { normalizeMeasureMetadata, validateMeasures } from './measures.js';
+import type { Measures } from './measures.js';
 export * from './drafts.js';
 export { stackWindow, scaleTimeline } from './stack-layout.js';
 import { parseTimestamp } from './calendar.js';
-import { parseDecimal } from './numeric.js';
+import { parseDecimal, timeDigitLimit } from './numeric.js';
+export {
+  DEFAULT_TIME_DIGITS,
+  UNBOUNDED_TIME_DIGITS,
+  timeDigitLimit,
+  setTimeDigitLimit,
+} from './numeric.js';
+export type { TimeDigits } from './numeric.js';
 import { nowCoordinate, validatePresentation } from './presentation.js';
 import type { TimePresentation } from './presentation.js';
 export {
@@ -234,6 +244,8 @@ export interface TimelineDocument {
   view?: TimelineView;
   /** Views saved in a file (#550); a server keeps its saved views apart. */
   views?: SavedViewEntry[];
+  /** The quantities its moments and durations carry, by name (#570). */
+  measures?: Measures;
   assets?: Record<string, string>;
   events: PointEvent[];
   durations?: Duration[];
@@ -275,34 +287,6 @@ export interface Frame {
  */
 export const TIME_TEXT_LIMIT = 20000;
 const TIME_TEXT_ERROR = `Times must be at most ${TIME_TEXT_LIMIT} characters, also as an exact fraction.`;
-/**
- * A server's limit on the digits of a time, as an exact fraction in lowest terms: its numerator
- * and its denominator. Times far larger than any timeline needs cost far more to read, compare
- * and summarize: on a shared server, a few moments with thousand-digit denominators keep its
- * index busy for minutes. So a server sets one (TIME_DIGIT_LIMIT, 1000/65 unless its operator
- * says otherwise: from 10^-64 to below 10^1000 of the timeline's unit), while the editor, the
- * desktop app and the offline file keep times unbounded, as rationals are. The largest real
- * timelines use 18 and 7 digits.
- */
-export const DEFAULT_TIME_DIGITS = Object.freeze({ numerator: 1000, denominator: 65 });
-/** Unbounded: no limit on either. */
-export const UNBOUNDED_TIME_DIGITS = Object.freeze({ numerator: Infinity, denominator: Infinity });
-export interface TimeDigits {
-  numerator: number;
-  denominator: number;
-}
-// Kept on the global object, so every copy of this module a bundler makes reads the limit the
-// server set at startup.
-const TIME_DIGITS_KEY = Symbol.for('openchronology.timeDigits');
-const timeDigitStore = globalThis as unknown as Record<symbol, TimeDigits | undefined>;
-/** The limit on times' digits in this process: unbounded unless a server set one. */
-export function timeDigitLimit(): TimeDigits {
-  return timeDigitStore[TIME_DIGITS_KEY] ?? UNBOUNDED_TIME_DIGITS;
-}
-/** Sets the limit on times' digits for this process (a server, at startup). */
-export function setTimeDigitLimit(limit: TimeDigits) {
-  timeDigitStore[TIME_DIGITS_KEY] = Object.freeze({ ...limit });
-}
 /** Digits in a bigint, without its sign. */
 const digits = (n: bigint) => (n < 0n ? -n : n).toString().length;
 export function parseTime(text: string): Q {
@@ -378,6 +362,9 @@ export function validateDocument(value: unknown, partial = false): TimelineDocum
     throw new Error('Saved comparisons reference sources instead of storing events.');
   const ids = new Set<string>();
   const plugins = doc.plugins === undefined ? undefined : validateInstalledPlugins(doc.plugins);
+  // Values are checked against the declarations (a fragment carries its timeline's settings).
+  const measures = doc.measures == null ? undefined : validateMeasures(doc.measures);
+  const declared = measures ?? {};
   const events = doc.events.map((raw: unknown): PointEvent => {
     if (!raw || typeof raw !== 'object') throw new Error('Invalid moment.');
     const e = raw as Record<string, unknown>;
@@ -396,6 +383,11 @@ export function validateDocument(value: unknown, partial = false): TimelineDocum
         throw new Error(`Moment ${field === 'title' ? 'titles' : 'notes'} must be text.`);
     }
     if (metadata.tags !== undefined) metadata.tags = normalizeEntityTags(metadata.tags);
+    try {
+      normalizeMeasureMetadata(metadata, declared);
+    } catch (error) {
+      throw new Error(`Moment ${e.id}: ${(error as Error).message}`);
+    }
     return { id: e.id, time: parseTime(e.time).toString(), metadata };
   });
   const legacy = convertLegacyDurations(events);
@@ -403,6 +395,7 @@ export function validateDocument(value: unknown, partial = false): TimelineDocum
     [...(doc.durations === undefined ? [] : asArray(doc.durations)), ...legacy.durations],
     partial ? null : ids,
     parseTime,
+    declared,
   ).sort((a, b) => (a.id < b.id ? -1 : a.id > b.id ? 1 : 0));
   // "Now" exists only where coordinates are calendar time (#537); a partial save carries no
   // settings, and its timeline's were checked when they were saved.
@@ -433,6 +426,7 @@ export function validateDocument(value: unknown, partial = false): TimelineDocum
     ...(doc.image == null ? {} : { image: validateTimelineImage(doc.image) }),
     ...(doc.view == null ? {} : { view: validateTimelineView(doc.view) }),
     ...(doc.views == null ? {} : { views: validateSavedViews(doc.views) }),
+    ...(measures && Object.keys(measures).length ? { measures } : {}),
     ...(doc.assets === undefined ? {} : { assets: validateAssets(doc.assets) }),
     events: legacy.events,
     ...(durations.length ? { durations } : {}),
@@ -479,6 +473,7 @@ export class TimelineIndex {
   image?: TimelineImage;
   view?: TimelineView;
   views?: SavedViewEntry[];
+  measures?: Measures;
   assets?: Record<string, string>;
   constructor(document: TimelineDocument) {
     // Server metadata reports unset settings as null; treat them as absent.
@@ -486,6 +481,7 @@ export class TimelineIndex {
     this.image = document.image == null ? undefined : validateTimelineImage(document.image);
     this.view = document.view == null ? undefined : validateTimelineView(document.view);
     this.views = document.views == null ? undefined : validateSavedViews(document.views);
+    this.measures = document.measures == null ? undefined : validateMeasures(document.measures);
     this.assets = document.assets == null ? undefined : validateAssets(document.assets);
     this.title = document.title;
     this.description = document.description;
@@ -737,6 +733,7 @@ export class TimelineIndex {
       ...(this.image === undefined ? {} : { image: this.image }),
       ...(this.view === undefined ? {} : { view: this.view }),
       ...(this.views === undefined ? {} : { views: this.views }),
+      ...(this.measures === undefined ? {} : { measures: this.measures }),
       ...(this.assets === undefined ? {} : { assets: this.assets }),
       events: [...this.points].flatMap(([, bucket]) => [...bucket]),
       ...(durations.length ? { durations } : {}),

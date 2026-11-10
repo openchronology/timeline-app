@@ -27,6 +27,7 @@ import { Moderation } from './moderation.mjs';
 import { deleteAccount } from './account-deletion.mjs';
 import { POLICY_VERSION, agreed, requireAgreed, requireAgreement } from './policies.mjs';
 import { mapTimes } from './time-map.mjs';
+import { changeMeasures } from './measure-change.mjs';
 import { saveBase } from './save-merge.mjs';
 import { timelineSettings } from './incremental.mjs';
 import { authorizeKey, keyRequestRead } from './api-keys.mjs';
@@ -1547,11 +1548,11 @@ export function createRequestHandler({
         }
         // One timeline and its actions. Reads (metadata, document, query, revision, recent):
         // anyone who may see it, checked by the store. Writes (save, changes, delete-range,
-        // map-times): signed in or a write-scoped key, with the CSRF token; write access
+        // map-times, measures): signed in or a write-scoped key, with the CSRF token; write access
         // checked by the store or here. Sharing, settings, members and deletion: its owner
         // (or an administrator), checked further down.
         const match =
-          /^\/api\/timelines\/([^/]+)(?:\/(document|query|members|settings|file|changes|delete-range|map-times|revision|recent|links))?$/.exec(
+          /^\/api\/timelines\/([^/]+)(?:\/(document|query|members|settings|file|changes|delete-range|map-times|measures|revision|recent|links))?$/.exec(
             pathname,
           );
         if (!match || !uuid.test(match[1])) throw new HttpError(404, 'Unknown endpoint.');
@@ -1698,6 +1699,28 @@ export function createRequestHandler({
             'Content-Type': 'application/x-ndjson; charset=utf-8',
           });
         }
+        // Changes measures (#572; measure-change.mjs) with their values: renaming, removing
+        // or narrowing, as one save, streaming its progress as JSON lines like map-times.
+        if (action === 'measures' && method === 'POST') {
+          auth.require(session, req);
+          const input = await body(req);
+          if (typeof input.revision !== 'string' || !/^\d+$/.test(input.revision))
+            throw new HttpError(400, 'Expected a revision string.');
+          const t = await store.access(id, userId);
+          const run = (progress) =>
+            changeMeasures(
+              store,
+              t,
+              userId,
+              { revision: input.revision, measures: input.measures, renames: input.renames },
+              progress,
+            );
+          if (!/application\/x-ndjson/.test(req.headers.accept ?? ''))
+            return response(res, 200, await run(undefined));
+          return await streamResponse(res, progressLines(run), {
+            'Content-Type': 'application/x-ndjson; charset=utf-8',
+          });
+        }
         // An incremental save (store.save): up to 5000 changed moments and durations (null to
         // delete) and 5000 relationships, at `revision`, with the settings sent back. Each
         // moment is validated in the context of those settings; ids must be unique within the
@@ -1765,7 +1788,7 @@ export function createRequestHandler({
             if (change.duration === null) return { id: change.id, duration: null };
             let duration;
             try {
-              duration = validateDuration(change.duration, parseTime);
+              duration = validateDuration(change.duration, parseTime, settings.measures ?? {});
             } catch (error) {
               throw new HttpError(400, error.message);
             }

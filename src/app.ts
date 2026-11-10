@@ -78,6 +78,7 @@ import {
   validateEntityTags,
   validateSeparations,
   validateTimelineImage,
+  validateMeasures,
   validateTimelineView,
   validateSavedViews,
   validateViewText,
@@ -187,6 +188,7 @@ import type {
   TimelineImage,
   TimelineView,
   SavedViewEntry,
+  Measures,
   ViewSeparation,
   TimePresentation,
   PresentationContext,
@@ -287,6 +289,8 @@ interface RemoteTimeline {
   view?: TimelineView;
   /** A desktop file's own views (#550); a server's are read apart. */
   views?: SavedViewEntry[];
+  /** The quantities its entities carry (#572), by name. */
+  measures?: Measures;
   assets?: Record<string, string>;
   /** Its sensitive-content labels (#115): its owner's and moderators'. */
   labels?: string[];
@@ -3499,6 +3503,7 @@ async function openRemote(id: string, restoreSeparation = true) {
   info.image = info.image ? validateTimelineImage(info.image) : undefined;
   info.view = readTimelineView(info.view);
   info.views = readSavedViews(info.views);
+  info.measures = info.measures ? validateMeasures(info.measures) : undefined;
   if (info.comparison) {
     const sources = await comparisonSources(info.comparison.sources);
     if (request !== documentRequest) return;
@@ -3522,6 +3527,7 @@ async function openRemote(id: string, restoreSeparation = true) {
       tags: info.tags,
       image: info.image,
       view: info.view,
+      measures: info.measures,
       assets: info.assets,
       events: [],
     });
@@ -7735,6 +7741,7 @@ async function moveToLatest(id: string) {
   info.image = info.image ? validateTimelineImage(info.image) : undefined;
   info.view = readTimelineView(info.view);
   info.views = readSavedViews(info.views);
+  info.measures = info.measures ? validateMeasures(info.measures) : undefined;
   // Settings not edited here are as `before` had them: they take the latest.
   adoptSettings(index, before!, info);
   if (
@@ -7767,6 +7774,7 @@ const SETTING_KEYS = [
   'image',
   'view',
   'views',
+  'measures',
   'presentation',
   'plugins',
   'assets',
@@ -7829,6 +7837,8 @@ function takeSetting(
   if (key === 'image') index.image = saved.image ? validateTimelineImage(saved.image) : undefined;
   if (key === 'view') index.view = readTimelineView(saved.view);
   if (key === 'views') index.views = readSavedViews(saved.views);
+  if (key === 'measures')
+    index.measures = saved.measures ? validateMeasures(saved.measures) : undefined;
   if (key === 'presentation')
     index.presentation = saved.presentation ? validatePresentation(saved.presentation) : undefined;
   if (key === 'plugins')
@@ -7841,6 +7851,7 @@ const SETTING_NAMES: Record<string, string> = {
   tags: 'The tags',
   image: 'The image',
   view: 'The default view',
+  measures: 'The measures',
   presentation: 'The time display',
   plugins: 'The plugins',
   assets: 'The images',
