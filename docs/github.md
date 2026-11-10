@@ -41,24 +41,24 @@ Each moment is titled with what happened and the item, such as `Labelled bug: #4
 
 The person is the one assigned, the reviewer whose review was requested or given, and otherwise whoever did it.
 
-| Kind          | Events, and their tags                                                                                                                                                        |
-| ------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `items`       | Each issue and pull request's duration, above. Without it, links (which need the durations) are left out too                                                                  |
-| `commits`     | Each commit, below                                                                                                                                                            |
-| `branches`    | `branch created`, `branch deleted` (live), or `branch` (imported: when a branch began, at its first commit of its own), with the branch's name                                |
-| `forks`       | `forked`: each fork, at when it was made, with its owner's `github/<login>`                                                                                                   |
-| `assignments` | `assigned`, `unassigned`                                                                                                                                                      |
-| `labels`      | `labeled`, `unlabeled`, with `label:<name>`                                                                                                                                   |
-| `milestones`  | `milestoned`, `demilestoned`, with `milestone:<title>`. Each milestone is also a duration from creation to closing (ongoing while open), with a `due` moment at its due date  |
-| `state`       | `closed`, `reopened`, `merged`: who did it, besides the duration's end                                                                                                        |
-| `renames`     | `renamed`, titled with the old title                                                                                                                                          |
-| `reviews`     | `review requested`, `review request removed`, `reviewed` (with `review:approved`, `review:changes requested` or `review:commented`), `ready for review`, `converted to draft` |
-| `mentions`    | `mentioned`, on the item named, with the naming item's tag, and a link between the two: one moment per pair, however often it is named again                                  |
-| `relations`   | `sub-issue added`/`removed`, `parent issue added`/`removed` (with the other item's tag, and a link), `marked as duplicate`, `unmarked as duplicate`                           |
-| `status`      | `moved`, with `status:<column>` and `project:<name>`: a move on a project board. The time in each column is also a duration, tagged `in column`                               |
-| `schedule`    | Boards' and plans' dates and progress ([boards](boards.md#moments)); nothing on repositories yet                                                                              |
-| `releases`    | `released`: each published release, a moment on its repository, with `release:<tag>` (and `prerelease`)                                                                       |
-| `other`       | `locked`, `unlocked`, `pinned`, `unpinned`, `transferred`                                                                                                                     |
+| Kind          | Events, and their tags                                                                                                                                                                                                  |
+| ------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `items`       | Each issue and pull request's duration, above. Without it, links (which need the durations) are left out too                                                                                                            |
+| `commits`     | Each commit, below                                                                                                                                                                                                      |
+| `branches`    | `branch created`, `branch deleted` (live), or `branch` (imported: when a branch began, at its first commit of its own), with the branch's name                                                                          |
+| `forks`       | `forked`: each fork, at when it was made, with its owner's `github/<login>`                                                                                                                                             |
+| `assignments` | `assigned`, `unassigned`                                                                                                                                                                                                |
+| `labels`      | `labeled`, `unlabeled`, with `label:<name>`                                                                                                                                                                             |
+| `milestones`  | `milestoned`, `demilestoned`, with `milestone:<title>`. Each milestone is also a duration from creation to closing (ongoing while open), with a `due` moment at its due date                                            |
+| `state`       | `closed`, `reopened`, `merged`: who did it, besides the duration's end                                                                                                                                                  |
+| `renames`     | `renamed`, titled with the old title                                                                                                                                                                                    |
+| `reviews`     | `review requested`, `review request removed`, `reviewed` (with `review:approved`, `review:changes requested` or `review:commented`), `ready for review`, `converted to draft`                                           |
+| `mentions`    | `mentioned`, on the item named, with the naming item's tag, and a link between the two: one moment per pair, however often it is named again                                                                            |
+| `relations`   | `sub-issue added`/`removed`, `parent issue added`/`removed` (with the other item's tag, and a link), `marked as duplicate`, `unmarked as duplicate`, `dependency added`/`removed` (Forgejo's dependencies, with a link) |
+| `status`      | `moved`, with `status:<column>` and `project:<name>`: a move on a project board. The time in each column is also a duration, tagged `in column`                                                                         |
+| `schedule`    | Plans: an item's or milestone's dates as a planned duration ([below](#plans-a-gantt-chart)); `rescheduled`, when a roadmap's date changes                                                                               |
+| `releases`    | `released`: each published release, a moment on its repository, with `release:<tag>` (and `prerelease`)                                                                                                                 |
+| `other`       | `locked`, `unlocked`, `pinned`, `unpinned`, `transferred`                                                                                                                                                               |
 
 All kinds are recorded, unless you choose:
 
@@ -100,6 +100,20 @@ Separating by `status:` tags turns the board's columns into rows, so it shows ho
 - a milestone is a duration, with its due date as a moment.
 
 Items in a milestone carry its `milestone:<title>` tag, so separating by that tag lines them up against it. Deleting a release, or a milestone, removes it.
+
+### Plans: a Gantt chart
+
+Dates an item or milestone is planned for become a **planned** duration beside it, titled `Planned: #412 …` and tagged `planned`, with the item's tags and its assignees. Separating by `planned` sets the plan beside what happened, as a Gantt chart would:
+
+| Planned by                           | From                                               | Until                                                             |
+| ------------------------------------ | -------------------------------------------------- | ----------------------------------------------------------------- |
+| A GitLab or Forgejo issue's due date | its creation                                       | the end of its due date                                           |
+| A milestone's due date               | its start date (GitLab's), or its creation         | its due date                                                      |
+| A GitHub project's roadmap           | the item's start date field (named like **Start**) | its target date field (named like **Target**, **End** or **Due**) |
+
+**GitHub Projects' roadmaps** give one planned duration per item and project, tagged `project:<name>`. GitHub serves project fields only through GraphQL, to a token allowed to read projects: a classic token with the `read:project` scope, or a fine-grained one with read access to the organization's **Projects**. Without that, the importer leaves the dates out with a warning. It reads them in one request per 50 issues and per 50 pull requests. The receiver rewrites the plan when a `projects_v2_item` delivery says a date field changed, with a `rescheduled` moment such as `Target date set to 2026-11-20 in Roadmap`.
+
+The `schedule` kind switches plans on and off.
 
 Every moment's ID is made from its item, what happened, to what and when. So the importer and the receiver write the same event as one moment.
 
@@ -259,7 +273,8 @@ github.com keeps its short form, `github/acme/app#412`, and GitHub Enterprise na
   One receiver takes GitHub's and Forgejo's deliveries together, each checked against its own secret.
 
 - **Labels:** Forgejo's deliveries say only that an item's labels changed, not which. The item's `label:` tags follow, but a label moment is recorded only by the importer, which reads it from the item's timeline.
-- **Not on Forgejo:** project boards, sub-issues and review requests by team.
+- **Dependencies:** an issue another blocks gets a `dependency added` moment and a link to it, from the importer.
+- **Not on Forgejo:** project boards (Forgejo's API does not show their columns), sub-issues and review requests by team.
 
 ## GitLab
 
@@ -289,7 +304,8 @@ Merge requests are numbered apart from issues, so they are written `!7`, and tag
 
   The receiver reads each change's before and after from the delivery: the labels added and removed, assignees, reviewers, title and draft state, and closing, reopening, merging and approval.
 
-- **Not on GitLab:** project boards, forks and sub-issues are not read live; forks are imported.
+- **Issue boards:** a board's lists are labels, so the importer reads the project's boards and turns each issue's list labels into moves: a `moved` moment when a list's label is added, and a stay in each list, `#12 in Doing`, tagged `in column` and `status:<list>`. An issue is in **Open** until it has a list's label, and its last stay ends when it closes. Labels changed at once, as a drag between lists changes them, count as one move. The receiver records the label changes but not the moves: run the importer with `--since` to bring the stays up to date.
+- **Not on GitLab:** forks and sub-issues are not read live; forks are imported.
 
 ## Running it as a service
 

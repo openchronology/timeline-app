@@ -33,6 +33,8 @@ export const BOARD_PLATFORMS = {
   jira: { prefix: 'jr', name: 'Jira' },
   planner: { prefix: 'pl', name: 'Microsoft Planner' },
   openproject: { prefix: 'op', name: 'OpenProject' },
+  // Plan files: Microsoft Project's XML (msproject-source.mjs).
+  msproject: { prefix: 'mp', name: 'Microsoft Project' },
 };
 /** The most characters of a card's text a duration keeps as its notes. */
 export const NOTES_LIMIT = 4000;
@@ -43,7 +45,7 @@ const ID = /^[A-Za-z0-9_.:-]{1,128}$/;
  * be `*` in routing rules: every Jira project or OpenProject project on that host.
  */
 const BOARD =
-  /^(trello|planner|jira|openproject):(?:([A-Za-z0-9.-]{1,253}(?::\d{1,5})?)\/)?([A-Za-z0-9_.~-]{1,128}|\*)$/;
+  /^(trello|planner|jira|openproject|msproject):(?:([A-Za-z0-9.-]{1,253}(?::\d{1,5})?)\/)?([A-Za-z0-9_.~-]{1,128}|\*)$/;
 /** A board reference's parts, `{platform, host, board}`, or null when it is not one. */
 export function parseBoard(reference) {
   const m = typeof reference === 'string' ? BOARD.exec(reference) : null;
@@ -328,7 +330,8 @@ export function cardChanges(board, source, card, kinds, { stints = true } = {}) 
     .map((e) => cardMoment(board, source, card, e));
   return {
     durations: [
-      ...(items ? [cardDuration(board, source, card)] : []),
+      // A plan's task not yet begun has no duration of its own, only its plan.
+      ...(items && card.created ? [cardDuration(board, source, card)] : []),
       ...plan.durations,
       ...(stints && keeps(kinds, 'in column') ? cardStints(board, source, card) : []),
     ],
