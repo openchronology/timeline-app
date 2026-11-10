@@ -25,6 +25,7 @@ import {
   subIssueChanges,
   timelineEvent,
 } from './github-events.mjs';
+import { parseBoard } from './board-source.mjs';
 
 /** The User-Agent GitHub requires of API clients: the project, never a person. */
 export const USER_AGENT =
@@ -247,30 +248,81 @@ export function validSignature(secret, body, header) {
 export function githubRoutes(config) {
   const uuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
   if (!config || typeof config !== 'object') throw new Error('The routes must be a JSON object.');
-  const routes = (config.routes ?? []).map((route, i) => {
-    // A repository reference, whose last part may be `*`: everything under that owner or
-    // group (on GitLab, in its subgroups too).
-    const pattern = typeof route?.repository === 'string' ? route.repository : '';
-    const parsed = parseRepository(pattern.replace(/\/\*$/, '/x'));
+  // Boards and plans (board-source.mjs): `{"board": "trello:<id>", "timeline": …}`, with the
+  // lists that count as done on Trello (`"done": ["Shipped"]`).
+  const boards = [];
+  for (const [i, route] of (config.routes ?? []).entries()) {
+    if (route?.board === undefined) continue;
+    const parsed = parseBoard(route.board);
     if (!parsed || !uuid.test(route.timeline ?? ''))
       throw new Error(
-        `Route ${i + 1} needs a repository (such as "owner/name", "owner/*" or "forgejo:codeberg.org/owner/*") and a timeline ID.`,
+        `Route ${i + 1} needs a board (such as "trello:<board ID>", "jira:<host>/<project key>", "planner:<plan ID>" or "openproject:<host>/<project>") and a timeline ID.`,
       );
-    const wild = pattern.endsWith('/*'),
-      path = parsed.path.toLowerCase();
-    return {
-      platform: parsed.platform,
-      host: parsed.host,
-      path: wild ? path.slice(0, -1) : path,
-      wild,
+    if (
+      route.done !== undefined &&
+      !(Array.isArray(route.done) && route.done.every((d) => typeof d === 'string'))
+    )
+      throw new Error(`Route ${i + 1}: "done" lists the names of the lists that count as done.`);
+    boards.push({
+      ...parsed,
+      board: parsed.board.toLowerCase(),
+      reference: route.board,
       timeline: route.timeline.toLowerCase(),
-    };
-  });
+      done: route.done,
+    });
+  }
+  const routes = (config.routes ?? [])
+    .filter((route) => route?.board === undefined)
+    .map((route, i) => {
+      // A repository reference, whose last part may be `*`: everything under that owner or
+      // group (on GitLab, in its subgroups too).
+      const pattern = typeof route?.repository === 'string' ? route.repository : '';
+      const parsed = parseRepository(pattern.replace(/\/\*$/, '/x'));
+      if (!parsed || !uuid.test(route.timeline ?? ''))
+        throw new Error(
+          `Route ${i + 1} needs a repository (such as "owner/name", "owner/*" or "forgejo:codeberg.org/owner/*") and a timeline ID.`,
+        );
+      const wild = pattern.endsWith('/*'),
+        path = parsed.path.toLowerCase();
+      return {
+        platform: parsed.platform,
+        host: parsed.host,
+        path: wild ? path.slice(0, -1) : path,
+        wild,
+        timeline: route.timeline.toLowerCase(),
+      };
+    });
   if (config.default !== undefined && !uuid.test(config.default))
     throw new Error('The default timeline must be a timeline ID.');
   const fallback = config.default?.toLowerCase() ?? null;
   return {
-    timelines: [...new Set([...routes.map((r) => r.timeline), ...(fallback ? [fallback] : [])])],
+    timelines: [
+      ...new Set([
+        ...routes.map((r) => r.timeline),
+        ...boards.map((b) => b.timeline),
+        ...(fallback ? [fallback] : []),
+      ]),
+    ],
+    // The boards named (not `*`), as configured: the receiver reads Planner's plans itself.
+    boards: boards.filter((b) => b.board !== '*'),
+    /**
+     * Where a board's events go, `{timeline, done}`, or null: the first rule naming the board
+     * by any of `names` (Trello's board ID or short link), or `*` on its host, then `default`.
+     */
+    routeBoard(platform, host, names) {
+      const wanted = names.filter(Boolean).map((n) => String(n).toLowerCase());
+      const match = boards.find(
+        (b) =>
+          b.platform === platform &&
+          b.host === (host?.toLowerCase() ?? null) &&
+          (b.board === '*' || wanted.includes(b.board)),
+      );
+      return match
+        ? { timeline: match.timeline, done: match.done }
+        : fallback
+          ? { timeline: fallback }
+          : null;
+    },
     // The kinds recorded (github-events.mjs EVENT_KINDS): all, `only` some, or all `except`
     // some.
     kinds: selectKinds({ only: config.only, except: config.except }),

@@ -15,6 +15,17 @@ import { deliveryChanges, loadRoutes, validSignature } from './github-source.mjs
 import { StintTracker, keeps, projectStatusChange } from './github-events.mjs';
 import { forgejoDelivery, validForgejoSignature } from './forgejo-source.mjs';
 import { gitlabDeliveryChanges, validGitlabToken } from './gitlab-source.mjs';
+import { BoardTracker, cardChanges, cardDiff, cardRemoval } from './board-source.mjs';
+import {
+  actionEvents,
+  readTrelloCard,
+  trelloCard,
+  validTrelloSignature,
+} from './trello-source.mjs';
+import { jiraDelivery, validJiraSignature } from './jira-source.mjs';
+import { openprojectDelivery, validOpenProjectSignature } from './openproject-source.mjs';
+import { boardClient, readBoard } from './board-import.mjs';
+import { dirname, join } from 'node:path';
 
 /** A delivery's JSON body, or null when it is not JSON. */
 function parse(body) {
@@ -109,11 +120,26 @@ export class GithubIngest {
     token,
     githubApi = 'https://api.github.com',
     stints = new StintTracker(),
+    boards = {},
+    tracker = new BoardTracker(),
   }) {
-    if (!secret && !secrets.forgejo && !secrets.gitlab)
+    if (
+      !secret &&
+      !secrets.forgejo &&
+      !secrets.gitlab &&
+      !boards.trello &&
+      !boards.jira &&
+      !boards.openproject &&
+      !boards.planner
+    )
       throw new Error(
-        'Set the webhook’s secret: GITHUB_WEBHOOK_SECRET for GitHub, FORGEJO_WEBHOOK_SECRET for Forgejo or Gitea, GITLAB_WEBHOOK_TOKEN for GitLab.',
+        'Set the webhook’s secret: GITHUB_WEBHOOK_SECRET for GitHub, FORGEJO_WEBHOOK_SECRET for Forgejo or Gitea, GITLAB_WEBHOOK_TOKEN for GitLab, or a board’s (docs/boards.md).',
       );
+    // Boards and plans (docs/boards.md): `trello` {secret, callbackUrl, reader}, `jira`
+    // {secret, startField}, `openproject` {secret, host}, `planner` a Graph reader.
+    this.boards = boards;
+    // Each card's last reading and column, for its stints and for comparing readings.
+    this.tracker = tracker;
     this.writer = new TimelineWriter({ api, key, fetcher });
     this.secret = secret;
     // Other platforms' webhook secrets: `forgejo`.
@@ -130,6 +156,143 @@ export class GithubIngest {
     this.timers = new Map();
     this.sending = new Map();
     this.stats = { deliveries: 0, rejected: 0, ignored: 0, saved: 0, failed: 0 };
+  }
+  /** A board's changes, queued on the timeline its route names; whether one did. */
+  queueBoard(route, reference, source, card, { events, at, removed = false }) {
+    if (!route) return false;
+    if (removed) {
+      this.tracker.forget(reference, card.key);
+      return keeps(this.routes.kinds, 'item')
+        ? this.queue({ timeline: route.timeline, ...cardRemoval(reference, card) })
+        : false;
+    }
+    const kinds = this.routes.kinds;
+    const changes = cardChanges(reference, source, { ...card, events }, kinds, { stints: false });
+    const stints = this.tracker.observe(reference, source, card, at);
+    if (keeps(kinds, 'in column')) changes.durations.push(...stints);
+    return this.queue({ timeline: route.timeline, ...changes });
+  }
+  /**
+   * A Trello delivery: its action's card is read again (deliveries carry only what changed),
+   * then queued with the action's events. 202, or 204 for an action on no card or board
+   * routed.
+   */
+  trello(payload) {
+    const action = payload?.action;
+    const board = action?.data?.board ?? payload?.model;
+    const cardId = action?.data?.card?.id;
+    const trello = this.boards.trello;
+    const route = board && this.routes.routeBoard('trello', null, [board.id, board.shortLink]);
+    if (!cardId || !route) return 204;
+    const reference = `trello:${board.id}`;
+    const source = { platform: 'trello', name: board.name ?? null };
+    const events = actionEvents(action);
+    if (action.type === 'deleteCard') {
+      this.queueBoard(route, reference, source, { key: cardId }, { removed: true });
+      return 202;
+    }
+    if (!events.length || !trello.reader) return 204;
+    const resolving = readTrelloCard(trello.reader, cardId)
+      .then((raw) => {
+        const lists = new Map(raw.list ? [[raw.idList, raw.list.name]] : []);
+        const card = trelloCard(raw, {
+          board: { shortLink: board.shortLink },
+          lists,
+          actions: [action],
+          done: route.done,
+        });
+        // The card's done time is when this action finished it, if it did.
+        const before = this.tracker.get(reference, card.key);
+        if (card.done && before?.done) card.done = before.done;
+        if (
+          !this.queueBoard(route, reference, source, card, { events: card.events, at: action.date })
+        )
+          this.stats.ignored++;
+      })
+      .catch((error) => this.log.error('trello: a card:', error.message))
+      .finally(() => this.resolving.delete(resolving));
+    this.resolving.add(resolving);
+    return 202;
+  }
+  /** A Jira delivery: its issue as it is now, with its changelog's events. */
+  jira(payload) {
+    const delivery = jiraDelivery(payload, { startField: this.boards.jira?.startField });
+    if (!delivery) return 204;
+    const route = this.routes.routeBoard('jira', delivery.host, [delivery.project]);
+    const reference = `jira:${delivery.host}/${delivery.project}`;
+    const source = {
+      platform: 'jira',
+      name: payload.issue.fields?.project?.name ?? delivery.project,
+    };
+    const at = new Date(Number(payload.timestamp) || Date.now()).toISOString();
+    return this.queueBoard(route, reference, source, delivery.card, {
+      events: delivery.card.events,
+      at,
+      removed: delivery.deleted,
+    })
+      ? 202
+      : 204;
+  }
+  /** An OpenProject delivery: the work package now, compared with its last reading. */
+  openproject(payload) {
+    const host = this.boards.openproject?.host;
+    const delivery = host ? openprojectDelivery(host, payload) : null;
+    if (!delivery?.project) return 204;
+    const route = this.routes.routeBoard('openproject', host, [delivery.project]);
+    const reference = `openproject:${host}/${delivery.project}`;
+    const source = {
+      platform: 'openproject',
+      name: payload.work_package._embedded?.project?.name ?? delivery.project,
+    };
+    const at = payload.work_package.updatedAt ?? new Date().toISOString();
+    const events = [
+      ...delivery.card.events,
+      ...cardDiff(this.tracker.get(reference, delivery.card.key), delivery.card, at, delivery.by),
+    ];
+    return this.queueBoard(route, reference, source, delivery.card, { events, at }) ? 202 : 204;
+  }
+  /**
+   * Reads each routed Planner plan, as a poll: the first reading writes every task; later ones
+   * what changed since (moves between buckets and other changes dated now, assignments and
+   * completion as Planner dates them), and remove tasks no longer there.
+   */
+  async pollPlanner(now = () => new Date().toISOString()) {
+    const reader = this.boards.planner;
+    if (!reader) return;
+    for (const plan of this.routes.boards.filter((b) => b.platform === 'planner')) {
+      try {
+        const read = await readBoard(reader, plan.reference);
+        const route = { timeline: plan.timeline };
+        const at = now();
+        const seen = new Set();
+        let queued = 0;
+        for (const card of read.cards) {
+          seen.add(card.key);
+          const before = this.tracker.get(read.reference, card.key);
+          // Planner dates assignments and completion; the rest is dated by this reading.
+          const events = before
+            ? [
+                ...cardDiff(before, card, at).filter(
+                  (e) => e.verb !== 'assigned' && e.verb !== 'completed',
+                ),
+                ...card.events.filter(
+                  (e) =>
+                    (e.verb === 'assigned' && !before.assignees.includes(e.subject)) ||
+                    (e.verb === 'completed' && !before.done),
+                ),
+              ]
+            : card.events;
+          if (before && !events.length && this.tracker.same(read.reference, card)) continue;
+          if (this.queueBoard(route, read.reference, read.source, card, { events, at })) queued++;
+        }
+        for (const key of this.tracker.keys(read.reference))
+          if (!seen.has(key))
+            this.queueBoard(route, read.reference, read.source, { key }, { removed: true });
+        if (queued) this.log.log?.(`planner: ${queued} tasks changed in "${read.board.name}".`);
+      } catch (error) {
+        this.log.error(`planner: ${plan.reference}: ${error.message}`);
+      }
+    }
   }
   /**
    * Checks that every routed timeline exists and has the Gregorian display, which ongoing
@@ -191,6 +354,36 @@ export class GithubIngest {
       }
       return this.handle(delivery.event, delivery.payload);
     }
+    if (headers['x-trello-webhook'] !== undefined) {
+      const trello = this.boards.trello;
+      if (
+        !trello ||
+        !validTrelloSignature(trello.secret, trello.callbackUrl, body, headers['x-trello-webhook'])
+      ) {
+        this.stats.rejected++;
+        return 401;
+      }
+      return this.board(body, (payload) => this.trello(payload));
+    }
+    if (headers['x-op-signature'] !== undefined) {
+      const op = this.boards.openproject;
+      if (!op || !validOpenProjectSignature(op.secret, body, headers['x-op-signature'])) {
+        this.stats.rejected++;
+        return 401;
+      }
+      return this.board(body, (payload) => this.openproject(payload));
+    }
+    if (
+      headers['x-atlassian-webhook-identifier'] !== undefined ||
+      headers['x-hub-signature'] !== undefined
+    ) {
+      const jira = this.boards.jira;
+      if (!jira || !validJiraSignature(jira.secret, body, headers['x-hub-signature'])) {
+        this.stats.rejected++;
+        return 401;
+      }
+      return this.board(body, (payload) => this.jira(payload));
+    }
     const gitlab = headers['x-gitlab-event'];
     if (gitlab) {
       if (
@@ -211,6 +404,15 @@ export class GithubIngest {
       return queued ? 202 : 204;
     }
     return 400;
+  }
+  /** A board's checked delivery: 400 when it is not JSON, else what `handle` answers. */
+  board(body, handle) {
+    const payload = parse(body);
+    if (!payload) return 400;
+    this.stats.deliveries++;
+    const status = handle(payload);
+    if (status === 204) this.stats.ignored++;
+    return status;
   }
   /** A checked delivery, in GitHub's shape: queued (202) or not kept (204). */
   handle(event, payload) {
@@ -263,7 +465,7 @@ export class GithubIngest {
   }
   /** Queues one repository's changes on its timeline; whether a route chose one. */
   queue(changes) {
-    const timeline = this.routes.route(changes.repository);
+    const timeline = changes.timeline ?? this.routes.route(changes.repository);
     if (!timeline) return false;
     let queue = this.pending.get(timeline);
     if (!queue) this.pending.set(timeline, (queue = new Pending()));
@@ -357,11 +559,16 @@ export class GithubIngest {
 }
 
 /**
- * Serves the webhook: POST with GitHub's headers at any path; anything else is 404 or 405.
+ * Serves the webhook: POST with a platform's headers at any path; HEAD is answered 200, as
+ * Trello checks a webhook's address before creating it; anything else is 404 or 405.
  * Resolves once listening, with the port and a close function.
  */
 export function listenGithub(ingest, { host = '127.0.0.1', port = 5580 } = {}) {
   const server = createServer((request, response) => {
+    if (request.method === 'HEAD') {
+      response.writeHead(200).end();
+      return;
+    }
     if (request.method !== 'POST') {
       response.writeHead(request.method === 'GET' ? 404 : 405).end();
       return;
@@ -392,6 +599,50 @@ export function listenGithub(ingest, { host = '127.0.0.1', port = 5580 } = {}) {
   });
 }
 
+/** A JSON state file's reading and writing: an unreadable one is empty. */
+const stateFile = {
+  read: (file) => {
+    try {
+      return JSON.parse(readFileSync(file, 'utf8'));
+    } catch {
+      return {};
+    }
+  },
+  write: (file, value) => writeFileSync(file, JSON.stringify(value)),
+};
+
+/**
+ * The boards' settings from the environment (docs/boards.md), each only when configured:
+ * Trello's app secret and callback URL (and key and token, to read a delivery's card), Jira's
+ * webhook secret, OpenProject's webhook secret and host, and Planner's app credentials.
+ */
+export function boardSettings(env, routes) {
+  const boards = {};
+  if (env.TRELLO_SECRET && env.TRELLO_CALLBACK_URL)
+    boards.trello = {
+      secret: env.TRELLO_SECRET,
+      callbackUrl: env.TRELLO_CALLBACK_URL,
+      reader: env.TRELLO_KEY && env.TRELLO_TOKEN ? boardClient('trello:x', env) : null,
+    };
+  if (env.JIRA_WEBHOOK_SECRET)
+    boards.jira = {
+      secret: env.JIRA_WEBHOOK_SECRET,
+      // Deliveries carry fields by ID: the start date's, such as customfield_10015.
+      startField: env.JIRA_START_FIELD
+        ? { id: env.JIRA_START_FIELD, name: env.JIRA_START_FIELD_NAME || 'Start date' }
+        : undefined,
+    };
+  if (env.OPENPROJECT_WEBHOOK_SECRET) {
+    const host =
+      env.OPENPROJECT_HOST || routes.boards.find((b) => b.platform === 'openproject')?.host || null;
+    if (host) boards.openproject = { secret: env.OPENPROJECT_WEBHOOK_SECRET, host };
+  }
+  const plan = routes.boards.find((b) => b.platform === 'planner');
+  if (plan && env.PLANNER_TENANT && env.PLANNER_CLIENT_ID && env.PLANNER_CLIENT_SECRET)
+    boards.planner = boardClient(plan.reference, env);
+  return boards;
+}
+
 /**
  * Runs the receiver from the environment: OCH_API_URL, OCH_API_KEY, GITHUB_WEBHOOK_SECRET,
  * GITHUB_ROUTES (or GITHUB_ROUTES_JSON), GITHUB_HOST and GITHUB_PORT (default
@@ -400,6 +651,7 @@ export function listenGithub(ingest, { host = '127.0.0.1', port = 5580 } = {}) {
  * left.
  */
 export async function main(env = process.env) {
+  const routes = loadRoutes(env);
   const ingest = new GithubIngest({
     api: env.OCH_API_URL,
     key: env.OCH_API_KEY,
@@ -408,23 +660,29 @@ export async function main(env = process.env) {
       forgejo: env.FORGEJO_WEBHOOK_SECRET || undefined,
       gitlab: env.GITLAB_WEBHOOK_TOKEN || undefined,
     },
-    routes: loadRoutes(env),
+    routes,
     flushMs: env.GITHUB_FLUSH_MS ? Number(env.GITHUB_FLUSH_MS) : undefined,
     token: env.GITHUB_TOKEN || undefined,
     githubApi: env.GITHUB_API_URL || undefined,
     // Open column stints survive a restart when GITHUB_STATE names a file for them.
-    stints: new StintTracker(env.GITHUB_STATE || undefined, {
-      read: (file) => {
-        try {
-          return JSON.parse(readFileSync(file, 'utf8'));
-        } catch {
-          return {};
-        }
-      },
-      write: (file, value) => writeFileSync(file, JSON.stringify(value)),
-    }),
+    stints: new StintTracker(env.GITHUB_STATE || undefined, stateFile),
+    boards: boardSettings(env, routes),
+    // Each card's last reading, beside GITHUB_STATE unless BOARD_STATE names a file.
+    tracker: new BoardTracker(
+      env.BOARD_STATE ||
+        (env.GITHUB_STATE ? join(dirname(env.GITHUB_STATE), 'boards.json') : undefined),
+      stateFile,
+    ),
   });
   await ingest.check();
+  // Planner sends no webhooks: its plans are read every PLANNER_POLL_MINUTES (default 5).
+  if (ingest.boards.planner && ingest.routes.boards.some((b) => b.platform === 'planner')) {
+    const minutes = Math.max(1, Number(env.PLANNER_POLL_MINUTES) || 5);
+    let polling = null;
+    const poll = () => (polling ??= ingest.pollPlanner().finally(() => (polling = null)));
+    void poll();
+    setInterval(poll, minutes * 60000).unref();
+  }
   const listening = await listenGithub(ingest, {
     host: env.GITHUB_HOST || '127.0.0.1',
     port: env.GITHUB_PORT ? Number(env.GITHUB_PORT) : 5580,

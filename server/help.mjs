@@ -290,6 +290,7 @@ export const HELP_SECTIONS = [
       'journald',
       'log-import',
       'github',
+      'boards',
       'licensing',
     ],
   },

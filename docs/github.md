@@ -15,6 +15,8 @@ What happens to them becomes **moments**: labels, milestones, assignments, revie
 
 Each tool only reads from GitHub. Nothing is written back.
 
+Trello boards, Jira projects, Microsoft Planner plans and OpenProject projects go through the same two tools: see [Boards and plans to timelines](boards.md).
+
 ## What a timeline shows
 
 | On GitHub                          | On the timeline                                                             |
@@ -54,6 +56,7 @@ The person is the one assigned, the reviewer whose review was requested or given
 | `mentions`    | `mentioned`, on the item named, with the naming item's tag, and a link between the two: one moment per pair, however often it is named again                                  |
 | `relations`   | `sub-issue added`/`removed`, `parent issue added`/`removed` (with the other item's tag, and a link), `marked as duplicate`, `unmarked as duplicate`                           |
 | `status`      | `moved`, with `status:<column>` and `project:<name>`: a move on a project board. The time in each column is also a duration, tagged `in column`                               |
+| `schedule`    | Boards' and plans' dates and progress ([boards](boards.md#moments)); nothing on repositories yet                                                                              |
 | `releases`    | `released`: each published release, a moment on its repository, with `release:<tag>` (and `prerelease`)                                                                       |
 | `other`       | `locked`, `unlocked`, `pinned`, `unpinned`, `transferred`                                                                                                                     |
 
