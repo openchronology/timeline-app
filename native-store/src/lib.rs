@@ -16,9 +16,10 @@
 //!   missing from older files, and their keys from older extras.
 //! - `events`: the moments, one row each, with their metadata JSON. Indexed by time.
 //! - `points`: a `rational_index` virtual table (shadow tables `points_nodes`, `points_meta`)
-//!   with one row per distinct moment time, weighted by how many moments share it. Its
-//!   augmented tree answers viewport overviews (groups of nearby moments) without reading
-//!   every moment.
+//!   with one row per distinct moment time, weighted by how many moments share it, and
+//!   carrying the sums of their measures' values (#574), one per declared measure in name
+//!   order. Its augmented tree answers viewport overviews (groups of nearby moments, with
+//!   their totals) without reading every moment.
 //! - `durations`: standalone durations; each endpoint is a fixed time or a moment it follows,
 //!   and an end with neither is ongoing: it ends "now" (#537).
 //! - `duration_intervals` + `duration_nodes`: durations with endpoints resolved to times, and
@@ -511,6 +512,11 @@ fn write<'a>(
             "CREATE VIRTUAL TABLE IF NOT EXISTS points USING rational_index",
             &[],
         )?;
+        // An index made before it kept measures' totals (#574) is made again with them.
+        if !points_have_sums(&db)? {
+            db.execute("DROP TABLE points", &[])?;
+            db.execute("CREATE VIRTUAL TABLE points USING rational_index", &[])?;
+        }
         db.execute("DELETE FROM points", &[])?;
         db.execute("DELETE FROM events", &[])?;
         // Upsert the single metadata row: inserted in a new file, updated in an existing one.
@@ -545,13 +551,15 @@ fn write<'a>(
             "SELECT time FROM events GROUP BY time COLLATE RATIONAL_V1 ORDER BY time COLLATE RATIONAL_V1",
             &[],
         )?;
+        // Each bucket's measure values added, one per declared measure (#574).
+        let sums = sums_sql(&measure_names(doc.measures.as_ref()));
         for range in times.chunks(5000) {
             let bound = |row: &Vec<Option<String>>| row.first().cloned().flatten();
             let (Some(first), Some(last)) = (bound(&range[0]), bound(&range[range.len() - 1]))
             else {
                 return Err("Missing moment time".into());
             };
-            db.execute("INSERT INTO points(time,value,weight,mode) SELECT time,time,count(*),'append' FROM events WHERE time>=?1 COLLATE RATIONAL_V1 AND time<=?2 COLLATE RATIONAL_V1 GROUP BY time COLLATE RATIONAL_V1",&[&first,&last])?;
+            db.execute(&format!("INSERT INTO points(time,value,weight,sums,mode) SELECT time,time,count(*),{sums},'append' FROM events WHERE time>=?1 COLLATE RATIONAL_V1 AND time<=?2 COLLATE RATIONAL_V1 GROUP BY time COLLATE RATIONAL_V1"),&[&first,&last])?;
         }
         db.execute("INSERT INTO points(mode) VALUES('build')", &[])?;
         // Durations from legacy links join the document's, in ID order as convert_legacy_durations
@@ -2207,6 +2215,111 @@ pub(crate) fn duration_summaries_walk(
 }
 /// Merges adjacent summaries while the merged block spans less than the threshold; the same
 /// rule as src/summaries.ts coalesceGroups. Groups are JSON frame groups in any order.
+/// The measures a timeline declares (#572), sorted by name: the positions of the sums the
+/// points index keeps for them (#574). Names the editor would refuse are left out, so they
+/// can be written into SQL.
+pub(crate) fn measure_names(measures: Option<&Value>) -> Vec<String> {
+    let mut names: Vec<String> = measures
+        .and_then(|m| m.as_object())
+        .map(|m| m.keys().cloned().collect())
+        .unwrap_or_default();
+    names.retain(|n| {
+        n.len() <= 40
+            && n.starts_with(|c: char| c.is_ascii_lowercase())
+            && n.bytes()
+                .all(|c| c.is_ascii_lowercase() || c.is_ascii_digit() || c == b'_')
+    });
+    names.sort();
+    names
+}
+/// The measures declared in a file's settings, as `measure_names` gives them.
+pub(crate) fn file_measure_names(db: &Connection) -> Result<Vec<String>, String> {
+    if db.scalar(
+        "SELECT count(*) FROM sqlite_schema WHERE name='timeline_extras' AND type='table'",
+        &[],
+    )? == "0"
+    {
+        return Ok(Vec::new());
+    }
+    let extras = db.query("SELECT extras FROM timeline_extras WHERE singleton=1", &[])?;
+    let value: Option<Value> = extras
+        .first()
+        .and_then(|row| row[0].as_deref())
+        .and_then(|text| serde_json::from_str(text).ok());
+    Ok(measure_names(
+        value.as_ref().and_then(|v| v.get("measures")),
+    ))
+}
+/// SQL (over `events` rows grouped by time) for a bucket's sums: each measure's values added
+/// (q_sum), joined by ';' in `names`' order, or NULL without measures.
+pub(crate) fn sums_sql(names: &[String]) -> String {
+    if names.is_empty() {
+        return "NULL".into();
+    }
+    names
+        .iter()
+        .map(|n| format!("q_sum(json_extract(metadata,'$.measures.{n}'))"))
+        .collect::<Vec<_>>()
+        .join("||';'||")
+}
+/// Whether the points index keeps sums (#574): files from before have no such columns.
+pub(crate) fn points_have_sums(db: &Connection) -> Result<bool, String> {
+    Ok(db.scalar(
+        "SELECT count(*) FROM pragma_table_info('points_nodes') WHERE name IN ('sums','total')",
+        &[],
+    )? == "2")
+}
+/// A group's totals by measure name (#574) from the index's sums (canonical rationals joined
+/// by ';', in `names`' order): integers without "/1", zeros left out; None when all are zero.
+pub(crate) fn named_totals(names: &[String], sums: Option<&str>) -> Option<Value> {
+    let mut totals = serde_json::Map::new();
+    for (name, value) in names.iter().zip(sums?.split(';')) {
+        if value.is_empty() || value == "0/1" {
+            continue;
+        }
+        let text = value.strip_suffix("/1").unwrap_or(value);
+        totals.insert(name.clone(), Value::String(text.to_string()));
+    }
+    (!totals.is_empty()).then_some(Value::Object(totals))
+}
+/// Rebuilds the points index from `events` with the file's measures' sums: for files whose
+/// index predates them, or whose measures changed names (#574).
+pub(crate) fn rebuild_point_index(db: &Connection) -> Result<(), String> {
+    db.execute("DROP TABLE IF EXISTS points", &[])?;
+    db.execute("CREATE VIRTUAL TABLE points USING rational_index", &[])?;
+    let sums = sums_sql(&file_measure_names(db)?);
+    db.execute(&format!("INSERT INTO points(time,value,weight,sums,mode) SELECT time,time,count(*),{sums},'append' FROM events GROUP BY time COLLATE RATIONAL_V1"), &[])?;
+    db.execute("INSERT INTO points(mode) VALUES('build')", &[])
+}
+/// Two groups' totals added (#574), exactly, through the rational extension.
+fn add_totals(db: &Connection, a: &Value, b: &Value) -> Result<Option<Value>, String> {
+    let (Some(a), Some(b)) = (a.as_object(), b.as_object()) else {
+        return Ok(if a.is_object() {
+            Some(a.clone())
+        } else if b.is_object() {
+            Some(b.clone())
+        } else {
+            None
+        });
+    };
+    let mut sum = a.clone();
+    for (name, value) in b {
+        let value = value.as_str().unwrap_or("0");
+        let total = match sum.get(name).and_then(|v| v.as_str()) {
+            Some(previous) => db.scalar("SELECT q_add(q(?1),q(?2))", &[previous, value])?,
+            None => db.scalar("SELECT q(?1)", &[value])?,
+        };
+        if total == "0/1" {
+            sum.remove(name);
+        } else {
+            sum.insert(
+                name.clone(),
+                Value::String(total.strip_suffix("/1").unwrap_or(&total).to_string()),
+            );
+        }
+    }
+    Ok((!sum.is_empty()).then_some(Value::Object(sum)))
+}
 pub(crate) fn coalesce_groups(
     db: &Connection,
     mut groups: Vec<Value>,
@@ -2274,6 +2387,9 @@ pub(crate) fn coalesce_groups(
         });
         if durations > 0 {
             merged["durationCount"] = Value::String(durations.to_string());
+        }
+        if let Some(totals) = add_totals(db, &prev["totals"], &g["totals"])? {
+            merged["totals"] = totals;
         }
         out.push(merged);
     }

@@ -129,6 +129,7 @@ rows. A build at any other time rebuilds the tree from its rows, keeping their r
 | threshold | Nonnegative rational TEXT; omitted or NULL requests raw rows |
 | mode | span (default) or neighbors in queries; append or build in an INSERT (above) |
 | visited_nodes | Read-only diagnostic number of node visits |
+| sums | Optional vector of rationals a row carries: canonical rationals joined by `;` (TEXT), NULL for none; in summaries, the group's vectors added (below) |
 
 Pass inputs with equality constraints as shown. Hidden viewport bounds are useful
 for summaries; ordinary comparisons on time also constrain coordinates before
@@ -139,6 +140,14 @@ Summary outputs: time (first coordinate), last_time, weight (total bucket weight
 distinct_count, and max_gap (largest adjacent gap). Raw rows have equal first/last
 times, distinct count 1, and gap 0/1. Value is returned for a single-coordinate
 group and NULL for larger groups. A summary's rowid identifies its first coordinate.
+
+Sums: a row may carry a vector of exact rationals in the hidden `sums` column, written
+on INSERT, UPDATE or append (`'1250/1;3/2'`). Every node keeps its subtree's vector
+total, element by element, as it keeps weights, so a summary's `sums` is the exact
+total of its rows' vectors, read from whole subtrees: a missing element is zero, and
+trailing zeros are left out (NULL when all are zero). An index whose shadow table was
+created before sums keeps working without them; it refuses rows with sums until it
+is made again.
 
 Span greedily gathers [a, a+threshold) from the first remaining coordinate a.
 Neighbors connects successive gaps strictly below the threshold and permits long
@@ -167,6 +176,7 @@ occurs.
 | q_add, q_sub, q_mul, q_div, q_min, q_max | Canonical rational TEXT |
 | q_neg, q_abs, q_floor, q_ceil | Canonical rational TEXT |
 | q_num, q_den | Arbitrary-precision integer TEXT |
+| q_sum(x) (aggregate) | Canonical rational TEXT: the exact sum, NULLs skipped, 0/1 over none |
 
 Rational arguments must be TEXT; bind strings or use q_decimal. NULL propagates
 through arithmetic; q_is_canonical(NULL) returns 0. Invalid arithmetic raises an

@@ -249,6 +249,78 @@ class ExtensionTests(unittest.TestCase):
             self.assertEqual(overview(c,Q(0),Q(1000),Q(1,2),'neighbors'),[('1/3','2000/3',2000,2000,'1/3')])
             self.assertEqual(c.execute("SELECT value FROM coords WHERE time='1/1'").fetchone(),('3',))
             c.close()
+    def test_sum_aggregate(self):
+        c=self.c
+        self.assertEqual(c.execute("SELECT q_sum(x) FROM (SELECT '1/2' x UNION ALL SELECT '1/3' UNION ALL SELECT NULL UNION ALL SELECT '7')").fetchone()[0],'47/6')
+        self.assertEqual(c.execute("SELECT q_sum(x) FROM (SELECT NULL x WHERE 0)").fetchone()[0],'0/1')
+        self.assertEqual(c.execute("SELECT q_sum(x) FROM (SELECT NULL x)").fetchone()[0],'0/1')
+        self.assertEqual(c.execute("SELECT g,q_sum(x) FROM (SELECT 1 g,'-3' x UNION ALL SELECT 1,'3' UNION ALL SELECT 2,'5/10') GROUP BY g").fetchall(),[(1,'0/1'),(2,'1/2')])
+        for bad in ['x','1/0',1.5]:
+            with self.assertRaises(sqlite3.DatabaseError): c.execute("SELECT q_sum(?)",(bad,)).fetchall()
+    def test_sums_total_like_weights(self):
+        """Rows' sums vectors are totalled per subtree and per overview group, exactly, through
+        inserts, updates (of the sums alone, or the key), deletes, bulk builds and a reopen."""
+        c=self.c; rng=random.Random(574)
+        def vec(): return [Q(rng.randint(-9,9),rng.randint(1,4)) for _ in range(rng.randint(0,3))]
+        def vtext(v): return ';'.join(text(x) for x in v)
+        def add(a,b):
+            n=max(len(a),len(b)); return [(a[i] if i<len(a) else 0)+(b[i] if i<len(b) else 0) for i in range(n)]
+        def norm(v):
+            v=list(v)
+            while v and v[-1]==0: v.pop()
+            return vtext(v) or None
+        rows={}
+        def check():
+            for _ in range(15):
+                lo=Q(rng.randint(-60,60),rng.randint(1,3)); hi=lo+Q(rng.randint(0,80),rng.randint(1,2))
+                th=Q(rng.randint(0,12),rng.randint(1,2))
+                for mode in ['span','neighbors']:
+                    got=c.execute('SELECT time,last_time,sums FROM coords WHERE lower=? AND upper=? AND threshold=? AND mode=? AND include_upper=1',(text(lo),text(hi),text(th),mode)).fetchall()
+                    for first,last,sums in got:
+                        want=[0]
+                        for k,(w,v) in rows.items():
+                            if Q(first)<=k<=Q(last): want=add(want,v)
+                        self.assertEqual(sums,norm(want),(first,last,mode))
+        ids={}
+        for step in range(400):
+            r=rng.random()
+            if ids and r<0.25:
+                k=rng.choice(list(ids)); c.execute('DELETE FROM coords WHERE rowid=?',(ids.pop(k),)); rows.pop(k)
+            elif ids and r<0.5:
+                k=rng.choice(list(ids)); v=vec(); c.execute('UPDATE coords SET sums=? WHERE rowid=?',(vtext(v) or None,ids[k])); rows[k]=(rows[k][0],v)
+            elif ids and r<0.6:
+                k=rng.choice(list(ids)); new=Q(rng.randint(-80,80),rng.randint(1,3))
+                if new in rows: continue
+                c.execute('UPDATE coords SET time=? WHERE rowid=?',(text(new),ids[k])); rows[new]=rows.pop(k); ids[new]=ids.pop(k)
+            else:
+                k=Q(rng.randint(-80,80),rng.randint(1,3))
+                if k in rows: continue
+                v=vec(); w=rng.randint(1,4)
+                ids[k]=c.execute('INSERT INTO coords(time,value,weight,sums) VALUES(?,?,?,?)',(text(k),text(k),w,vtext(v) or None)).lastrowid; rows[k]=(w,v)
+            if step%40==0: check()
+        check()
+        # The whole tree's root total is every row's sums added.
+        root=c.execute('SELECT total FROM coords_nodes WHERE id=(SELECT root FROM coords_meta)').fetchone()[0]
+        want=[0]
+        for w,v in rows.values(): want=add(want,v)
+        self.assertEqual(root,norm(want))
+        # Built in bulk from appended rows, the same.
+        c.execute('DELETE FROM coords')
+        for k,(w,v) in rows.items(): c.execute("INSERT INTO coords(time,value,weight,sums,mode) VALUES(?,?,?,?,'append')",(text(k),text(k),w,vtext(v) or None))
+        c.execute("INSERT INTO coords(mode) VALUES('build')"); check()
+        for bad in ['1/2;x','1/0',b'1',5]:
+            with self.assertRaises(sqlite3.DatabaseError): c.execute("INSERT INTO coords(time,sums) VALUES('999/1',?)",(bad,))
+    def test_index_without_sums_columns(self):
+        """An index whose shadow table predates sums keeps working without them."""
+        path=os.path.join(tempfile.mkdtemp(),'old.db'); c=connection(path)
+        c.execute('CREATE VIRTUAL TABLE coords USING rational_index')
+        c.execute("INSERT INTO coords(time,weight) VALUES('1/1',2),('2/1',3)"); c.commit(); c.close()
+        c=sqlite3.connect(path); c.execute('ALTER TABLE coords_nodes DROP COLUMN sums'); c.execute('ALTER TABLE coords_nodes DROP COLUMN total'); c.commit(); c.close()
+        c=connection(path)
+        c.execute("INSERT INTO coords(time,weight) VALUES('3/1',1)")
+        self.assertEqual(c.execute("SELECT time,weight,sums FROM coords WHERE lower='0/1' AND upper='9/1' AND threshold='100/1' AND mode='span'").fetchall(),[('1/1',6,None)])
+        with self.assertRaises(sqlite3.DatabaseError): c.execute("INSERT INTO coords(time,sums) VALUES('4/1','1/1')")
+        c.close()
     def test_utf16_and_attached_schema(self):
         c=connection();c.execute("PRAGMA encoding='UTF-16'")
         c.execute("CREATE TABLE t(time TEXT COLLATE RATIONAL_V1)")

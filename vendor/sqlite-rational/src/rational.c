@@ -155,6 +155,30 @@ static void scalar(sqlite3_context *ctx, int argc, sqlite3_value **argv) {
 done:
   mpq_clears(a, b, NULL);
 }
+/* q_sum(x): the exact sum of the group's rationals, NULLs skipped, '0/1' over none. An
+   argument that is not exact rational TEXT fails the query, as the scalar functions do. */
+typedef struct { int ready, failed; mpq_t sum; } Sum;
+static void sum_step(sqlite3_context *ctx, int argc, sqlite3_value **argv) {
+  Sum *s = sqlite3_aggregate_context(ctx, sizeof(*s));
+  mpq_t v;
+  int rc;
+  (void)argc;
+  if (!s) { sqlite3_result_error_nomem(ctx); return; }
+  if (!s->ready) { mpq_init(s->sum); s->ready = 1; }
+  if (s->failed || sqlite3_value_type(argv[0]) == SQLITE_NULL) return;
+  mpq_init(v); rc = q_arg(v, argv[0]);
+  if (rc == SQLITE_OK) mpq_add(s->sum, s->sum, v); else s->failed = rc;
+  mpq_clear(v);
+}
+static void sum_final(sqlite3_context *ctx) {
+  Sum *s = sqlite3_aggregate_context(ctx, 0);
+  if (s && s->failed) {
+    sqlite3_result_error(ctx, s->failed == SQLITE_TOOBIG ? "Rational argument too large" : "Expected exact rational TEXT", -1);
+    sqlite3_result_error_code(ctx, s->failed);
+  } else if (!s || !s->ready) sqlite3_result_text(ctx, "0/1", -1, SQLITE_STATIC);
+  else q_result(ctx, s->sum);
+  if (s && s->ready) mpq_clear(s->sum);
+}
 static int collation(void *unused, int an, const void *ap, int bn, const void *bp) {
   int ar, br, result;
   mpq_t a, b;
@@ -189,6 +213,9 @@ int sqlite_rational_register(sqlite3 *db) {
     rc = sqlite3_create_function_v2(db, functions[i].name, functions[i].argc,
       SQLITE_UTF8 | SQLITE_DETERMINISTIC | functions[i].flags,
       (void *)(intptr_t)functions[i].op, scalar, NULL, NULL, NULL);
+  if (rc == SQLITE_OK)
+    rc = sqlite3_create_function_v2(db, "q_sum", 1, SQLITE_UTF8 | SQLITE_DETERMINISTIC | SQLITE_DIRECTONLY,
+      NULL, NULL, sum_step, sum_final, NULL);
   if (rc == SQLITE_OK) rc = q_index_register(db);
   return rc;
 }

@@ -1,20 +1,89 @@
 #include "internal.h"
 #define MAX_DEPTH 128
 #define TRY(expression) do { rc = (expression); if (rc != SQLITE_OK) goto done; } while (0)
+/* Sums: a vector of exact rationals that rows may carry (the hidden `sums` column, as TEXT:
+   canonical rationals separated by ';', "" or NULL for none) and that the tree totals per
+   subtree, element by element, as it totals weights. A missing element is zero, so vectors
+   of different lengths add. Indexes whose shadow table predates them have none (has_sums). */
+typedef struct { int length; mpq_t *values; } Sums;
+static void sums_clear(Sums *s) {
+  int i;
+  for (i = 0; i < s->length; i++) mpq_clear(s->values[i]);
+  sqlite3_free(s->values); s->values = NULL; s->length = 0;
+}
+static int sums_grow(Sums *s, int length) {
+  mpq_t *values;
+  int i;
+  if (length <= s->length) return SQLITE_OK;
+  if (length > 4096) return SQLITE_TOOBIG;
+  values = sqlite3_realloc64(s->values, (sqlite3_uint64)length * sizeof(*values));
+  if (!values) return SQLITE_NOMEM;
+  for (i = s->length; i < length; i++) mpq_init(values[i]);
+  s->values = values; s->length = length; return SQLITE_OK;
+}
+/* Adds the vector `text` (bytes long) into `s`. */
+static int sums_parse(Sums *s, const char *text, int bytes) {
+  int i = 0, start = 0, k = 0, rc = SQLITE_OK;
+  mpq_t value;
+  if (!text || bytes <= 0) return SQLITE_OK;
+  mpq_init(value);
+  for (i = 0; i <= bytes; i++) {
+    if (i < bytes && text[i] != ';') continue;
+    if (i > start) {
+      TRY(q_parse(value, text + start, i - start));
+      TRY(sums_grow(s, k + 1)); mpq_add(s->values[k], s->values[k], value);
+    }
+    k++; start = i + 1;
+  }
+done:
+  mpq_clear(value); return rc;
+}
+static int sums_add(Sums *into, const Sums *from) {
+  int i, rc = sums_grow(into, from->length);
+  for (i = 0; rc == SQLITE_OK && i < from->length; i++) mpq_add(into->values[i], into->values[i], from->values[i]);
+  return rc;
+}
+/* The vector as TEXT, trailing zeros left out; NULL (and *empty set) when all are zero. */
+static char *sums_text(const Sums *s, int *empty) {
+  int last = s->length - 1, i;
+  char *text = NULL;
+  while (last >= 0 && mpq_sgn(s->values[last]) == 0) last--;
+  *empty = last < 0;
+  if (*empty) return NULL;
+  for (i = 0; i <= last; i++) {
+    char *item = q_text(s->values[i]), *joined;
+    if (!item) { sqlite3_free(text); return NULL; }
+    joined = text ? sqlite3_mprintf("%s;%s", text, item) : sqlite3_mprintf("%s", item);
+    sqlite3_free(text); sqlite3_free(item);
+    if (!joined) return NULL;
+    text = joined;
+  }
+  return text;
+}
+static int bind_sums(sqlite3_stmt *st, int column, const Sums *s) {
+  int empty;
+  char *text = sums_text(s, &empty);
+  if (empty) return sqlite3_bind_null(st, column);
+  if (!text) return SQLITE_NOMEM;
+  return sqlite3_bind_text(st, column, text, -1, sqlite3_free);
+}
 typedef struct {
   sqlite3_int64 id, left, right, weight, count, size, first_id;
   int height;
   mpq_t key, first, last, gap;
+  Sums own, total;
 } Node;
 typedef struct {
   sqlite3_vtab base;
   sqlite3 *db;
   char *nodes, *meta;
+  int has_sums;
   sqlite3_stmt *get, *save, *erase, *root_get, *root_set, *insert, *payload, *change;
 } Index;
 typedef struct {
   sqlite3_int64 id, count, size;
   mpq_t first, last, gap;
+  Sums sums;
 } Row;
 typedef struct {
   sqlite3_vtab_cursor base;
@@ -25,7 +94,7 @@ typedef struct {
   mpq_t lower, upper, threshold;
 } Cursor;
 static void node_free(Node *n) {
-  if (n) { mpq_clears(n->key, n->first, n->last, n->gap, NULL); sqlite3_free(n); }
+  if (n) { mpq_clears(n->key, n->first, n->last, n->gap, NULL); sums_clear(&n->own); sums_clear(&n->total); sqlite3_free(n); }
 }
 static int node_get(Index *v, sqlite3_int64 id, Node **out) {
   sqlite3_stmt *s = v->get;
@@ -51,6 +120,10 @@ static int node_get(Index *v, sqlite3_int64 id, Node **out) {
     rc = q_parse(fields[i], (const char *)sqlite3_column_text(s, col), sqlite3_column_bytes(s, col));
     if (rc != SQLITE_OK) break;
   }
+  if (rc == SQLITE_OK && v->has_sums)
+    rc = sums_parse(&n->own, (const char *)sqlite3_column_text(s, 11), sqlite3_column_bytes(s, 11));
+  if (rc == SQLITE_OK && v->has_sums)
+    rc = sums_parse(&n->total, (const char *)sqlite3_column_text(s, 12), sqlite3_column_bytes(s, 12));
   sqlite3_reset(s);
   if (rc != SQLITE_OK || n->height <= 0 || n->height > MAX_DEPTH || n->weight <= 0 ||
       n->left == id || n->right == id || n->count < n->weight || n->size <= 0) {
@@ -83,6 +156,13 @@ static int save(Index *v, Node *n) {
   n->count = n->weight; n->size = 1;
   mpq_set(n->first, l ? l->first : n->key); mpq_set(n->last, r ? r->last : n->key);
   n->first_id = l ? l->first_id : n->id; mpq_set_ui(n->gap, 0, 1);
+  /* The subtree's sums: its own row's and its children's. */
+  sums_clear(&n->total);
+  if (v->has_sums) {
+    TRY(sums_add(&n->total, &n->own));
+    if (l) TRY(sums_add(&n->total, &l->total));
+    if (r) TRY(sums_add(&n->total, &r->total));
+  }
   if (l) {
     TRY(checked_add(n->count, l->count, &n->count)); TRY(checked_add(n->size, l->size, &n->size));
     mpq_set(n->gap, l->gap); mpq_sub(gap, n->key, l->last);
@@ -100,6 +180,7 @@ static int save(Index *v, Node *n) {
   sqlite3_bind_int64(s, 6, n->count); sqlite3_bind_int64(s, 7, n->size);
   TRY(bind_q(s, 8, n->gap));
   sqlite3_bind_int64(s, 9, n->first_id); sqlite3_bind_int64(s, 10, n->id);
+  if (v->has_sums) TRY(bind_sums(s, 11, &n->total));
   TRY(finish(s));
 done:
   sqlite3_reset(s); sqlite3_clear_bindings(s); node_free(l); node_free(r); mpq_clear(gap); return rc;
@@ -221,11 +302,13 @@ static int above(Cursor *c, const mpq_t key) {
 }
 static void rows_clear(Cursor *c) {
   int i;
-  for (i = 0; i < c->length; i++) mpq_clears(c->rows[i].first, c->rows[i].last, c->rows[i].gap, NULL);
+  for (i = 0; i < c->length; i++) {
+    mpq_clears(c->rows[i].first, c->rows[i].last, c->rows[i].gap, NULL); sums_clear(&c->rows[i].sums);
+  }
   sqlite3_free(c->rows); c->rows = NULL; c->length = c->capacity = c->position = 0;
 }
 static int append(Cursor *c, const mpq_t first, const mpq_t last, const mpq_t gap,
-  sqlite3_int64 count, sqlite3_int64 size, sqlite3_int64 id, int merge) {
+  sqlite3_int64 count, sqlite3_int64 size, sqlite3_int64 id, int merge, const Sums *sums) {
   Row *r;
   int rc = SQLITE_OK;
   mpq_t boundary;
@@ -234,6 +317,7 @@ static int append(Cursor *c, const mpq_t first, const mpq_t last, const mpq_t ga
     r = &c->rows[c->length - 1]; mpq_sub(boundary, first, r->last);
     if (mpq_cmp(boundary, c->threshold) < 0) {
       TRY(checked_add(r->count, count, &r->count)); TRY(checked_add(r->size, size, &r->size));
+      if (sums) TRY(sums_add(&r->sums, sums));
       mpq_set(r->last, last);
       if (mpq_cmp(boundary, r->gap) > 0) mpq_set(r->gap, boundary);
       if (mpq_cmp(gap, r->gap) > 0) mpq_set(r->gap, gap);
@@ -250,8 +334,10 @@ static int append(Cursor *c, const mpq_t first, const mpq_t last, const mpq_t ga
     c->rows = rows; c->capacity = capacity;
   }
   r = &c->rows[c->length++]; mpq_inits(r->first, r->last, r->gap, NULL);
+  r->sums.length = 0; r->sums.values = NULL;
   mpq_set(r->first, first); mpq_set(r->last, last); mpq_set(r->gap, gap);
   r->count = count; r->size = size; r->id = id;
+  if (sums) TRY(sums_add(&r->sums, sums));
 done:
   mpq_clear(boundary); return rc;
 }
@@ -269,11 +355,11 @@ static int walk(Index *v, Cursor *c, sqlite3_int64 id, int fold, int depth) {
   if (full && (fold || (c->summarize && c->neighbors &&
       (n->size == 1 || mpq_cmp(n->gap, c->threshold) < 0)))) {
     c->consumed++;
-    TRY(append(c, n->first, n->last, n->gap, n->count, n->size, n->first_id, fold || c->summarize));
+    TRY(append(c, n->first, n->last, n->gap, n->count, n->size, n->first_id, fold || c->summarize, &n->total));
   } else {
     TRY(walk(v, c, n->left, fold, depth + 1));
     if (!below(c, n->key) && !above(c, n->key))
-      TRY(append(c, n->key, n->key, zero, n->weight, 1, n->id, fold || c->summarize));
+      TRY(append(c, n->key, n->key, zero, n->weight, 1, n->id, fold || c->summarize, &n->own));
     TRY(walk(v, c, n->right, fold, depth + 1));
   }
 done:
@@ -322,7 +408,7 @@ static int span(Index *v, Cursor *c, sqlite3_int64 root) {
       rc = walk(v, &part, root, 1, 0);
       c->visited += part.visited; c->consumed += part.consumed;
       for (i = 0; rc == SQLITE_OK && i < part.length; i++) {
-        Row *r = &part.rows[i]; rc = append(c, r->first, r->last, r->gap, r->count, r->size, r->id, 0);
+        Row *r = &part.rows[i]; rc = append(c, r->first, r->last, r->gap, r->count, r->size, r->id, 0, &r->sums);
       }
       rows_clear(&part); mpq_clears(part.lower, part.upper, part.threshold, NULL);
       if (rc != SQLITE_OK) goto done;
@@ -364,25 +450,42 @@ static int connect_impl(sqlite3 *db, int argc, const char *const *argv, sqlite3_
     sql = sqlite3_mprintf(
       "CREATE TABLE %s(id INTEGER PRIMARY KEY,time TEXT NOT NULL,value,weight INTEGER NOT NULL,"
       "l INTEGER NOT NULL,r INTEGER NOT NULL,height INTEGER NOT NULL,first TEXT NOT NULL,last TEXT NOT NULL,"
-      "count INTEGER NOT NULL,size INTEGER NOT NULL,gap TEXT NOT NULL,first_id INTEGER NOT NULL);"
+      "count INTEGER NOT NULL,size INTEGER NOT NULL,gap TEXT NOT NULL,first_id INTEGER NOT NULL,sums TEXT,total TEXT);"
       "CREATE TABLE %s(singleton INTEGER PRIMARY KEY CHECK(singleton=1),root INTEGER NOT NULL,next_id INTEGER NOT NULL);"
       "INSERT INTO %s VALUES(1,0,1)", v->nodes, v->meta, v->meta);
     if (!sql) { rc = SQLITE_NOMEM; goto done; }
     TRY(sqlite3_exec(db, sql, NULL, NULL, error));
   }
+  /* Shadow tables created before sums have no sums columns: such an index keeps working
+     without them (its sums read as none) until it is rebuilt. */
+  {
+    sqlite3_stmt *probe = NULL;
+    char *check = sqlite3_mprintf("SELECT sums,total FROM %s LIMIT 0", v->nodes);
+    if (!check) { rc = SQLITE_NOMEM; goto done; }
+    v->has_sums = sqlite3_prepare_v2(db, check, -1, &probe, NULL) == SQLITE_OK;
+    sqlite3_finalize(probe); sqlite3_free(check);
+  }
   TRY(sqlite3_declare_vtab(db,
     "CREATE TABLE x(time TEXT COLLATE RATIONAL_V1,value,weight INTEGER,last_time TEXT COLLATE RATIONAL_V1,"
     "distinct_count INTEGER,max_gap TEXT COLLATE RATIONAL_V1,lower HIDDEN,upper HIDDEN,threshold HIDDEN,"
-    "mode HIDDEN,include_lower HIDDEN,include_upper HIDDEN,visited_nodes HIDDEN)"));
+    "mode HIDDEN,include_lower HIDDEN,include_upper HIDDEN,visited_nodes HIDDEN,sums HIDDEN)"));
   TRY(sqlite3_vtab_config(db, SQLITE_VTAB_CONSTRAINT_SUPPORT, 1));
-  TRY(prepare(v, &v->get, "SELECT time,weight,l,r,height,first,last,count,size,gap,first_id FROM %s WHERE id=?1", v->nodes));
-  TRY(prepare(v, &v->save, "UPDATE %s SET l=?1,r=?2,height=?3,first=?4,last=?5,count=?6,size=?7,gap=?8,first_id=?9 WHERE id=?10", v->nodes));
+  TRY(prepare(v, &v->get, v->has_sums
+    ? "SELECT time,weight,l,r,height,first,last,count,size,gap,first_id,sums,total FROM %s WHERE id=?1"
+    : "SELECT time,weight,l,r,height,first,last,count,size,gap,first_id FROM %s WHERE id=?1", v->nodes));
+  TRY(prepare(v, &v->save, v->has_sums
+    ? "UPDATE %s SET l=?1,r=?2,height=?3,first=?4,last=?5,count=?6,size=?7,gap=?8,first_id=?9,total=?11 WHERE id=?10"
+    : "UPDATE %s SET l=?1,r=?2,height=?3,first=?4,last=?5,count=?6,size=?7,gap=?8,first_id=?9 WHERE id=?10", v->nodes));
   TRY(prepare(v, &v->erase, "DELETE FROM %s WHERE id=?1", v->nodes));
   TRY(prepare(v, &v->root_get, "SELECT root,next_id FROM %s WHERE singleton=1", v->meta));
   TRY(prepare(v, &v->root_set, "UPDATE %s SET root=?1,next_id=?2 WHERE singleton=1", v->meta));
-  TRY(prepare(v, &v->insert, "INSERT INTO %s VALUES(?1,?2,?3,?4,0,0,1,?2,?2,?4,1,'0/1',?1)", v->nodes));
-  TRY(prepare(v, &v->payload, "SELECT value FROM %s WHERE id=?1", v->nodes));
-  TRY(prepare(v, &v->change, "UPDATE %s SET value=?1,count=count-weight+?2,weight=?2 WHERE id=?3", v->nodes));
+  TRY(prepare(v, &v->insert, v->has_sums
+    ? "INSERT INTO %s(id,time,value,weight,l,r,height,first,last,count,size,gap,first_id,sums,total) VALUES(?1,?2,?3,?4,0,0,1,?2,?2,?4,1,'0/1',?1,?5,?5)"
+    : "INSERT INTO %s VALUES(?1,?2,?3,?4,0,0,1,?2,?2,?4,1,'0/1',?1)", v->nodes));
+  TRY(prepare(v, &v->payload, v->has_sums ? "SELECT value,sums FROM %s WHERE id=?1" : "SELECT value FROM %s WHERE id=?1", v->nodes));
+  TRY(prepare(v, &v->change, v->has_sums
+    ? "UPDATE %s SET value=?1,count=count-weight+?2,weight=?2,sums=?4 WHERE id=?3"
+    : "UPDATE %s SET value=?1,count=count-weight+?2,weight=?2 WHERE id=?3", v->nodes));
   *out = &v->base; v = NULL;
 done:
   sqlite3_free(sql); if (v) disconnect(&v->base); return rc;
@@ -532,7 +635,7 @@ static int filter(sqlite3_vtab_cursor *cursor, int plan_number, const char *plan
     if (i != SQLITE_ROW) { rc = i; goto done; }
     rc = node_get(v, target, &n);
     if (rc == SQLITE_OK && !below(c, n->key) && !above(c, n->key))
-      rc = append(c, n->key, n->key, zero, n->weight, 1, n->id, 0);
+      rc = append(c, n->key, n->key, zero, n->weight, 1, n->id, 0, &n->own);
     node_free(n);
   } else if (!c->summarize || c->neighbors || mpq_sgn(c->threshold) == 0) {
     if (c->summarize && mpq_sgn(c->threshold) == 0) c->neighbors = 1;
@@ -581,6 +684,14 @@ static int column(sqlite3_vtab_cursor *cursor, sqlite3_context *ctx, int col) {
     case 10: sqlite3_result_int(ctx, c->include_lower); break;
     case 11: sqlite3_result_int(ctx, c->include_upper); break;
     case 12: sqlite3_result_int64(ctx, c->visited); break;
+    case 13: {
+      int empty;
+      char *text = sums_text(&r->sums, &empty);
+      if (empty) sqlite3_result_null(ctx);
+      else if (!text) sqlite3_result_error_nomem(ctx);
+      else sqlite3_result_text(ctx, text, -1, sqlite3_free);
+      break;
+    }
     default: break;
   }
   return SQLITE_OK;
@@ -589,22 +700,27 @@ static int column(sqlite3_vtab_cursor *cursor, sqlite3_context *ctx, int col) {
 typedef struct {
   sqlite3_int64 *ids, *weights;
   mpq_t *keys;
+  Sums *own;
   sqlite3_int64 length;
 } Sorted;
 /* Writes the balanced subtree of sorted[lo..hi] (inclusive) bottom-up, each node once, and
    returns its root, height, total weight and largest adjacent gap. Midpoints keep sibling
    heights within one, so the result is a valid AVL tree. */
 static int build_range(Index *v, Sorted *s, sqlite3_int64 lo, sqlite3_int64 hi, sqlite3_int64 *id,
-  int *height, sqlite3_int64 *count, mpq_t gap) {
+  int *height, sqlite3_int64 *count, mpq_t gap, Sums *total) {
   sqlite3_int64 mid = lo + (hi - lo) / 2, left = 0, right = 0, lc = 0, rc_count = 0;
   int lh = 0, rh = 0, rc = SQLITE_OK;
   mpq_t lgap, rgap, step;
+  Sums ltotal = {0, NULL}, rtotal = {0, NULL};
   sqlite3_stmt *st = v->save;
   *id = 0; *height = 0; *count = 0; mpq_set_ui(gap, 0, 1);
   if (lo > hi) return SQLITE_OK;
   mpq_inits(lgap, rgap, step, NULL);
-  if (lo < mid) TRY(build_range(v, s, lo, mid - 1, &left, &lh, &lc, lgap));
-  if (mid < hi) TRY(build_range(v, s, mid + 1, hi, &right, &rh, &rc_count, rgap));
+  if (lo < mid) TRY(build_range(v, s, lo, mid - 1, &left, &lh, &lc, lgap, &ltotal));
+  if (mid < hi) TRY(build_range(v, s, mid + 1, hi, &right, &rh, &rc_count, rgap, &rtotal));
+  if (s->own) {
+    TRY(sums_add(total, &ltotal)); TRY(sums_add(total, &s->own[mid])); TRY(sums_add(total, &rtotal));
+  }
   *count = s->weights[mid];
   TRY(checked_add(*count, lc, count)); TRY(checked_add(*count, rc_count, count));
   if (left) {
@@ -623,9 +739,11 @@ static int build_range(Index *v, Sorted *s, sqlite3_int64 lo, sqlite3_int64 hi, 
   sqlite3_bind_int64(st, 6, *count); sqlite3_bind_int64(st, 7, hi - lo + 1);
   TRY(bind_q(st, 8, gap));
   sqlite3_bind_int64(st, 9, s->ids[lo]); sqlite3_bind_int64(st, 10, *id);
+  if (v->has_sums) TRY(bind_sums(st, 11, total));
   TRY(finish(st));
 done:
-  sqlite3_reset(st); sqlite3_clear_bindings(st); mpq_clears(lgap, rgap, step, NULL); return rc;
+  sqlite3_reset(st); sqlite3_clear_bindings(st); mpq_clears(lgap, rgap, step, NULL);
+  sums_clear(&ltotal); sums_clear(&rtotal); return rc;
 }
 /* INSERT INTO t(mode) VALUES('build'): builds the tree from every row, appended or not, in
    one pass over them sorted by key (O(n log n) to sort, one write per row), and ends loading.
@@ -637,9 +755,11 @@ static int build(Index *v) {
   int rc = SQLITE_OK, height;
   char *sql = NULL;
   mpq_t gap;
+  Sums total = {0, NULL};
   mpq_init(gap);
   TRY(roots_any(v, &root, &next));
-  sql = sqlite3_mprintf("SELECT id,time,weight FROM %s ORDER BY time COLLATE RATIONAL_V1,id", v->nodes);
+  sql = sqlite3_mprintf(v->has_sums ? "SELECT id,time,weight,sums FROM %s ORDER BY time COLLATE RATIONAL_V1,id"
+    : "SELECT id,time,weight FROM %s ORDER BY time COLLATE RATIONAL_V1,id", v->nodes);
   if (!sql) { rc = SQLITE_NOMEM; goto done; }
   TRY(sqlite3_prepare_v2(v->db, sql, -1, &rows, NULL));
   while ((rc = sqlite3_step(rows)) == SQLITE_ROW) {
@@ -648,13 +768,18 @@ static int build(Index *v) {
       sqlite3_int64 *ids = sqlite3_realloc64(s.ids, more * sizeof(*ids));
       sqlite3_int64 *weights = ids ? sqlite3_realloc64(s.weights, more * sizeof(*weights)) : NULL;
       mpq_t *keys = weights ? sqlite3_realloc64(s.keys, more * sizeof(*keys)) : NULL;
+      Sums *own = keys && v->has_sums ? sqlite3_realloc64(s.own, more * sizeof(*own)) : NULL;
       if (ids) s.ids = ids;
       if (weights) s.weights = weights;
       if (keys) s.keys = keys;
-      if (!keys) { rc = SQLITE_NOMEM; goto done; }
+      if (own) s.own = own;
+      if (!keys || (v->has_sums && !own)) { rc = SQLITE_NOMEM; goto done; }
       capacity = more;
     }
-    mpq_init(s.keys[s.length]); s.length++;
+    mpq_init(s.keys[s.length]);
+    if (s.own) { s.own[s.length].length = 0; s.own[s.length].values = NULL; }
+    s.length++;
+    if (s.own) TRY(sums_parse(&s.own[s.length - 1], (const char *)sqlite3_column_text(rows, 3), sqlite3_column_bytes(rows, 3)));
     s.ids[s.length - 1] = sqlite3_column_int64(rows, 0);
     s.weights[s.length - 1] = sqlite3_column_int64(rows, 2);
     TRY(q_parse(s.keys[s.length - 1], (const char *)sqlite3_column_text(rows, 1), sqlite3_column_bytes(rows, 1)));
@@ -664,19 +789,31 @@ static int build(Index *v) {
   }
   if (rc != SQLITE_DONE) goto done;
   rc = SQLITE_OK;
-  TRY(build_range(v, &s, 0, s.length - 1, &root, &height, &count, gap));
+  TRY(build_range(v, &s, 0, s.length - 1, &root, &height, &count, gap, &total));
   for (i = 0; i < s.length; i++) if (s.ids[i] >= next) next = s.ids[i] + 1;
   sqlite3_bind_int64(v->root_set, 1, root); sqlite3_bind_int64(v->root_set, 2, next);
   TRY(finish(v->root_set));
 done:
   sqlite3_finalize(rows); sqlite3_free(sql); mpq_clear(gap);
   for (i = 0; i < s.length; i++) mpq_clear(s.keys[i]);
-  sqlite3_free(s.ids); sqlite3_free(s.weights); sqlite3_free(s.keys); return rc;
+  if (s.own) for (i = 0; i < s.length; i++) sums_clear(&s.own[i]);
+  sums_clear(&total);
+  sqlite3_free(s.ids); sqlite3_free(s.weights); sqlite3_free(s.keys); sqlite3_free(s.own); return rc;
+}
+/* The hidden sums column's argument (argv[15]): NULL, or a vector this index can keep. */
+#define SUMS_ARG 15
+static int check_sums(Index *v, int argc, sqlite3_value **argv) {
+  Sums s = {0, NULL};
+  int rc;
+  if (argc <= SUMS_ARG || sqlite3_value_type(argv[SUMS_ARG]) == SQLITE_NULL) return SQLITE_OK;
+  if (!v->has_sums || sqlite3_value_type(argv[SUMS_ARG]) != SQLITE_TEXT) return SQLITE_CONSTRAINT;
+  rc = sums_parse(&s, (const char *)sqlite3_value_text(argv[SUMS_ARG]), sqlite3_value_bytes(argv[SUMS_ARG]));
+  sums_clear(&s); return rc == SQLITE_OK ? SQLITE_OK : SQLITE_CONSTRAINT;
 }
 /* INSERT INTO t(time,value,weight,mode) VALUES(…,'append'): stores a row without linking it
    into the tree, so loading many rows costs one write each; queries and other changes are
    refused until a build. Only an empty or loading index takes appended rows. */
-static int append_row(Index *v, sqlite3_value **argv, sqlite3_int64 *rowid_out) {
+static int append_row(Index *v, int argc, sqlite3_value **argv, sqlite3_int64 *rowid_out) {
   sqlite3_int64 root = 0, next = 1, id, weight = 1;
   int rc = SQLITE_OK;
   mpq_t key;
@@ -694,9 +831,11 @@ static int append_row(Index *v, sqlite3_value **argv, sqlite3_int64 *rowid_out) 
     if (sqlite3_value_type(argv[4]) != SQLITE_INTEGER || sqlite3_value_int64(argv[4]) <= 0) { rc = SQLITE_CONSTRAINT; goto done; }
     weight = sqlite3_value_int64(argv[4]);
   }
+  TRY(check_sums(v, argc, argv));
   /* A taken id fails the shadow table's primary key. */
   sqlite3_bind_int64(v->insert, 1, id); TRY(bind_q(v->insert, 2, key));
   sqlite3_bind_value(v->insert, 3, argv[3]); sqlite3_bind_int64(v->insert, 4, weight);
+  if (v->has_sums && argc > SUMS_ARG) sqlite3_bind_value(v->insert, 5, argv[SUMS_ARG]);
   TRY(finish(v->insert));
   if (id >= next) next = id + 1;
   sqlite3_bind_int64(v->root_set, 1, LOADING); sqlite3_bind_int64(v->root_set, 2, next);
@@ -727,9 +866,9 @@ static int update(sqlite3_vtab *table, int argc, sqlite3_value **argv, sqlite3_i
   if (mode) {
     /* Bulk loading: only time, value and weight may accompany 'append'; nothing 'build'. */
     for (i = mode == 1 ? 5 : 1; i < argc; i++)
-      if (i != 11 && sqlite3_value_type(argv[i]) != SQLITE_NULL) { rc = SQLITE_CONSTRAINT; goto done; }
+      if (i != 11 && !(mode == 1 && i == SUMS_ARG) && sqlite3_value_type(argv[i]) != SQLITE_NULL) { rc = SQLITE_CONSTRAINT; goto done; }
     if (mode < 0) rc = SQLITE_CONSTRAINT;
-    else if (mode == 1) rc = append_row(v, argv, rowid_out);
+    else if (mode == 1) rc = append_row(v, argc, argv, rowid_out);
     else { rc = build(v); *rowid_out = 0; }
     goto done;
   }
@@ -753,9 +892,10 @@ static int update(sqlite3_vtab *table, int argc, sqlite3_value **argv, sqlite3_i
     if (sqlite3_value_type(argv[4]) != SQLITE_INTEGER || sqlite3_value_int64(argv[4]) <= 0) { rc = SQLITE_CONSTRAINT; goto done; }
     weight = sqlite3_value_int64(argv[4]);
   } else if (old) { rc = SQLITE_CONSTRAINT; goto done; }
-  for (i = 5; i < argc; i++) if (!sqlite3_value_nochange(argv[i]) && (old || sqlite3_value_type(argv[i]) != SQLITE_NULL)) {
+  for (i = 5; i < argc; i++) if (i != SUMS_ARG && !sqlite3_value_nochange(argv[i]) && (old || sqlite3_value_type(argv[i]) != SQLITE_NULL)) {
     rc = SQLITE_CONSTRAINT; goto done;
   }
+  if (argc > SUMS_ARG && !sqlite3_value_nochange(argv[SUMS_ARG])) TRY(check_sums(v, argc, argv));
   TRY(find(v, root, key, &found));
   if (found && (!old || found != old->id)) { rc = SQLITE_CONSTRAINT; goto done; }
   same_key = old && mpq_equal(old->key, key);
@@ -774,30 +914,43 @@ static int update(sqlite3_vtab *table, int argc, sqlite3_value **argv, sqlite3_i
     TRY(checked_add(total, weight, &total));
   }
   if (same_key) {
-    if (sqlite3_value_nochange(argv[3])) {
+    int keep_value = sqlite3_value_nochange(argv[3]);
+    int keep_sums = v->has_sums && (argc <= SUMS_ARG || sqlite3_value_nochange(argv[SUMS_ARG]));
+    if (keep_value || keep_sums) {
       int step;
       sqlite3_bind_int64(v->payload, 1, id); step = sqlite3_step(v->payload);
       if (step != SQLITE_ROW) { sqlite3_reset(v->payload); rc = SQLITE_CORRUPT; goto done; }
-      sqlite3_bind_value(v->change, 1, sqlite3_column_value(v->payload, 0)); sqlite3_reset(v->payload);
-    } else sqlite3_bind_value(v->change, 1, argv[3]);
+      if (keep_value) sqlite3_bind_value(v->change, 1, sqlite3_column_value(v->payload, 0));
+      if (keep_sums) sqlite3_bind_value(v->change, 4, sqlite3_column_value(v->payload, 1));
+      sqlite3_reset(v->payload);
+    }
+    if (!keep_value) sqlite3_bind_value(v->change, 1, argv[3]);
+    if (v->has_sums && !keep_sums) sqlite3_bind_value(v->change, 4, argv[SUMS_ARG]);
     sqlite3_bind_int64(v->change, 2, weight); sqlite3_bind_int64(v->change, 3, id);
     TRY(finish(v->change)); TRY(insert_tree(v, root, id, key, &root, 0));
   } else {
-    sqlite3_value *payload = NULL;
-    if (old && sqlite3_value_nochange(argv[3])) {
+    sqlite3_value *payload = NULL, *sums = NULL;
+    int keep_sums = old && v->has_sums && (argc <= SUMS_ARG || sqlite3_value_nochange(argv[SUMS_ARG]));
+    if (old && (sqlite3_value_nochange(argv[3]) || keep_sums)) {
       int step;
       sqlite3_bind_int64(v->payload, 1, old->id); step = sqlite3_step(v->payload);
-      if (step == SQLITE_ROW) payload = sqlite3_value_dup(sqlite3_column_value(v->payload, 0));
+      if (step == SQLITE_ROW && sqlite3_value_nochange(argv[3]))
+        payload = sqlite3_value_dup(sqlite3_column_value(v->payload, 0));
+      if (step == SQLITE_ROW && keep_sums) sums = sqlite3_value_dup(sqlite3_column_value(v->payload, 1));
       sqlite3_reset(v->payload);
-      if (step != SQLITE_ROW || !payload) { rc = step == SQLITE_ROW ? SQLITE_NOMEM : SQLITE_CORRUPT; goto done; }
+      if (step != SQLITE_ROW || (sqlite3_value_nochange(argv[3]) && !payload) || (keep_sums && !sums)) {
+        sqlite3_value_free(payload); sqlite3_value_free(sums);
+        rc = step == SQLITE_ROW ? SQLITE_NOMEM : SQLITE_CORRUPT; goto done;
+      }
     }
     if (old) rc = delete_tree(v, root, old->key, &root, 0);
     if (rc == SQLITE_OK) {
       sqlite3_bind_int64(v->insert, 1, id); rc = bind_q(v->insert, 2, key);
       sqlite3_bind_value(v->insert, 3, payload ? payload : argv[3]); sqlite3_bind_int64(v->insert, 4, weight);
+      if (v->has_sums) sqlite3_bind_value(v->insert, 5, sums ? sums : argc > SUMS_ARG ? argv[SUMS_ARG] : NULL);
       if (rc == SQLITE_OK) rc = finish(v->insert);
     }
-    sqlite3_value_free(payload);
+    sqlite3_value_free(payload); sqlite3_value_free(sums);
     if (rc != SQLITE_OK) goto done;
     TRY(insert_tree(v, root, id, key, &root, 0));
   }
