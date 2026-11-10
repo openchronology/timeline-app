@@ -142,6 +142,10 @@ A chart can draw a curve for some of its moments beneath the total ([#434](https
 
 Each of `series` (one to eight) is `{ "label": "Errors", "tags": ["severity:err", "severity:crit"], "color": "#bc6663" }`: a label of up to 100 characters, one to forty tags (kept as tags are: trimmed and lower case) and a color, with an optional `setting` naming one of the plugin's `color` settings that, when set, is used instead.
 
+### Charting a measure
+
+A chart can draw one of the timeline's [measures](measures.md) instead of the moments' count ([#575](https://github.com/openchronology/timeline-app/issues/575)): `{ "kind": "measure", "measure": "cost" }`, with an optional color `setting` as above. The curve is highest where the view's total of the measure is largest. Each summary weighs as much as its total, read from the view's summaries as counts are. A total below zero counts as zero, and a measure chart has no series.
+
 ## Timeline theme
 
 Install **Timeline theme** to choose the timeline's colors, fonts and text sizes. Like the timeline background, it belongs to the whole timeline, so it's set in the **Plugins** dialog under the plugin:
@@ -177,6 +181,7 @@ Plugins combine **JSON host component declarations** and an optional restricted 
 - Targets: an optional `targets` array of `"moments"` and/or `"durations"`. Without it, color and outline markers, hover cards and relationship arrows apply to moments and [durations](durations.md); every other plugin applies to moments only. Durations use text, notes, color, link, image URL, toggle and relationship-arrows fields, color and outline markers, hover cards and backgrounds (`background.kind: "image"`, which applies to durations only); stacks, shapes, sizes, icons and summary expansion are moment-only.
 
 - Derived metadata: `derive` rules that work out values from the metadata an entity already has, for the other plugins to read ([derived metadata](#derived-metadata)).
+- Sizes by a measure: an optional `sizeBy: { "measure": "cost" }` sizes markers and summaries by their value or total of one of the timeline's [measures](measures.md) ([#575](https://github.com/openchronology/timeline-app/issues/575)), relative to the largest in view. The top third is large, the middle third medium and the rest small. It replaces the plugin's or the usual size while anything in view has a positive total.
 - Added shapes: an optional `shapes` array of the shapes added after the first twelve that the plugin draws, currently only `"ellipse"`. A shape field, shape marker or `api.shape(...)` of a plugin that doesn't list one treats it as unknown, as before it existed; the field's selector offers the plugin's shapes.
 
 A plugin can define fields without a marker effect, or an effect without a new editor field. Additional component kinds require an implementation and security review in the host; they are not arbitrary downloaded UI programs. New capabilities will use versioned contracts.
@@ -217,7 +222,7 @@ The document's ordered configuration is:
 }
 ```
 
-Read-only server overview queries return the requested plugin metadata for individual markers in the same bounded query. They do not download the full timeline or issue a separate request for each icon. Group summaries do not include arbitrary moment metadata.
+Read-only server overview queries return the requested plugin metadata for individual markers in the same bounded query. They do not download the full timeline or issue a separate request for each icon. Group summaries do not include arbitrary moment metadata, but they do carry their measures' totals. A single marker's metadata carries its measure values when any plugin is enabled.
 
 ## Derived metadata
 
@@ -370,17 +375,19 @@ function render(moment: string, api: PluginAPI): string {
 
 `moment` is reserved and currently an empty string. Use the explicit API:
 
-| Method                                                                 | Effect                                                                                                     |
-| ---------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------- |
-| `get(key)`                                                             | Read a declared field, title, or description as bounded text. Missing/structured values become empty text. |
-| `shape(name)`                                                          | Choose a supported shape. Unrecognized/empty input contributes no effect.                                  |
-| `color(hex)`                                                           | Choose a six-digit hex color. Unrecognized/empty input contributes no effect.                              |
-| `outline(style)`                                                       | Outline the marker or band `dashed` or `solid`. Unrecognized/empty input contributes no effect.            |
-| `icon(key)`                                                            | Use the URL from a declared `image-url` field.                                                             |
-| `card()`                                                               | Enable the title/notes/image hover card.                                                                   |
-| `none()`                                                               | Contribute no marker effects.                                                                              |
-| `merge(a, b)`                                                          | Combine effect strings; the second overrides matching properties.                                          |
-| `trim`, `upper`, `lower`, `startsWith`, `endsWith`, `slice`, `replace` | Bounded string operations, as in the formatter language.                                                   |
+| Method                                                                 | Effect                                                                                                          |
+| ---------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------- |
+| `get(key)`                                                             | Read a declared field, title, or description as bounded text. Missing/structured values become empty text.      |
+| `shape(name)`                                                          | Choose a supported shape. Unrecognized/empty input contributes no effect.                                       |
+| `color(hex)`                                                           | Choose a six-digit hex color. Unrecognized/empty input contributes no effect.                                   |
+| `outline(style)`                                                       | Outline the marker or band `dashed` or `solid`. Unrecognized/empty input contributes no effect.                 |
+| `icon(key)`                                                            | Use the URL from a declared `image-url` field.                                                                  |
+| `card()`                                                               | Enable the title/notes/image hover card.                                                                        |
+| `none()`                                                               | Contribute no marker effects.                                                                                   |
+| `merge(a, b)`                                                          | Combine effect strings; the second overrides matching properties.                                               |
+| `trim`, `upper`, `lower`, `startsWith`, `endsWith`, `slice`, `replace` | Bounded string operations, as in the formatter language.                                                        |
+| `measure(name)`                                                        | The moment's value of a [measure](measures.md), as an exact rational; zero when it has none (#575).             |
+| `rational`, `compare`, `add`, `sub`, `mul`, `div`                      | Exact arithmetic, as in the formatter language: `api.compare(api.measure("cost"), api.rational("100000")) > 0`. |
 
 Scripts support `const` locals, ternary conditionals, string concatenation and comparisons. No loops, imports, globals, property access, arbitrary function calls, `eval`, `Function`, filesystem, session, DOM, or network access exist. Source is capped at 16,384 characters, AST nodes at 1,024, evaluation at 4,096 steps/128 API calls, individual text at 2,048 characters, and cumulative text allocation at 32,768 characters. Compiler caching is bounded. A runtime error discards that script's effects and preserves host rendering; other plugins continue. Later enabled plugins overwrite earlier matching effects. Missing effects leave earlier ones intact.
 

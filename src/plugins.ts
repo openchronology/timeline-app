@@ -6,6 +6,7 @@ import { localSource, localSourcesAllowed, localPicture } from './local-files.js
 import { compilePluginScript } from './custom-time.js';
 import { contentLabels, CONTENT_LABELS_KEY } from './content-labels.js';
 import { validateEntityTags } from './tags.js';
+import { MEASURES_KEY, MEASURE_NAME, measureValue } from './measures.js';
 /** Versioned host components and optional source interpreted by our bounded language. */
 export interface PluginField {
   kind:
@@ -56,7 +57,15 @@ export interface PluginManifest {
    * most, as a smooth curve; in the color of one of its plugin's color settings, if given. Its
    * `series` (#434) chart the moments with any of their tags beside the total, each in its color.
    */
-  chart?: { kind: 'moments'; setting?: string; series?: ChartSeries[] };
+  chart?:
+    | { kind: 'moments'; setting?: string; series?: ChartSeries[] }
+    /** A measure's totals across the view instead of the moments' count (#575). */
+    | { kind: 'measure'; measure: string; setting?: string };
+  /**
+   * Markers and summaries sized by a measure's value or total (#575), relative to the largest
+   * in view, instead of the plugin's or the usual size.
+   */
+  sizeBy?: { measure: string };
   /** The timeline's colors and fonts (#230): each theme role's setting, by role. */
   theme?: PluginTheme;
   /** Entities the plugin applies to; omitted means moments, plus durations for colors/cards. */
@@ -470,6 +479,12 @@ function manifestEffects(manifest: PluginManifest, metadata: Record<string, unkn
           const icon = imageURL(metadata[key]);
           return JSON.stringify(icon && icon.length < 1800 ? { icon } : {});
         }
+        // A measure's value on this moment (#575), exact; zero when it has none.
+        case 'measure': {
+          const measure = text();
+          if (!MEASURE_NAME.test(measure)) throw new Error('Invalid measure name.');
+          return measureValue(metadata, measure);
+        }
         case 'expand':
           return '{"expand":true}';
         case 'card':
@@ -716,6 +731,7 @@ export function validatePluginManifest(value: unknown): PluginManifest {
     'settings',
     'backdrop',
     'chart',
+    'sizeBy',
     'theme',
     'targets',
     'derive',
@@ -826,10 +842,29 @@ export function validatePluginManifest(value: unknown): PluginManifest {
     result.backdrop = { kind: 'image', setting: backdrop.setting as string };
   }
   if (p.chart !== undefined) {
-    const chart = object(p.chart, ['kind', 'setting', 'series']);
+    const chart = object(p.chart, ['kind', 'setting', 'series', 'measure']);
     const colorSetting = (key: unknown) =>
       key === undefined || !!result.settings?.some((s) => s.key === key && s.kind === 'color');
-    if (chart.kind !== 'moments' || !colorSetting(chart.setting))
+    if (chart.kind === 'measure') {
+      if (
+        typeof chart.measure !== 'string' ||
+        !MEASURE_NAME.test(chart.measure) ||
+        chart.series !== undefined ||
+        !colorSetting(chart.setting)
+      )
+        throw new Error(
+          "A measure chart names a measure, in one of its plugin's color settings, without series.",
+        );
+      result.chart = {
+        kind: 'measure',
+        measure: chart.measure,
+        ...(chart.setting === undefined ? {} : { setting: chart.setting as string }),
+      };
+    } else if (
+      chart.kind !== 'moments' ||
+      chart.measure !== undefined ||
+      !colorSetting(chart.setting)
+    )
       throw new Error("A background chart counts moments, in one of its plugin's color settings.");
     let series: ChartSeries[] | undefined;
     if (chart.series !== undefined) {
@@ -855,11 +890,18 @@ export function validatePluginManifest(value: unknown): PluginManifest {
         };
       });
     }
-    result.chart = {
-      kind: 'moments',
-      ...(chart.setting === undefined ? {} : { setting: chart.setting as string }),
-      ...(series ? { series } : {}),
-    };
+    if (chart.kind === 'moments')
+      result.chart = {
+        kind: 'moments',
+        ...(chart.setting === undefined ? {} : { setting: chart.setting as string }),
+        ...(series ? { series } : {}),
+      };
+  }
+  if (p.sizeBy !== undefined) {
+    const sizeBy = object(p.sizeBy, ['measure']);
+    if (typeof sizeBy.measure !== 'string' || !MEASURE_NAME.test(sizeBy.measure))
+      throw new Error('Sizing by a measure names one.');
+    result.sizeBy = { measure: sizeBy.measure };
   }
   if (p.theme !== undefined) {
     const theme = object(p.theme, [...THEME_ROLES]);
@@ -1148,9 +1190,12 @@ export function pluginBackdrop(plugins: readonly InstalledPlugin[] = []): string
  * The chart behind the timeline (#289): null when no enabled plugin draws one, or the color of
  * the last that does (null for the usual marker color).
  */
-export function pluginChart(
-  plugins: readonly InstalledPlugin[] = [],
-): { color: string | null; series: { label: string; tags: string[]; color: string }[] } | null {
+export function pluginChart(plugins: readonly InstalledPlugin[] = []): {
+  color: string | null;
+  series: { label: string; tags: string[]; color: string }[];
+  /** A measure chart's measure (#575): its totals are drawn instead of the moments' count. */
+  measure?: string;
+} | null {
   let chart: ReturnType<typeof pluginChart> = null;
   for (const { manifest, enabled, settings } of plugins)
     if (enabled && manifest.chart) {
@@ -1160,14 +1205,25 @@ export function pluginChart(
       };
       chart = {
         color: color(manifest.chart.setting),
-        series: (manifest.chart.series ?? []).map((s) => ({
-          label: s.label,
-          tags: s.tags,
-          color: color(s.setting) ?? s.color,
-        })),
+        series:
+          manifest.chart.kind === 'moments'
+            ? (manifest.chart.series ?? []).map((s) => ({
+                label: s.label,
+                tags: s.tags,
+                color: color(s.setting) ?? s.color,
+              }))
+            : [],
+        ...(manifest.chart.kind === 'measure' ? { measure: manifest.chart.measure } : {}),
       };
     }
   return chart;
+}
+/** The measure markers and summaries are sized by (#575): the last enabled plugin's, or null. */
+export function pluginSizeMeasure(plugins: readonly InstalledPlugin[] = []): string | null {
+  let measure: string | null = null;
+  for (const { manifest, enabled } of plugins)
+    if (enabled && manifest.sizeBy) measure = manifest.sizeBy.measure;
+  return measure;
 }
 /**
  * A duration's background image: the last enabled background plugin's valid image URL. Bands
@@ -1243,6 +1299,16 @@ export function pluginMetadata(
   metadata: Record<string, unknown> = {},
 ) {
   const result: Record<string, unknown> = {};
+  // Measure values (#575): hover cards, scripts and sizes read them.
+  const measures = metadata[MEASURES_KEY];
+  if (
+    plugins.some((p) => p.enabled) &&
+    measures &&
+    typeof measures === 'object' &&
+    !Array.isArray(measures) &&
+    JSON.stringify(measures).length <= 1024
+  )
+    result[MEASURES_KEY] = measures;
   for (const { manifest, enabled } of plugins)
     if (enabled) {
       if (manifest.hover || manifest.source)
@@ -1281,7 +1347,9 @@ export function pluginMetadata(
         for (const source of rule.from) projectSource(source, metadata, result);
       }
       // The tags its chart's series count (#434), so the view's moments can be told apart.
-      for (const series of manifest.chart?.series ?? []) {
+      for (const series of manifest.chart?.kind === 'moments'
+        ? (manifest.chart.series ?? [])
+        : []) {
         const tags = (Array.isArray(metadata.tags) ? metadata.tags : []).filter(
           (t): t is string => typeof t === 'string' && series.tags.includes(t),
         );

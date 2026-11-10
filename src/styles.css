@@ -4483,3 +4483,17 @@ body[data-warnings]:not([data-images-shown])
   margin: 0;
   font-variant-numeric: tabular-nums;
 }
+/* Summaries sized by a measure's total (#575). */
+.event-marker.group[data-size='small'] {
+  width: 24px;
+  height: 24px;
+  top: 180px;
+}
+.event-marker.group[data-size='large'] {
+  width: 42px;
+  height: 42px;
+  top: 171px;
+}
+.focus-measures .measure-list {
+  margin: 4px 0 8px;
+}

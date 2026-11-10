@@ -111,4 +111,32 @@ export async function checkMeasures(page) {
   await input('reader-close').click();
   await input('inspector').waitFor({ state: 'hidden' });
   await input('view-mode').uncheck();
+
+  // A summary's label shows its total as the measure shows totals (#575).
+  await input('json-file').setInputFiles({
+    name: 'summed.ochx',
+    mimeType: 'application/json',
+    buffer: Buffer.from(
+      JSON.stringify({
+        format: 'openchronology',
+        version: 1,
+        title: 'Summed',
+        description: '',
+        measures: document.measures,
+        events: ['1999', '150', '1'].map((cost, i) => ({
+          id: 'same' + i,
+          time: '10/1',
+          metadata: { title: 'Same ' + i, measures: { cost } },
+        })),
+      }),
+    ),
+  });
+  await page.waitForFunction(() => document.getElementById('timeline-title').value === 'Summed');
+  const summary = page.locator('.event-marker.group').first();
+  await summary.waitFor();
+  assert.match(await summary.getAttribute('aria-label'), /^3 moments · Cost \$21\.50 near /);
+  assert.match(
+    await page.locator('.event-caption-title', { hasText: '3 moments' }).first().textContent(),
+    /3 moments · Cost \$21\.50/,
+  );
 }

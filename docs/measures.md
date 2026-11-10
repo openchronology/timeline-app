@@ -112,6 +112,19 @@ Every summary of a timeline keeps the total of each measure over what it summari
 - **Where:** the browser's index, the server's PostgreSQL trees and a desktop file's SQLite index all keep them. A desktop file saved before this is re-indexed when it is opened.
 - **In overviews:** each group in an overview (`/api/timelines/{id}/query` with `kind: "overview"`) has `totals`, the exact totals of its moments by measure name, with zeros left out.
 
+## Showing totals
+
+- **Summaries:** a summary's label says what it holds, then up to two of its totals, each labelled and shown as its measure shows totals: `3 moments · Cost $21.50`. Its tooltip and the name screen readers hear list them all.
+- **Single events:** an event's values are listed in the reader and in its hover card.
+- **Separated tracks:** each track's summaries show their own totals.
+- **Comparisons:** a comparison of several timelines doesn't show totals, since each timeline declares its own measures.
+
+Plugins can use measures too ([plugins](plugins.md)):
+
+- **Scripts:** `api.measure("cost")` reads a moment's value exactly, to compare with `api.compare`.
+- **Sizes:** `sizeBy` sizes markers and summaries by a measure's total.
+- **Charts:** the background chart can draw a measure's totals across the view.
+
 ## Where measures go
 
 The declarations are a timeline setting, like its title and time display. They're kept by:
