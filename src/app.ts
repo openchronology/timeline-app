@@ -13368,17 +13368,24 @@ function renderBackgroundChart(host: HTMLElement) {
   const chart = pluginChart(installedPlugins());
   const x = (time: string) => viewport.x(parsedTime(time), width()),
     spread = Math.max(24, 2 * pixels());
-  // A measure chart (#575) weighs each group by its total of the measure (none below zero).
+  // A measure chart (#575) weighs each group by its total of the measure (none below zero),
+  // and each duration drawn as a band by its own value, at its start (#576).
+  const weight = (text: string | undefined) => {
+    const total = text ? Q.parse(text.includes('/') ? text : text + '/1') : Q.zero;
+    return String(total.compare(Q.zero) > 0 ? total.toApproximateNumber() : 0);
+  };
   const charted = chart?.measure
-    ? frame.groups.map((g) => {
-        const text = g.totals?.[chart.measure!];
-        const total = text ? Q.parse(text.includes('/') ? text : text + '/1') : Q.zero;
-        return {
+    ? [
+        ...frame.groups.map((g) => ({
           first: g.first,
           last: g.last,
-          count: String(total.compare(Q.zero) > 0 ? total.toApproximateNumber() : 0),
-        };
-      })
+          count: weight(g.totals?.[chart.measure!]),
+        })),
+        ...(frame.durations ?? []).map((band) => {
+          const values = band.metadata.measures as Record<string, string> | undefined;
+          return { first: band.first, last: band.first, count: weight(values?.[chart.measure!]) };
+        }),
+      ]
     : frame.groups;
   const density = chart && momentDensity(charted, x, width(), spread);
   const most = density ? Math.max(...density) : 0;

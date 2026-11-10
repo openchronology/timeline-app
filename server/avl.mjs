@@ -9,7 +9,7 @@
 // keys: the order of the tree is held in left_id/right_id, never in the IDs. In a fork, the
 // tree's rows are read through to its source's (indexReader in index-versions.mjs), and the
 // nodes a save changes are written as the fork's own rows.
-import { Q, durationOverview, addTotals, negateTotals } from '../dist/core.mjs';
+import { Q, durationOverview, addTotals, negateTotals, entityTotals } from '../dist/core.mjs';
 import { removeRows } from './index-versions.mjs';
 
 /**
@@ -257,8 +257,10 @@ export const INTERVAL_TREE = {
     'min_extent',
     'max_extent',
     'height',
+    'totals',
   ],
   casts: {
+    totals: '::jsonb',
     min_time: '::mpq',
     max_time: '::mpq',
     first_time: '::mpq',
@@ -284,9 +286,10 @@ export const INTERVAL_TREE = {
     minExtent: r.min_extent,
     maxExtent: r.max_extent,
     height: r.height,
+    totals: r.totals ?? undefined,
   }),
   select:
-    'id,left_id,right_id,oc_qtext(min_time) AS min,oc_qtext(max_time) AS max,oc_qtext(first_time) AS first,oc_qtext(last_time) AS last,band,definition,oc_qtext(max_first) AS max_first,subtree_count,oc_qtext(min_extent) AS min_extent,oc_qtext(max_extent) AS max_extent,height',
+    'id,left_id,right_id,oc_qtext(min_time) AS min,oc_qtext(max_time) AS max,oc_qtext(first_time) AS first,oc_qtext(last_time) AS last,band,definition,oc_qtext(max_first) AS max_first,subtree_count,oc_qtext(min_extent) AS min_extent,oc_qtext(max_extent) AS max_extent,height,totals',
   encode: (owner, n) => [
     owner,
     n.id,
@@ -303,6 +306,7 @@ export const INTERVAL_TREE = {
     n.minExtent,
     n.maxExtent,
     n.height,
+    n.totals ? JSON.stringify(n.totals) : null,
   ],
   compare: (key, n) => parsed(key, 'first').compare(parsed(n, 'first')) || order(key.id, n.band.id),
   create: (nodeId, payload) => ({ id: nodeId, ...payload }),
@@ -327,6 +331,9 @@ export const INTERVAL_TREE = {
     n.count = 1 + (l?.count ?? 0) + (r?.count ?? 0);
     n.minExtent = min(min(extent, l?.minExtent), r?.minExtent);
     n.maxExtent = max(max(extent, l?.maxExtent), r?.maxExtent);
+    // Measure totals (#576): each duration's values where it starts, from its band (which
+    // keeps them whole), and its children's.
+    n.totals = addTotals(addTotals(l?.totals, entityTotals(n.band?.metadata)), r?.totals);
   },
   // As the moment tree's: the keys (start, ID) descend together, split at each node.
   // Parameters: $1 the timeline, $2 the keys' starts, $3 their IDs (two parallel arrays),

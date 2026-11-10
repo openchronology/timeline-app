@@ -7,7 +7,12 @@ import type { PointEvent, Metadata } from './core.js';
 import { normalizeEntityTags } from './tags.js';
 import { entryLimitText, withinEntryLimit } from './entry-limit.js';
 import { clip } from './clip.js';
-import { normalizeMeasureMetadata } from './measures.js';
+import {
+  MEASURES_KEY,
+  addMeasureTotals,
+  entityTotals,
+  normalizeMeasureMetadata,
+} from './measures.js';
 import type { Measures } from './measures.js';
 /**
  * An endpoint is an exact time, an anchor that follows a moment's time, or (an end only) the
@@ -249,6 +254,8 @@ export interface IntervalNode {
   first: Q;
   last: Q;
   extent: Q;
+  /** The subtree's measure totals, each duration's counted where it starts (#576). */
+  totals?: Record<string, string>;
 }
 /** Augmented balanced interval tree: intervals spanning the viewport survive even if both endpoints are outside. */
 export function durationTree(
@@ -290,6 +297,11 @@ export function durationTree(
       last,
       extent,
     };
+    const totals = addMeasureTotals(
+      addMeasureTotals(left?.totals, entityTotals(band.metadata)),
+      right?.totals,
+    );
+    if (totals) node.totals = totals;
     for (const n of [left, right])
       if (n) {
         if (n.max.compare(node.max) > 0) node.max = n.max;
@@ -505,7 +517,10 @@ export function summariesWithOngoing(
         Q.parse(band.last).compare(lower) >= 0 &&
         collapses(band, threshold),
     )
-    .map((band) => ({ first: band.first, last: band.last, count: 1, band }));
+    .map((band) => {
+      const totals = entityTotals(band.metadata);
+      return { first: band.first, last: band.last, count: 1, band, ...(totals ? { totals } : {}) };
+    });
   if (!added.length) return summaries;
   return [...summaries, ...added].sort((a, b) => Q.parse(a.first).compare(Q.parse(b.first)));
 }
@@ -618,6 +633,8 @@ export interface DurationSummary {
   count: number;
   /** The duration, when the cluster holds exactly one. */
   band?: DurationBand;
+  /** Its durations' measure totals (#576), canonical text by name; absent when all zero. */
+  totals?: Record<string, string>;
 }
 /**
  * Anchored-span summaries of the collapsed durations (extent below the threshold) that
@@ -634,7 +651,8 @@ export function durationSummaries(
   let anchor: Q | null = null,
     last: Q | null = null,
     count = 0,
-    single: DurationBand | undefined;
+    single: DurationBand | undefined,
+    totals: Record<string, string> | undefined;
   const close = () => {
     if (anchor && last)
       out.push({
@@ -642,17 +660,26 @@ export function durationSummaries(
         last: last.toString(),
         count,
         ...(count === 1 && single ? { band: single } : {}),
+        ...(totals ? { totals } : {}),
       });
     anchor = last = null;
     count = 0;
     single = undefined;
+    totals = undefined;
   };
-  const join = (first: Q, end: Q, n: number, band?: DurationBand) => {
+  const join = (
+    first: Q,
+    end: Q,
+    n: number,
+    band: DurationBand | undefined,
+    sums: Record<string, string> | undefined,
+  ) => {
     if (anchor && first.sub(anchor).compare(threshold) >= 0) close();
     if (!anchor) anchor = first;
     if (!last || end.compare(last) > 0) last = end;
     count += n;
     single = n === 1 && count === 1 ? band : undefined;
+    totals = addMeasureTotals(totals, sums);
   };
   const stack: { node: IntervalNode; point: boolean }[] = root
     ? [{ node: root, point: false }]
@@ -670,7 +697,7 @@ export function durationSummaries(
         first.compare(upper) <= 0 &&
         end.sub(first).compare(threshold) < 0
       )
-        join(first, end, 1, n.band);
+        join(first, end, 1, n.band, entityTotals(n.band.metadata));
       continue;
     }
     if (n.max.compare(lower) < 0 || n.min.compare(upper) > 0) continue;
@@ -683,7 +710,7 @@ export function durationSummaries(
       n.maxFirst.compare(upper) <= 0;
     const base = anchor && n.min.sub(anchor).compare(threshold) < 0 ? anchor : n.min;
     if (whole && n.maxFirst.sub(base).compare(threshold) < 0) {
-      join(n.min, n.max, n.count, n.count === 1 ? n.band : undefined);
+      join(n.min, n.max, n.count, n.count === 1 ? n.band : undefined, n.totals);
       continue;
     }
     if (n.right) stack.push({ node: n.right, point: false });
@@ -713,8 +740,12 @@ export function durationOverview(metadata: Metadata): Metadata {
   if (typeof metadata.description === 'string')
     result.description = clip(metadata.description, 2000);
   let size = JSON.stringify(result).length;
+  // Measure values (#576), kept whole (they are validated and bounded): what summaries total
+  // and the band's reader and hover card show.
+  const values = metadata[MEASURES_KEY];
+  if (values && typeof values === 'object' && !Array.isArray(values)) result[MEASURES_KEY] = values;
   for (const [key, value] of Object.entries(metadata))
-    if (['title', 'description', 'tags', CONTENT_LABELS_KEY].includes(key)) continue;
+    if (['title', 'description', 'tags', CONTENT_LABELS_KEY, MEASURES_KEY].includes(key)) continue;
     else if ((typeof value === 'string' && overviewString(value)) || value === true) {
       // `true` is a toggle that is on, such as a presumptive duration (#325).
       size += key.length + (value === true ? 4 : value.length) + 6;

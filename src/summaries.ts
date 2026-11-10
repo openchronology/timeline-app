@@ -5,6 +5,7 @@ import { Rational as Q } from 'rational-ordered-map';
 import { durationOverview, isOngoing, summariesWithOngoing, withOngoing } from './durations.js';
 import type { DurationBand, DurationSummary } from './durations.js';
 import type { Frame, FrameGroup } from './core.js';
+import { addMeasureTotals, entityTotals } from './measures.js';
 
 /** Groups of collapsed durations, in frame form: no moments, a duration count. */
 export function durationGroups(summaries: readonly DurationSummary[]): FrameGroup[] {
@@ -15,6 +16,8 @@ export function durationGroups(summaries: readonly DurationSummary[]): FrameGrou
     distinct: 0,
     durationCount: String(s.count),
     ...(s.band ? { duration: { ...s.band, metadata: durationOverview(s.band.metadata) } } : {}),
+    // Its durations' measure totals, each counted where it starts (#576).
+    ...(s.totals ? { totals: s.totals } : {}),
   }));
 }
 /** Moments plus collapsed durations represented by a group. */
@@ -28,24 +31,7 @@ export function entityCount(group: FrameGroup): bigint {
  * nearby moment groups and coarsens cached summaries.
  */
 /** Two groups' measure totals added (#574): canonical text by name, zeros left out. */
-export function addTotals(
-  a: Record<string, string> | undefined,
-  b: Record<string, string> | undefined,
-): Record<string, string> | undefined {
-  if (!a) return b;
-  if (!b) return a;
-  const sum: Record<string, string> = { ...a };
-  for (const [name, text] of Object.entries(b)) {
-    const value =
-      sum[name] === undefined
-        ? Q.parse(asFraction(text))
-        : Q.parse(asFraction(sum[name])).add(Q.parse(asFraction(text)));
-    if (value.numerator === 0n) delete sum[name];
-    else sum[name] = value.denominator === 1n ? value.numerator.toString() : value.toString();
-  }
-  return Object.keys(sum).length ? sum : undefined;
-}
-const asFraction = (text: string) => (text.includes('/') ? text : text + '/1');
+export const addTotals = addMeasureTotals;
 /** Totals with every value negated, to take an entity's values away (#574). */
 export function negateTotals(
   a: Record<string, string> | undefined,
@@ -120,6 +106,10 @@ export function frameWithOngoing<F extends Frame>(
     const left = BigInt(group.durationCount!) - 1n;
     if (left > 0n) group.durationCount = left.toString();
     else delete group.durationCount;
+    // Its values leave with it (#576), and return with it below when it is still short.
+    const totals = addTotals(group.totals, negateTotals(entityTotals(band.metadata)));
+    if (totals) group.totals = totals;
+    else delete group.totals;
     if (group.duration?.id === band.id) delete group.duration;
   }
   groups = groups.filter((g) => BigInt(g.count) > 0n || BigInt(g.durationCount ?? '0') > 0n);

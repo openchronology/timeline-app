@@ -385,11 +385,15 @@ export async function applyIncrementally(c, t, patch) {
     ]),
   );
   for (const { durationId, before, band } of durationOps) {
-    if (before && band && before.first === band.first && before.last === band.last)
-      await durations.replace({ first: band.first, id: durationId }, (n) =>
+    if (before && band && before.first === band.first && before.last === band.last) {
+      // In place; when its measure values change (#576), so do the totals above it.
+      const revalued =
+        canonical(before.band?.metadata?.measures ?? {}) !==
+        canonical(band.metadata?.measures ?? {});
+      await durations[revalued ? 'adjust' : 'replace']({ first: band.first, id: durationId }, (n) =>
         Object.assign(n, intervalPayload(band)),
       );
-    else {
+    } else {
       if (before) await durations.remove({ first: before.first, id: durationId });
       if (band)
         await durations.insert({ first: band.first, id: durationId }, intervalPayload(band));

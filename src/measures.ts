@@ -295,3 +295,27 @@ export function printedMeasures(
   }
   return rows;
 }
+
+/** Two maps of totals added (#574): canonical text by name, zeros left out; undefined for none. */
+export function addMeasureTotals(
+  a: Record<string, string> | undefined,
+  b: Record<string, string> | undefined,
+): Record<string, string> | undefined {
+  if (!a || !Object.keys(a).length) return b && Object.keys(b).length ? b : undefined;
+  if (!b || !Object.keys(b).length) return a;
+  const sum: Record<string, string> = { ...a };
+  const fraction = (text: string) => Q.parse(text.includes('/') ? text : text + '/1');
+  for (const [name, text] of Object.entries(b)) {
+    const value = own(sum, name) ? fraction(sum[name]).add(fraction(text)) : fraction(text);
+    if (value.numerator === 0n) delete sum[name];
+    else sum[name] = measureText(value);
+  }
+  return Object.keys(sum).length ? sum : undefined;
+}
+/** An entity's own values as totals (#576): its metadata.measures, or undefined. */
+export function entityTotals(metadata: Record<string, unknown> | undefined) {
+  const values = metadata?.[MEASURES_KEY];
+  return plain(values) && Object.keys(values).length
+    ? (values as Record<string, string>)
+    : undefined;
+}

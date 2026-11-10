@@ -1046,6 +1046,9 @@ CREATE TABLE IF NOT EXISTS oc_duration_nodes (
 -- definition: the duration as the document has it ({id, start, end, metadata}; its start and
 -- end may be anchored to moments), the source of saves, exports and history.
 ALTER TABLE oc_duration_nodes ADD COLUMN IF NOT EXISTS definition jsonb;
+-- totals: the subtree's measure totals (#576), each duration's values counted where it starts:
+-- {name: exact value as text}, zeros left out; NULL is all zero. avl.mjs keeps them.
+ALTER TABLE oc_duration_nodes ADD COLUMN IF NOT EXISTS totals jsonb;
 -- Subtree summaries for collapsing short durations: largest start, entry count and extent
 -- bounds. NULL marks rows built before these columns; migrate.mjs rebuilds them.
 -- max_first: the subtree's latest start; subtree_count: its durations; min_extent,
@@ -1122,14 +1125,23 @@ CREATE INDEX IF NOT EXISTS oc_duration_nodes_first_key ON oc_duration_nodes(time
 -- raises on a node the tree names but lacks. Reads only. Forks are handed to
 -- oc_duration_overview_lineage and views use oc_view_duration_overview (generated below from
 -- this definition, which the rewrites there match by text).
+-- The duration overview's result gained totals (#576): older versions, and their generated
+-- view and fork variants, go first.
+DO $$ BEGIN
+  IF EXISTS(SELECT 1 FROM pg_proc WHERE proname='oc_duration_overview' AND NOT ('totals'=ANY(proargnames))) THEN
+    DROP FUNCTION oc_duration_overview(uuid,mpq,mpq,mpq);
+    DROP FUNCTION IF EXISTS oc_view_duration_overview(uuid,mpq,mpq,mpq);
+    DROP FUNCTION IF EXISTS oc_duration_overview_lineage(uuid,mpq,mpq,mpq);
+  END IF;
+END $$;
 CREATE OR REPLACE FUNCTION oc_duration_overview(tid uuid, lo mpq, hi mpq, threshold mpq)
-RETURNS TABLE(first_time text,last_time text,duration_count integer,band jsonb)
+RETURNS TABLE(first_time text,last_time text,duration_count integer,band jsonb,totals jsonb)
 -- PostgreSQL cannot estimate the exact mpq filters; an ordered index scan suits them.
 LANGUAGE plpgsql STABLE SET enable_bitmapscan=off AS $$
 DECLARE ids integer[]; points boolean[]:=ARRAY[false]; lows integer[]:=ARRAY[NULL::integer];
   highs integer[]:=ARRAY[NULL::integer]; idx integer; nid integer; point boolean; low integer; high integer;
   n record; r record; earliest mpq; fits mpq; anchor mpq; reach mpq; finish mpq; total integer:=0;
-  single jsonb; low_first mpq; low_id text; high_first mpq; high_id text;
+  single jsonb; low_first mpq; low_id text; high_first mpq; high_id text; sums jsonb;
 BEGIN
   IF lo IS NULL OR hi IS NULL OR threshold IS NULL OR threshold<='0'::mpq OR lo>hi THEN RETURN; END IF;
   -- A collapsed duration that reaches the window starts after lo - threshold.
@@ -1143,7 +1155,7 @@ BEGIN
     -- Pop the top entry.
     idx:=cardinality(ids); nid:=ids[idx]; point:=points[idx]; low:=lows[idx]; high:=highs[idx];
     ids:=ids[1:idx-1]; points:=points[1:idx-1]; lows:=lows[1:idx-1]; highs:=highs[1:idx-1];
-    SELECT d.left_id,d.right_id,d.min_time,d.max_time,d.max_first,d.subtree_count,d.min_extent,d.max_extent,d.first_time,d.last_time,d.band INTO n FROM oc_duration_nodes d WHERE d.timeline_id=tid AND d.id=nid;
+    SELECT d.left_id,d.right_id,d.min_time,d.max_time,d.max_first,d.subtree_count,d.min_extent,d.max_extent,d.first_time,d.last_time,d.band,d.totals INTO n FROM oc_duration_nodes d WHERE d.timeline_id=tid AND d.id=nid;
     IF NOT FOUND THEN RAISE EXCEPTION 'Broken duration index'; END IF;
     IF point THEN
       -- The node's own duration: only a short one that intersects the window collapses.
@@ -1151,13 +1163,15 @@ BEGIN
       -- It starts at or past the open group's reach (anchor + threshold): emit that group.
       IF anchor IS NOT NULL AND n.first_time>=reach THEN
         first_time:=oc_qtext(anchor); last_time:=oc_qtext(finish); duration_count:=total;
-        band:=CASE WHEN total=1 THEN single END; RETURN NEXT; anchor:=NULL;
+        band:=CASE WHEN total=1 THEN single END; totals:=sums; RETURN NEXT; anchor:=NULL;
       END IF;
       -- Open a group at this start, or extend the open one's latest end.
-      IF anchor IS NULL THEN anchor:=n.first_time; reach:=anchor+threshold; finish:=n.last_time; total:=0;
+      IF anchor IS NULL THEN anchor:=n.first_time; reach:=anchor+threshold; finish:=n.last_time; total:=0; sums:=NULL;
       ELSIF n.last_time>finish THEN finish:=n.last_time; END IF;
       -- band is kept for a group of exactly one duration.
       total:=total+1; single:=CASE WHEN total=1 THEN n.band END;
+      -- Its measure values, counted where it starts (#576).
+      sums:=oc_add_totals(sums,n.band->'metadata'->'measures');
       CONTINUE;
     END IF;
     -- Prune a subtree that misses the window, whose collapsed durations all end before it
@@ -1170,11 +1184,12 @@ BEGIN
     IF n.max_extent<threshold AND n.min_time>=lo AND n.max_first<=hi AND n.max_first<fits THEN
       IF anchor IS NOT NULL AND n.min_time>=reach THEN
         first_time:=oc_qtext(anchor); last_time:=oc_qtext(finish); duration_count:=total;
-        band:=CASE WHEN total=1 THEN single END; RETURN NEXT; anchor:=NULL;
+        band:=CASE WHEN total=1 THEN single END; totals:=sums; RETURN NEXT; anchor:=NULL;
       END IF;
-      IF anchor IS NULL THEN anchor:=n.min_time; reach:=anchor+threshold; finish:=n.max_time; total:=0;
+      IF anchor IS NULL THEN anchor:=n.min_time; reach:=anchor+threshold; finish:=n.max_time; total:=0; sums:=NULL;
       ELSIF n.max_time>finish THEN finish:=n.max_time; END IF;
       total:=total+n.subtree_count; single:=CASE WHEN total=1 THEN n.band END;
+      sums:=oc_add_totals(sums,n.totals);
     -- Short and long mixed in a small subtree: read its short durations by one range scan of
     -- the start index (first_key) over its starts, in start order. A duration outside the
     -- subtree can share a boundary start; the ancestor bounds exclude it, by ID where the
@@ -1200,11 +1215,12 @@ BEGIN
         -- Group as for a single node's duration, above.
         IF anchor IS NOT NULL AND r.f>=reach THEN
           first_time:=oc_qtext(anchor); last_time:=oc_qtext(finish); duration_count:=total;
-          band:=CASE WHEN total=1 THEN single END; RETURN NEXT; anchor:=NULL;
+          band:=CASE WHEN total=1 THEN single END; totals:=sums; RETURN NEXT; anchor:=NULL;
         END IF;
-        IF anchor IS NULL THEN anchor:=r.f; reach:=anchor+threshold; finish:=r.l; total:=0;
+        IF anchor IS NULL THEN anchor:=r.f; reach:=anchor+threshold; finish:=r.l; total:=0; sums:=NULL;
         ELSIF r.l>finish THEN finish:=r.l; END IF;
         total:=total+1; single:=CASE WHEN total=1 THEN r.b END;
+        sums:=oc_add_totals(sums,r.b->'metadata'->'measures');
       END LOOP;
     ELSE
       -- Descend in order: push the right subtree (bounded by this node before it), this
@@ -1221,7 +1237,7 @@ BEGIN
   -- Emit the last open group.
   IF anchor IS NOT NULL THEN
     first_time:=oc_qtext(anchor); last_time:=oc_qtext(finish); duration_count:=total;
-    band:=CASE WHEN total=1 THEN single END; RETURN NEXT;
+    band:=CASE WHEN total=1 THEN single END; totals:=sums; RETURN NEXT;
   END IF;
 END $$;
 -- A duration by its ID (band->>'id'): saves, merges, history and duration queries look one up.
@@ -1334,6 +1350,7 @@ CREATE TABLE IF NOT EXISTS oc_view_duration_nodes (
 -- A view's ongoing durations (#537), as oc_duration_nodes_ongoing.
 CREATE INDEX IF NOT EXISTS oc_view_duration_nodes_ongoing ON oc_view_duration_nodes(timeline_id) WHERE band->'end'->>'ongoing'='true';
 ALTER TABLE oc_view_duration_nodes ADD COLUMN IF NOT EXISTS height integer;
+ALTER TABLE oc_view_duration_nodes ADD COLUMN IF NOT EXISTS totals jsonb;
 DROP INDEX IF EXISTS oc_view_duration_nodes_first_approx;
 ALTER TABLE oc_view_duration_nodes DROP COLUMN IF EXISTS first_approx;
 ALTER TABLE oc_view_duration_nodes ADD COLUMN IF NOT EXISTS first_key numeric
@@ -1392,6 +1409,8 @@ CREATE TABLE IF NOT EXISTS oc_edge_nodes (
 );
 -- AVL heights and the arc tree's root, as for durations; a static tree's root was node 1.
 ALTER TABLE oc_edge_nodes ADD COLUMN IF NOT EXISTS height integer;
+-- The interval trees share their columns (avl.mjs INTERVAL_TREE); arcs carry no measures.
+ALTER TABLE oc_edge_nodes ADD COLUMN IF NOT EXISTS totals jsonb;
 ALTER TABLE oc_timelines ADD COLUMN IF NOT EXISTS edge_root integer;
 UPDATE oc_timelines t SET edge_root=1 WHERE edge_root IS NULL
   AND EXISTS(SELECT 1 FROM oc_edge_nodes n WHERE n.timeline_id=t.id AND n.id=1);
@@ -1967,8 +1986,8 @@ BEGIN
   -- Unpack each entry; look nodes up from their parent's level and version.
   src:=oc_rewrite(src,'nid:=ids[idx];',
     'code:=ids[idx]; nid:=code&36028797018963967; hint:=code>>56; hint_retired:=(code>>55)&1=1;');
-  src:=oc_rewrite(src,'SELECT d.left_id,d.right_id,d.min_time,d.max_time,d.max_first,d.subtree_count,d.min_extent,d.max_extent,d.first_time,d.last_time,d.band INTO n FROM oc_duration_nodes d WHERE d.timeline_id=tid AND d.id=nid;',
-    oc_lineage_lookup('d.left_id,d.right_id,d.min_time,d.max_time,d.max_first,d.subtree_count,d.min_extent,d.max_extent,d.first_time,d.last_time,d.band',
+  src:=oc_rewrite(src,'SELECT d.left_id,d.right_id,d.min_time,d.max_time,d.max_first,d.subtree_count,d.min_extent,d.max_extent,d.first_time,d.last_time,d.band,d.totals INTO n FROM oc_duration_nodes d WHERE d.timeline_id=tid AND d.id=nid;',
+    oc_lineage_lookup('d.left_id,d.right_id,d.min_time,d.max_time,d.max_first,d.subtree_count,d.min_extent,d.max_extent,d.first_time,d.last_time,d.band,d.totals',
       'n','oc_duration_nodes','d','nid','hint','lv','found_retired','hint_retired'));
   src:=oc_rewrite(src,'SELECT d.first_time,d.band->>''id'' INTO low_first,low_id FROM oc_duration_nodes d WHERE d.timeline_id=tid AND d.id=low;',
     oc_lineage_lookup('d.first_time,d.band->>''id''','low_first,low_id','oc_duration_nodes','d','low','1','bound_lv','other_retired','false'));

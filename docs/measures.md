@@ -112,6 +112,15 @@ Every summary of a timeline keeps the total of each measure over what it summari
 - **Where:** the browser's index, the server's PostgreSQL trees and a desktop file's SQLite index all keep them. A desktop file saved before this is re-indexed when it is opened.
 - **In overviews:** each group in an overview (`/api/timelines/{id}/query` with `kind: "overview"`) has `totals`, the exact totals of its moments by measure name, with zeros left out.
 
+## Durations
+
+A duration's values count entirely **where it starts**, as if it were a moment at its start ([#576](https://github.com/openchronology/timeline-app/issues/576)). Its whole value goes to the summary or window holding its start, never split between windows or counted twice.
+
+- **Collapsed durations:** durations too short to draw at the view's scale join summaries, and their values join the summary's totals.
+- **Bands:** a duration long enough to draw as a band keeps its own values. Its reader and hover card show them, and a [measure chart](plugins.md#charting-a-measure) counts them at its start.
+- **Ongoing durations:** each counts where it starts, like the rest.
+- **Trees:** the duration trees keep subtree totals by start in every edition, so a summary of many durations reads cached totals, as one of many moments does.
+
 ## Showing totals
 
 - **Summaries:** a summary's label says what it holds, then up to two of its totals, each labelled and shown as its measure shows totals: `3 moments · Cost $21.50`. Its tooltip and the name screen readers hear list them all.

@@ -930,6 +930,9 @@ impl Snapshot {
                             if let Some(band) = c.band {
                                 group["duration"] = band;
                             }
+                            if let Some(totals) = c.totals {
+                                group["totals"] = totals;
+                            }
                             groups.push(group);
                         }
                         groups = super::coalesce_groups(&db, groups, &threshold)?;
@@ -3807,6 +3810,74 @@ mod measure_total_tests {
             );
         }
         Value::Object(v)
+    }
+    /// Collapsed durations' values count where they start, once (#576): across a window's
+    /// groups, every moment's and every collapsed duration's, as summing them by hand gives.
+    #[test]
+    fn collapsed_durations_total_where_they_start() {
+        let mut r = Random(576);
+        let measures = json!({"cost":{"type":"mpz"}});
+        let events: Vec<Value> = (0..60)
+            .map(|i| json!({"id":format!("m{i}"),"time":format!("{}/1",r.next(400)),"metadata":{"measures":{"cost":(r.next(900) as i64 - 200).to_string()}}}))
+            .collect();
+        let durations: Vec<(i64, i64, i64)> = (0..80)
+            .map(|_| {
+                let start = r.next(400) as i64;
+                let length = if r.next(10) < 8 {
+                    r.next(4) as i64
+                } else {
+                    60 + r.next(200) as i64
+                };
+                (start, start + length, r.next(900) as i64 - 200)
+            })
+            .collect();
+        let spans: Vec<Value> = durations
+            .iter()
+            .enumerate()
+            .map(|(i, (s, e, c))| json!({"id":format!("d{i}"),"start":format!("{s}/1"),"end":format!("{e}/1"),"metadata":{"measures":{"cost":c.to_string()}}}))
+            .collect();
+        let doc: Document = serde_json::from_value(json!({"format":"openchronology","version":1,"title":"Spans","description":"","measures":measures,"events":events,"durations":spans})).unwrap();
+        let snapshot = Snapshot::from_document(&doc).unwrap();
+        let moments: i64 = doc
+            .events
+            .iter()
+            .map(|e| {
+                e.metadata["measures"]["cost"]
+                    .as_str()
+                    .unwrap()
+                    .parse::<i64>()
+                    .unwrap()
+            })
+            .sum();
+        for threshold in ["3/1", "10/1", "50/1"] {
+            let frame = snapshot
+                .query(&serde_json::from_value(json!({"kind":"overview","lower":"-1/1","upper":"700/1","threshold":threshold})).unwrap())
+                .unwrap();
+            let limit: i64 = frame["threshold"]
+                .as_str()
+                .unwrap()
+                .split('/')
+                .map(|p| p.parse::<i64>().unwrap())
+                .reduce(|n, d| (n + d - 1) / d)
+                .unwrap();
+            let collapsed: i64 = durations
+                .iter()
+                .filter(|(s, e, _)| e - s < limit)
+                .map(|(_, _, c)| c)
+                .sum();
+            let total: i64 = frame["groups"]
+                .as_array()
+                .unwrap()
+                .iter()
+                .filter_map(|g| g["totals"]["cost"].as_str())
+                .map(|v| v.parse::<i64>().unwrap())
+                .sum();
+            assert_eq!(total, moments + collapsed, "{threshold}");
+            // Bands drawn on their own carry their values.
+            for band in frame["durations"].as_array().unwrap() {
+                assert!(band["metadata"]["measures"]["cost"].is_string());
+            }
+        }
     }
     #[test]
     fn overview_groups_total_their_moments_values() {
