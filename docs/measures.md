@@ -138,7 +138,7 @@ A measure's values can be **changes**, such as payments in and out, with a runni
 - **Summaries' totals split the window:** each summary covers from its first time up to the next one's, the first from the window's start and the last to its end. So every change in the window counts once, a long duration's too. A summary's total is the difference between its balance after and the balance before it.
 - **Comparisons:** each timeline keeps its own balance.
 
-A balance is read from the timeline's change index in O(log n): the browser and servers keep one (a server's in PostgreSQL, alongside its other trees, shared by forks). Desktop files follow (#595).
+A balance is read from the timeline's change index in O(log n). The browser, servers and desktop files each keep one: a server's in PostgreSQL alongside its other trees, shared by forks, and a desktop file's as a SQLite index, built when an older file is opened.
 
 ## Showing totals
 

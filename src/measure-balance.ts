@@ -210,3 +210,62 @@ export function changePoints(
     .filter((entry): entry is [string, Record<string, string>] => !!entry[1])
     .sort((a, b) => Q.parse(a[0]).compare(Q.parse(b[0])));
 }
+
+/** A request for the changes up to `time` (after everything when undefined), at it or before. */
+export interface PrefixAsk {
+  time: Q | undefined;
+  inclusive: boolean;
+}
+/**
+ * `frame` with its measures' totals split across its summaries and its balances (#595), from a
+ * change index answered by `prefixes`: the changes up to each asked time, in order. A first
+ * pass records the times partitionTotals and windowBalances need, the second uses the answers,
+ * so a store answers them all in one request.
+ */
+export async function measuredFrame<
+  F extends {
+    groups: { first: string; totals?: Record<string, string> }[];
+    balances?: Record<string, WindowBalance>;
+  },
+>(
+  frame: F,
+  lower: Q,
+  upper: Q,
+  measures: Measures | undefined,
+  prefixes: (asks: PrefixAsk[]) => Promise<(Record<string, string> | undefined)[]>,
+): Promise<F> {
+  if (!measures || !Object.keys(measures).length) return frame;
+  const key = (time: Q | undefined, inclusive: boolean) =>
+    `${time?.toString() ?? '∞'}|${inclusive}`;
+  const wanted = new Map<string, PrefixAsk>();
+  const known = new Map<string, Record<string, string> | undefined>();
+  const prefix = (time: Q | undefined, inclusive: boolean) => {
+    const k = key(time, inclusive);
+    if (!wanted.has(k)) wanted.set(k, { time, inclusive });
+    return known.get(k);
+  };
+  const sum: ChangeSum = (from, to, { includeLower, includeUpper }) => {
+    const below = from === undefined ? undefined : prefix(from, !includeLower);
+    return addMeasureTotals(
+      to === undefined ? prefix(undefined, true) : prefix(to, includeUpper),
+      below &&
+        Object.fromEntries(
+          Object.entries(below).map(([n, v]) => [n, v.startsWith('-') ? v.slice(1) : '-' + v]),
+        ),
+    );
+  };
+  const measure = () => ({
+    groups: partitionTotals(frame.groups, lower, upper, sum),
+    balances: windowBalances(measures, lower, upper, sum),
+  });
+  measure();
+  const asks = [...wanted.values()];
+  const answers = asks.length ? await prefixes(asks) : [];
+  asks.forEach((a, i) => known.set(key(a.time, a.inclusive), answers[i] ?? undefined));
+  const { groups, balances } = measure();
+  return {
+    ...frame,
+    groups: groupBalances(groups, balances),
+    ...(balances ? { balances } : {}),
+  };
+}

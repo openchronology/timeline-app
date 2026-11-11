@@ -38,9 +38,7 @@ import {
   addTotals,
   negateTotals,
   changePoints,
-  partitionTotals,
-  windowBalances,
-  groupBalances,
+  measuredFrame,
 } from '../dist/core.mjs';
 import { randomUUID } from 'node:crypto';
 import { pluginCompiler } from './plugin-sandbox.mjs';
@@ -2985,49 +2983,19 @@ async function endsInView(c, view, edges) {
 }
 /**
  * `frame` with its measures' totals and balances from the change index (#595) of timeline (or
- * view) `tree`, read by SQL function `fn` (oc_change_prefixes): each summary's totals are the
- * changes in its part of the window [lower, upper] (partitionTotals), and each anchored
- * measure's balances follow (windowBalances, groupBalances). The changes up to each time the
- * two need are read in one call: a first pass records which, the second uses them.
+ * view) `tree`, read by SQL function `fn` (oc_change_prefixes) in one call (measuredFrame):
+ * each summary's totals are the changes in its part of the window [lower, upper], and each
+ * anchored measure's balances follow.
  */
 async function withChanges(c, fn, tree, lower, upper, measures, frame) {
-  if (!measures || !Object.keys(measures).length) return frame;
-  const key = (time, inclusive) => `${time?.toString() ?? '∞'}|${inclusive}`;
-  const wanted = new Map();
-  const prefixes = new Map();
-  // The changes up to `time` (all of them when undefined), including it when `inclusive`.
-  const prefix = (time, inclusive) => {
-    const k = key(time, inclusive);
-    if (!wanted.has(k)) wanted.set(k, { time, inclusive });
-    return prefixes.get(k);
-  };
-  const sum = (from, to, { includeLower, includeUpper }) =>
-    addTotals(
-      to === undefined ? prefix(undefined, true) : prefix(to, includeUpper),
-      from === undefined ? undefined : negateTotals(prefix(from, !includeLower)),
-    );
-  const measure = () => {
-    const groups = partitionTotals(frame.groups, lower, upper, sum);
-    const balances = windowBalances(measures, lower, upper, sum);
-    return { groups, balances };
-  };
-  measure();
-  const asked = [...wanted.values()];
-  if (asked.length) {
+  return measuredFrame(frame, lower, upper, measures, async (asks) => {
     const { rows } = await c.query(`SELECT ${fn}($1,$2::mpq[],$3::boolean[]) AS sums`, [
       tree,
-      asked.map((a) => a.time?.toString() ?? null),
-      asked.map((a) => a.inclusive),
+      asks.map((a) => a.time?.toString() ?? null),
+      asks.map((a) => a.inclusive),
     ]);
-    const sums = rows[0].sums ?? [];
-    asked.forEach((a, i) => prefixes.set(key(a.time, a.inclusive), sums[i] ?? undefined));
-  }
-  const { groups, balances } = measure();
-  return {
-    ...frame,
-    groups: groupBalances(groups, balances),
-    ...(balances ? { balances } : {}),
-  };
+    return rows[0].sums ?? [];
+  });
 }
 /**
  * The change index (#595) of `document`, whose resolved bands are `bands`, written whole into

@@ -49,6 +49,7 @@ import {
 } from './drafts.js';
 import type { DraftWrite } from './drafts.js';
 import { addMeasureRow, readMeasureRows, renderMeasureFields } from './measure-ui.js';
+import { measuredFrame } from './measure-balance.js';
 import type { Advice, Measurements, Platform } from './capacity.js';
 import { createHoverPreview } from './hover-preview.js';
 import { renderReader } from './event-reader.js';
@@ -1265,15 +1266,38 @@ async function timelineQuery<T>(query: Record<string, unknown>, signal?: AbortSi
       query: { ...query, metadata_keys, ...(now ? { now: now.toString() } : {}) },
     });
     // A window carries them resolved, apart: their placeholders go, and they join it.
+    if (query.kind !== 'overview') return result;
     const { ongoing, ...frame } = result as Frame & { ongoing?: DurationBand[] };
-    if (query.kind !== 'overview' || !ongoing) return result;
-    return frameWithOngoing(
-      frame,
-      ongoing,
-      Q.parse(String(query.lower)),
-      Q.parse(String(query.upper)),
-      Q.parse(frame.threshold ?? String(query.threshold)),
-    ) as T;
+    const lower = Q.parse(String(query.lower)),
+      upper = Q.parse(String(query.upper));
+    const resolved = ongoing
+      ? frameWithOngoing(
+          frame,
+          ongoing,
+          lower,
+          upper,
+          Q.parse(frame.threshold ?? String(query.threshold)),
+        )
+      : (result as Frame);
+    // Totals that split the window and balances (#595), from the file's change index.
+    const generation = local.generation;
+    return (await measuredFrame(resolved, lower, upper, timelineMeasures(), async (asks) => {
+      const { sums } = await window.__TAURI__!.core.invoke<{
+        sums: (Record<string, string> | null)[];
+      }>('desktop_query', {
+        generation,
+        query: {
+          kind: 'changes',
+          // A filtered view's own changes: the store derives the same view's index.
+          ...(query.filter ? { filter: query.filter } : {}),
+          lower: '0',
+          upper: '0',
+          times: asks.map((a) => a.time?.toString() ?? null),
+          inclusive: asks.map((a) => a.inclusive),
+        },
+      });
+      return sums.map((s) => s ?? undefined);
+    })) as T;
   }
   if (!remote) throw new Error('No indexed timeline is open.');
   return api<T>(`timelines/${remote.id}/query`, 'POST', query, signal);

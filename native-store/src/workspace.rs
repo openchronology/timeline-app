@@ -155,6 +155,12 @@ pub struct Query {
     /// The entity of a `related` query.
     #[serde(default)]
     pub entity: Option<Value>,
+    /// A `changes` query (#595): the times to read the measures' changes up to (null for after
+    /// everything), and whether each includes its own time's changes.
+    #[serde(default)]
+    pub times: Vec<Option<String>>,
+    #[serde(default)]
+    pub inclusive: Vec<bool>,
     /// Restricts a search to one kind of entity ("moment").
     #[serde(default)]
     pub only: Option<String>,
@@ -294,6 +300,20 @@ impl Snapshot {
         {
             return Err("Unsupported SQLite rational index".into());
         }
+        // The change index (#595) likewise, when the file has one (older files have none).
+        let changes = saved.query(
+            "SELECT lower(sql) FROM sqlite_schema WHERE name='changes'",
+            &[],
+        )?;
+        let foreign = changes.first().is_some_and(|row| {
+            row[0]
+                .as_deref()
+                .map(|sql| sql.split_whitespace().collect::<Vec<_>>().join(" "))
+                != Some("create virtual table changes using rational_index".into())
+        });
+        if foreign {
+            return Err("Unsupported SQLite change index".into());
+        }
         // Serves the moment pages' (time, id) keyset order and range (see `query`, "events").
         // Only the private copy gets it; files written by `save` carry events_time.
         saved.execute(
@@ -307,6 +327,7 @@ impl Snapshot {
             super::rebuild_duration_index(&saved)?;
             super::rebuild_edge_index(&saved)?;
             super::rebuild_point_index(&saved)?;
+            super::rebuild_change_index(&saved)?;
             intervals::set_layout(&saved, &format!("rebuilt-{}", intervals::token()))?;
         }
         super::create_start_index(&saved)?;
@@ -872,6 +893,7 @@ impl Snapshot {
             return Err("Reversed viewport bounds".into());
         }
         let result = match q.kind.as_str() {
+            "changes" => json!({"sums": super::change_prefixes(&db, &q.times, &q.inclusive)?}),
             "overview" => {
                 if db.scalar("SELECT q_cmp(q(?),q('0'))", &[&q.threshold])? == "-1" {
                     return Err("Negative grouping threshold".into());
@@ -1110,9 +1132,9 @@ const PROGRESS_STEP: usize = 2000;
 fn current_layout(db: &Connection) -> Result<bool, String> {
     Ok(intervals::layout(db)?.is_some_and(|(version, _)| version == intervals::LAYOUT)
         && db.scalar(
-            "SELECT count(*) FROM sqlite_schema WHERE name IN ('interval_roots','duration_nodes','edge_nodes','duration_intervals','edge_intervals') AND type='table'",
+            "SELECT count(*) FROM sqlite_schema WHERE name IN ('interval_roots','duration_nodes','edge_nodes','duration_intervals','edge_intervals','changes') AND type='table'",
             &[],
-        )? == "5")
+        )? == "6")
 }
 /// The target, opened for writing, if it is a valid timeline holding the baseline's state.
 ///
@@ -1306,6 +1328,17 @@ fn apply_changes(
             )?;
         }
     }
+    // Times whose changes (#595) must be counted again: the affected moments' times, and each
+    // replaced duration's first and last, before and after.
+    let mut change_times = affected.clone();
+    for id in &durations {
+        for row in db.query(
+            "SELECT first,last FROM duration_intervals WHERE id=?1",
+            &[id],
+        )? {
+            change_times.extend(row.into_iter().flatten());
+        }
+    }
     let mut tree = intervals::Tree::open(db, "duration_intervals", "duration_nodes")?;
     // Durations whose start (where their arcs attach) moved, or that were deleted.
     let mut moved_durations = BTreeSet::new();
@@ -1350,6 +1383,14 @@ fn apply_changes(
         return Err("Use at most 200000 durations per timeline".into());
     }
     tree.flush()?;
+    for id in &durations {
+        for row in db.query(
+            "SELECT first,last FROM duration_intervals WHERE id=?1",
+            &[id],
+        )? {
+            change_times.extend(row.into_iter().flatten());
+        }
+    }
     // Links: deleted entities lose theirs, then the patch's own changes (the last one wins).
     super::create_relationship_table(db)?;
     let key = |a: (&str, &str), b: (&str, &str)| {
@@ -1452,6 +1493,11 @@ fn apply_changes(
     // now at that time (events_time index), or not at all when none are left, with its
     // measures' sums (#574). Measures named differently change every bucket's sums: the index
     // is rebuilt instead.
+    let replaced_places =
+        super::measure_places(patch.settings.measures.as_ref()) != super::file_measure_places(db)?;
+    if !replaced_places {
+        super::recount_changes(db, &change_times)?;
+    }
     let names = super::measure_names(patch.settings.measures.as_ref());
     if names != super::file_measure_names(db)? {
         renamed_measures = true;
@@ -1494,6 +1540,9 @@ fn apply_changes(
     )?;
     if renamed_measures {
         super::rebuild_point_index(db)?;
+    }
+    if replaced_places {
+        super::rebuild_change_index(db)?;
     }
     intervals::set_layout(db, token)
 }
@@ -3963,5 +4012,206 @@ mod measure_total_tests {
         }
         let reopened = Snapshot::open(&path).unwrap();
         check(&reopened, "price");
+    }
+}
+/// The change index (#595): the changes up to any time, at it or before, as a hand sum of the
+/// document's moments and durations gives them, after saves, sparse changes, a measure's
+/// durations moved from end to start, and an older file opened.
+#[cfg(test)]
+mod change_index_tests {
+    use super::*;
+    struct Random(u64);
+    impl Random {
+        fn next(&mut self, n: i64) -> i64 {
+            self.0 = self
+                .0
+                .wrapping_mul(6364136223846793005)
+                .wrapping_add(1442695040888963407);
+            ((self.0 >> 33) % n as u64) as i64
+        }
+    }
+    fn values(r: &mut Random) -> Value {
+        let mut v = serde_json::Map::new();
+        for name in ["cost", "hours"] {
+            if r.next(10) < 6 {
+                v.insert(name.into(), json!((r.next(1000) - 400).max(1).to_string()));
+            }
+        }
+        json!({"title":"E","measures":v})
+    }
+    fn time(t: &str) -> i64 {
+        t.trim_end_matches("/1").parse().unwrap()
+    }
+    /// The changes as (time, cost, hours), from a document: a moment's at its time, a
+    /// duration's cost at its start and hours where `hours_at_end` says.
+    fn hand_changes(doc: &Document, hours_at_end: bool) -> Vec<(i64, i64, i64)> {
+        let at: std::collections::HashMap<&str, i64> = doc
+            .events
+            .iter()
+            .map(|e| (e.id.as_str(), time(&e.time)))
+            .collect();
+        let value = |m: &serde_json::Map<String, Value>, n: &str| -> i64 {
+            m.get("measures")
+                .and_then(|v| v.get(n))
+                .and_then(Value::as_str)
+                .map_or(0, |s| s.parse().unwrap())
+        };
+        let mut out = Vec::new();
+        for e in &doc.events {
+            out.push((
+                time(&e.time),
+                value(&e.metadata, "cost"),
+                value(&e.metadata, "hours"),
+            ));
+        }
+        for d in &doc.durations {
+            let place = |end: &Value| match end {
+                Value::String(t) => time(t),
+                v => at[v["moment"].as_str().unwrap()],
+            };
+            let (s, e) = (
+                place(&serde_json::to_value(&d.start).unwrap()),
+                place(&serde_json::to_value(&d.end).unwrap()),
+            );
+            let (first, last) = (s.min(e), s.max(e));
+            let (cost, hours) = (value(&d.metadata, "cost"), value(&d.metadata, "hours"));
+            out.push((first, cost, if hours_at_end { 0 } else { hours }));
+            if hours_at_end {
+                out.push((last, 0, hours));
+            }
+        }
+        out
+    }
+    fn check(snapshot: &Snapshot, hours_at_end: bool) {
+        let doc = snapshot.document().unwrap();
+        let changes = hand_changes(&doc, hours_at_end);
+        let mut times = Vec::new();
+        let mut inclusive = Vec::new();
+        for t in (-10..=420).step_by(7) {
+            for incl in [false, true] {
+                times.push(Some(format!("{t}/1")));
+                inclusive.push(incl);
+            }
+        }
+        times.push(None);
+        inclusive.push(true);
+        let query: Query = serde_json::from_value(
+            json!({"kind":"changes","lower":"0","upper":"0","times":times,"inclusive":inclusive}),
+        )
+        .unwrap();
+        let result = snapshot.query(&query).unwrap();
+        assert!(
+            result["sums"][times.len() - 1].get("cost").is_some(),
+            "Some changes counted"
+        );
+        for (i, (t, incl)) in times.iter().zip(&inclusive).enumerate() {
+            let within = |c: &&(i64, i64, i64)| match t {
+                None => true,
+                Some(t) => {
+                    if *incl {
+                        c.0 <= time(t)
+                    } else {
+                        c.0 < time(t)
+                    }
+                }
+            };
+            let cost: i64 = changes.iter().filter(within).map(|c| c.1).sum();
+            let hours: i64 = changes.iter().filter(within).map(|c| c.2).sum();
+            let got = &result["sums"][i];
+            let read = |n: &str| {
+                got.get(n)
+                    .and_then(Value::as_str)
+                    .map_or(0, |s| s.parse().unwrap())
+            };
+            assert_eq!(
+                (read("cost"), read("hours")),
+                (cost, hours),
+                "up to {t:?}, inclusive {incl}"
+            );
+        }
+    }
+    fn measures(hours_at_end: bool) -> Value {
+        json!({"cost":{"type":"mpz"},"hours":{"type":"mpz","durations":if hours_at_end {"end"} else {"start"}}})
+    }
+    #[test]
+    fn change_prefixes_match_hand_sums() {
+        let mut r = Random(595);
+        let events: Vec<Value> = (0..80)
+            .map(|i| json!({"id":format!("m{i}"),"time":format!("{}/1",r.next(400)),"metadata":values(&mut r)}))
+            .collect();
+        let durations: Vec<Value> = (0..60)
+            .map(|i| {
+                let end = if r.next(3) == 0 {
+                    json!({"moment":format!("m{}",r.next(80))})
+                } else {
+                    json!(format!("{}/1", r.next(400)))
+                };
+                json!({"id":format!("d{i}"),"start":format!("{}/1",r.next(400)),"end":end,"metadata":values(&mut r)})
+            })
+            .collect();
+        let doc: Document = serde_json::from_value(json!({"format":"openchronology","version":1,"title":"Changes","description":"","measures":measures(true),"events":events,"durations":durations})).unwrap();
+        let snapshot = Snapshot::from_document(&doc).unwrap();
+        check(&snapshot, true);
+
+        // Sparse changes: moments moved (with durations anchored to them), values changed,
+        // entities removed and added, durations moved and removed.
+        let mut settings = snapshot.header().unwrap().document;
+        settings.events.clear();
+        settings.durations.clear();
+        let mut changes = Vec::new();
+        let mut seen = std::collections::BTreeSet::new();
+        for i in 0..25 {
+            let id = format!("m{}", r.next(80));
+            if seen.insert(id.clone()) {
+                let event = if r.next(4) == 0 {
+                    Value::Null
+                } else {
+                    json!({"id":id,"time":format!("{}/1",r.next(400)),"metadata":values(&mut r)})
+                };
+                changes.push(json!({"id":id,"event":event}));
+            }
+            changes.push(json!({"id":format!("n{i}"),"event":{"id":format!("n{i}"),"time":format!("{}/1",r.next(400)),"metadata":values(&mut r)}}));
+        }
+        let mut duration_changes = Vec::new();
+        for i in 0..20 {
+            let id = format!("d{}", r.next(60));
+            if seen.insert(id.clone()) {
+                let duration = if r.next(4) == 0 {
+                    Value::Null
+                } else {
+                    json!({"id":id,"start":format!("{}/1",r.next(400)),"end":format!("{}/1",r.next(400)),"metadata":values(&mut r)})
+                };
+                duration_changes.push(json!({"id":id,"duration":duration}));
+            }
+            duration_changes.push(json!({"id":format!("e{i}"),"duration":{"id":format!("e{i}"),"start":format!("{}/1",r.next(400)),"end":format!("{}/1",r.next(400)),"metadata":values(&mut r)}}));
+        }
+        let patch: Patch = serde_json::from_value(
+            json!({"settings":settings,"changes":changes,"durationChanges":duration_changes}),
+        )
+        .unwrap();
+        let saved = snapshot
+            .save_patch(&snapshot.directory().join("changes.och"), &patch)
+            .unwrap();
+        check(&saved, true);
+
+        // Hours now counted at durations' starts: every time's changes are counted again.
+        let mut moved = saved.header().unwrap().document;
+        moved.events.clear();
+        moved.durations.clear();
+        moved.measures = Some(measures(false));
+        let patch: Patch = serde_json::from_value(json!({"settings":moved,"changes":[]})).unwrap();
+        let path = snapshot.directory().join("moved.och");
+        let again = saved.save_patch(&path, &patch).unwrap();
+        check(&again, false);
+
+        // An older file, with no change index, gets one when opened.
+        drop(again);
+        {
+            let db = Connection::open(&path, true).unwrap();
+            db.execute("UPDATE index_layout SET version=3", &[])
+                .unwrap();
+            db.execute("DROP TABLE changes", &[]).unwrap();
+        }
+        check(&Snapshot::open(&path).unwrap(), false);
     }
 }

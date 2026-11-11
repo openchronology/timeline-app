@@ -20,6 +20,10 @@
 //!   carrying the sums of their measures' values (#574), one per declared measure in name
 //!   order. Its augmented tree answers viewport overviews (groups of nearby moments, with
 //!   their totals) without reading every moment.
+//! - `changes`: a `rational_index` virtual table (#595) with one row per time at which the
+//!   measures change, carrying the sums of those changes: moments' values at their times,
+//!   durations' at their starts or ends as each measure says. Its tree gives the changes up
+//!   to any time, from which balances and summaries' split totals are read.
 //! - `durations`: standalone durations; each endpoint is a fixed time or a moment it follows,
 //!   and an end with neither is ongoing: it ends "now" (#537).
 //! - `duration_intervals` + `duration_nodes`: durations with endpoints resolved to times, and
@@ -724,6 +728,7 @@ fn write<'a>(
             insert_duration(&db, duration)?;
         }
         rebuild_duration_index(&db)?;
+        rebuild_change_index(&db)?;
         create_relationship_table(&db)?;
         for r in &doc.relationships {
             relate(&db, r, true)?;
@@ -2505,6 +2510,123 @@ pub(crate) fn rebuild_point_index(db: &Connection) -> Result<(), String> {
     let sums = sums_sql(&file_measure_names(db)?);
     db.execute(&format!("INSERT INTO points(time,value,weight,sums,mode) SELECT time,time,count(*),{sums},'append' FROM events GROUP BY time COLLATE RATIONAL_V1"), &[])?;
     db.execute("INSERT INTO points(mode) VALUES('build')", &[])
+}
+/// Where each declared measure's changes apply (#595), by name in `measure_names`' order:
+/// true for a measure whose durations count at their end.
+pub(crate) fn measure_places(measures: Option<&Value>) -> Vec<(String, bool)> {
+    measure_names(measures)
+        .into_iter()
+        .map(|name| {
+            let end = measures
+                .and_then(|m| m.get(&name))
+                .and_then(|d| d.get("durations"))
+                .and_then(Value::as_str)
+                == Some("end");
+            (name, end)
+        })
+        .collect()
+}
+/// The measures' places declared in a file's settings, as `measure_places` gives them.
+pub(crate) fn file_measure_places(db: &Connection) -> Result<Vec<(String, bool)>, String> {
+    if db.scalar(
+        "SELECT count(*) FROM sqlite_schema WHERE name='timeline_extras' AND type='table'",
+        &[],
+    )? == "0"
+    {
+        return Ok(Vec::new());
+    }
+    let extras = db.query("SELECT extras FROM timeline_extras WHERE singleton=1", &[])?;
+    let value: Option<Value> = extras
+        .first()
+        .and_then(|row| row[0].as_deref())
+        .and_then(|text| serde_json::from_str(text).ok());
+    Ok(measure_places(
+        value.as_ref().and_then(|v| v.get("measures")),
+    ))
+}
+/// Every change's row (#595), as (t, metadata, part): a moment at its time ('m'), a duration at
+/// its start ('s') and, unless it is ongoing, at its end ('e'); only entities with values.
+const CHANGE_ROWS: &str = "SELECT time AS t,metadata,'m' AS part FROM events WHERE json_extract(metadata,'$.measures') IS NOT NULL \
+    UNION ALL SELECT first,metadata,'s' FROM duration_intervals WHERE json_extract(metadata,'$.measures') IS NOT NULL \
+    UNION ALL SELECT last,metadata,'e' FROM duration_intervals WHERE end_json<>'{\"ongoing\":true}' AND json_extract(metadata,'$.measures') IS NOT NULL";
+/// SQL (over CHANGE_ROWS grouped by time) for a time's changes: each measure's values added
+/// where it applies, moments' and its durations' start or end, joined by ';' in order.
+fn change_sums_sql(places: &[(String, bool)]) -> String {
+    places
+        .iter()
+        .map(|(n, end)| {
+            let part = if *end { "'e'" } else { "'s'" };
+            format!("q_sum(CASE WHEN part IN ('m',{part}) THEN json_extract(metadata,'$.measures.{n}') END)")
+        })
+        .collect::<Vec<_>>()
+        .join("||';'||")
+}
+/// Rebuilds the change index (#595), the `changes` rational_index: one row per time at which
+/// the file's measures change, carrying those changes as sums, so the changes up to any time
+/// are one fold of its tree. Empty without measures.
+pub(crate) fn rebuild_change_index(db: &Connection) -> Result<(), String> {
+    db.execute("DROP TABLE IF EXISTS changes", &[])?;
+    db.execute("CREATE VIRTUAL TABLE changes USING rational_index", &[])?;
+    db.execute(
+        "CREATE INDEX IF NOT EXISTS duration_intervals_last ON duration_intervals(last COLLATE RATIONAL_V1)",
+        &[],
+    )?;
+    let places = file_measure_places(db)?;
+    if places.is_empty() {
+        return Ok(());
+    }
+    let sums = change_sums_sql(&places);
+    db.execute(&format!("INSERT INTO changes(time,value,weight,sums,mode) SELECT t,t,1,{sums},'append' FROM ({CHANGE_ROWS}) GROUP BY t COLLATE RATIONAL_V1"), &[])?;
+    db.execute("INSERT INTO changes(mode) VALUES('build')", &[])
+}
+/// The change index's rows at `times` counted again (#595), after a sparse save changed what
+/// changes there.
+pub(crate) fn recount_changes(
+    db: &Connection,
+    times: &std::collections::BTreeSet<String>,
+) -> Result<(), String> {
+    let places = file_measure_places(db)?;
+    if places.is_empty() {
+        return Ok(());
+    }
+    let sums = change_sums_sql(&places);
+    for time in times {
+        db.execute("DELETE FROM changes WHERE time=q(?1)", &[time])?;
+        db.execute(&format!("INSERT INTO changes(time,value,weight,sums) SELECT q(?1),q(?1),1,{sums} FROM ({CHANGE_ROWS}) c WHERE c.t=q(?1) HAVING count(*)>0"), &[time])?;
+    }
+    Ok(())
+}
+/// The changes up to each of `times` (#595; after everything for None), including that time's
+/// where `inclusive` says, by name: the sums of the change index's span summaries over the
+/// range, added up, so any span limit gives the same answer.
+pub(crate) fn change_prefixes(
+    db: &Connection,
+    times: &[Option<String>],
+    inclusive: &[bool],
+) -> Result<Vec<Option<Value>>, String> {
+    let names = file_measure_names(db)?;
+    if names.is_empty() || times.len() != inclusive.len() || times.len() > 4096 {
+        return Ok(times.iter().map(|_| None).collect());
+    }
+    let span = format!("1{}/1", "0".repeat(60));
+    let mut out = Vec::new();
+    for (time, inclusive) in times.iter().zip(inclusive) {
+        let rows = match time {
+            None => db.query("SELECT sums FROM changes WHERE threshold=q(?1) AND mode='span'", &[&span])?,
+            Some(t) => db.query(
+                &format!("SELECT sums FROM changes WHERE upper=q(?1) AND include_upper={} AND threshold=q(?2) AND mode='span'", u8::from(*inclusive)),
+                &[t, &span],
+            )?,
+        };
+        let mut total = Value::Null;
+        for row in rows {
+            if let Some(sums) = named_totals(&names, row[0].as_deref()) {
+                total = add_totals(db, &total, &sums)?.unwrap_or(Value::Null);
+            }
+        }
+        out.push((!total.is_null()).then_some(total));
+    }
+    Ok(out)
 }
 /// Two groups' totals added (#574), exactly, through the rational extension.
 fn add_totals(db: &Connection, a: &Value, b: &Value) -> Result<Option<Value>, String> {
