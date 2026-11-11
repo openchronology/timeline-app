@@ -144,3 +144,59 @@ test('derivations read a measure: a value, or a summary’s total (#587)', async
     validatePluginManifest(manifest({ derive: [{ metadataKey: 'x', from: [{ measure: 'No' }] }] })),
   );
 });
+
+test('a balance chart draws a measure’s running balance as steps (#595)', async () => {
+  const { balanceSteps, stepPaths } = await import('../dist/core.mjs');
+  const chart = validatePluginManifest(manifest({ chart: { kind: 'balance', measure: 'cost' } }));
+  assert.deepEqual(chart.chart, { kind: 'balance', measure: 'cost' });
+  assert.deepEqual(pluginChart([{ manifest: chart, enabled: true }]), {
+    color: null,
+    series: [],
+    balance: 'cost',
+  });
+  assert.throws(() => validatePluginManifest(manifest({ chart: { kind: 'balance' } })));
+  const x = (t) => Number(t.split('/')[0]);
+  // From 100, down 150 at 20 (below zero), up 50 at 60.
+  const groups = [
+    { first: '20/1', last: '20/1', balanceAfter: { cost: '-50' } },
+    { first: '50/1', last: '70/1', balanceAfter: { cost: '0' } },
+  ];
+  const { steps, zero } = balanceSteps(groups, 'cost', 100, 0, x, 100);
+  assert.deepEqual(steps, [
+    [0, 1],
+    [20, 0],
+    [60, 1 / 3],
+  ]);
+  assert.equal(zero, 1 / 3);
+  const { line, area } = stepPaths(steps, zero, 10, 100, 0, 30);
+  assert.equal(line, 'M10 0H30V30H70V20H110');
+  assert.equal(area, 'M10 0H30V30H70V20H110V20H10Z');
+  // Changes with no summary to place them step at the view's end; a flat zero draws nothing.
+  assert.deepEqual(balanceSteps([], 'cost', 5, 7, x, 100).steps.at(-1), [100, 1]);
+  assert.equal(balanceSteps([], 'cost', 0, 0, x, 100), null);
+});
+
+test('scripts read a moment’s or summary’s balance after it (#595)', async () => {
+  const { pluginSummaryEffects, BALANCES, groupBalanceSpans } = await import('../dist/core.mjs');
+  const source = `function render(m, api) {
+    return api.compare(api.balance("cost"), api.rational("0")) < 0 ? api.color("#cc0000") : api.none();
+  }`;
+  const plugins = installed({ source, renderSummaries: true });
+  const overdrawn = { cost: { before: '10', after: '-5' } },
+    fine = { cost: { before: '-5', after: '5' } };
+  assert.deepEqual(pluginSummaryEffects(plugins, { cost: '-15' }, undefined, overdrawn), {
+    color: '#cc0000',
+  });
+  assert.deepEqual(pluginSummaryEffects(plugins, { cost: '10' }, undefined, fine), {});
+  // A moment's, on its metadata; without a balance there is none to compare.
+  assert.equal(pluginColor(plugins, { [BALANCES]: overdrawn }), '#cc0000');
+  assert.equal(pluginColor(plugins, {}), null);
+  // Each group's balance before is the one before's after; the first's is the window's.
+  assert.deepEqual(
+    groupBalanceSpans([{ balanceAfter: { cost: '3' } }, { balanceAfter: { cost: '7' } }], {
+      cost: { before: '1', after: '7' },
+    }),
+    [{ cost: { before: '1', after: '3' } }, { cost: { before: '3', after: '7' } }],
+  );
+  assert.equal(groupBalanceSpans([{}], undefined), undefined);
+});

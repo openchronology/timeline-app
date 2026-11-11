@@ -7,6 +7,8 @@ import { compilePluginScript } from './custom-time.js';
 import { contentLabels, CONTENT_LABELS_KEY } from './content-labels.js';
 import { validateEntityTags } from './tags.js';
 import { MEASURES_KEY, MEASURE_NAME, measureValue } from './measures.js';
+import { BALANCES } from './measure-balance.js';
+import type { WindowBalance } from './measure-balance.js';
 /** Versioned host components and optional source interpreted by our bounded language. */
 export interface PluginField {
   kind:
@@ -60,7 +62,9 @@ export interface PluginManifest {
   chart?:
     | { kind: 'moments'; setting?: string; series?: ChartSeries[] }
     /** A measure's totals across the view instead of the moments' count (#575). */
-    | { kind: 'measure'; measure: string; setting?: string };
+    | { kind: 'measure'; measure: string; setting?: string }
+    /** A measure's running balance across the view (#595), as steps, instead of its totals. */
+    | { kind: 'balance'; measure: string; setting?: string };
   /**
    * Markers and summaries sized by a measure's value or total (#575), relative to the largest
    * in view, instead of the plugin's or the usual size.
@@ -521,6 +525,18 @@ function manifestEffects(
           if (!Number.isInteger(n) || n < 1 || n > 8) throw new Error('Name a compared timeline.');
           return measureValue({ [MEASURES_KEY]: timelines?.(n) }, measure);
         }
+        // A moment's or summary's balance after its changes (#595), exact; empty when the
+        // measure has no balance (no anchor) or the view has none for it.
+        case 'balance': {
+          const measure = text();
+          if (!MEASURE_NAME.test(measure)) throw new Error('Invalid measure name.');
+          const balances = (metadata as Record<PropertyKey, unknown>)[BALANCES] as
+            Record<string, WindowBalance> | undefined;
+          const after = balances?.[measure]?.after;
+          return after === undefined
+            ? ''
+            : measureValue({ [MEASURES_KEY]: { [measure]: after } }, measure);
+        }
         // A measure's value on this moment (#575), exact; zero when it has none.
         case 'measure': {
           const measure = text();
@@ -641,16 +657,21 @@ function scriptEffects(
  * What enabled plugins whose scripts render summaries (#587) set on a summary: its color,
  * shape, size and outline. Scripts read `totals` as `api.total(name)` (and as a metadata
  * `measures` path or `measure` derivation); in a comparison, `timelines(n)` gives its nth
- * timeline's totals. Later plugins win.
+ * timeline's totals. `api.balance(name)` reads `balances`, its balances after its changes
+ * (#595). Later plugins win.
  */
 export function pluginSummaryEffects(
   plugins: readonly InstalledPlugin[],
   totals: Record<string, string> | undefined,
   timelines?: TimelineTotals,
+  balances?: Record<string, WindowBalance>,
 ): Pick<Effects, 'color' | 'shape' | 'size' | 'outline'> {
   const summaryPlugins = plugins.filter((p) => p.enabled && p.manifest.renderSummaries);
   if (!summaryPlugins.length) return {};
-  const metadata = derivedMetadata(plugins, totals ? { [MEASURES_KEY]: totals } : {});
+  const metadata = derivedMetadata(plugins, {
+    ...(totals ? { [MEASURES_KEY]: totals } : {}),
+    ...(balances ? { [BALANCES]: balances } : {}),
+  });
   const effects: Pick<Effects, 'color' | 'shape' | 'size' | 'outline'> = {};
   for (const { manifest } of summaryPlugins) {
     const { color, shape, size, outline } = manifestEffects(manifest, metadata, timelines);
@@ -920,7 +941,7 @@ export function validatePluginManifest(value: unknown): PluginManifest {
     const chart = object(p.chart, ['kind', 'setting', 'series', 'measure']);
     const colorSetting = (key: unknown) =>
       key === undefined || !!result.settings?.some((s) => s.key === key && s.kind === 'color');
-    if (chart.kind === 'measure') {
+    if (chart.kind === 'measure' || chart.kind === 'balance') {
       if (
         typeof chart.measure !== 'string' ||
         !MEASURE_NAME.test(chart.measure) ||
@@ -931,7 +952,7 @@ export function validatePluginManifest(value: unknown): PluginManifest {
           "A measure chart names a measure, in one of its plugin's color settings, without series.",
         );
       result.chart = {
-        kind: 'measure',
+        kind: chart.kind,
         measure: chart.measure,
         ...(chart.setting === undefined ? {} : { setting: chart.setting as string }),
       };
@@ -1275,6 +1296,8 @@ export function pluginChart(plugins: readonly InstalledPlugin[] = []): {
   series: { label: string; tags: string[]; color: string }[];
   /** A measure chart's measure (#575): its totals are drawn instead of the moments' count. */
   measure?: string;
+  /** A balance chart's measure (#595): its running balance is drawn, as steps. */
+  balance?: string;
 } | null {
   let chart: ReturnType<typeof pluginChart> = null;
   for (const { manifest, enabled, settings } of plugins)
@@ -1294,6 +1317,7 @@ export function pluginChart(plugins: readonly InstalledPlugin[] = []): {
               }))
             : [],
         ...(manifest.chart.kind === 'measure' ? { measure: manifest.chart.measure } : {}),
+        ...(manifest.chart.kind === 'balance' ? { balance: manifest.chart.measure } : {}),
       };
     }
   return chart;

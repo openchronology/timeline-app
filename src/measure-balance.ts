@@ -269,3 +269,33 @@ export async function measuredFrame<
     ...(balances ? { balances } : {}),
   };
 }
+
+/**
+ * A moment's or summary's balances before and after its changes (#595), on the metadata the
+ * hover card, the reader and plugin scripts (`api.balance`) read: a symbol, so it is never
+ * saved and no metadata key can be mistaken for it.
+ */
+export const BALANCES = Symbol('balances');
+/**
+ * Each group's balances before and after its changes (#595), by anchored measure: before the
+ * first, the window's balance before its changes; before each later one, the one before's
+ * balance after. Undefined without anchored measures.
+ */
+export function groupBalanceSpans(
+  groups: readonly { balanceAfter?: Record<string, string> }[],
+  balances: Record<string, WindowBalance> | undefined,
+): Record<string, WindowBalance>[] | undefined {
+  if (!balances || !Object.keys(balances).length) return undefined;
+  let before = Object.fromEntries(Object.entries(balances).map(([n, b]) => [n, b.before]));
+  return groups.map((group) => {
+    const after = group.balanceAfter ?? before;
+    const span = Object.fromEntries(
+      Object.keys(balances).map((name) => [
+        name,
+        { before: before[name] ?? '0', after: after[name] ?? before[name] ?? '0' },
+      ]),
+    );
+    before = after;
+    return span;
+  });
+}
