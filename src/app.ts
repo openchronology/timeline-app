@@ -5075,23 +5075,27 @@ function animateView(destination: Viewport, automatic = false) {
     // it would redraw the unchanged view at full cost and the zoom would show a frame late
     // (#319).
     const progress = Math.min(1, Math.max(1000 / 60, now - started) / 220);
-    if (progress === 1) {
+    const done = progress === 1;
+    if (done) {
+      // The last frame, which on a stalled page (a frame arriving 220 ms or more after the
+      // key) is also the first: drawn in this frame like the others, not scheduled for the
+      // next, or the zoom would show a frame late (#319).
       cancelZoomAnimation();
-      navigate(destination, false);
-      return;
+      viewport = destination.rasterize(width());
+    } else {
+      const amount = Q.from(BigInt(Math.round((1 - (1 - progress) ** 3) * 1_000_000)), 1_000_000n);
+      viewport = new Viewport(
+        from.left.add(destination.left.sub(from.left).mul(amount)),
+        from.span.add(destination.span.sub(from.span).mul(amount)),
+      ).rasterize(width());
     }
-    const amount = Q.from(BigInt(Math.round((1 - (1 - progress) ** 3) * 1_000_000)), 1_000_000n);
-    viewport = new Viewport(
-      from.left.add(destination.left.sub(from.left).mul(amount)),
-      from.span.add(destination.span.sub(from.span).mul(amount)),
-    ).rasterize(width());
     renderAxis();
     if (model && !sparseWorkspace()) frame = model.frame(viewport, width(), pixels());
     // Draw the moments in this frame, with the axis: a frame later they would trail it.
-    // Reuse confirmed server data; fetch the final window once.
-    if (stageWidth() > 96 && stageHeight() > 0) render(false);
-    else requestRender(false);
-    zoomAnimation = requestAnimationFrame(tick);
+    // Reuse confirmed server data until the last frame, which fetches the final window once.
+    if (stageWidth() > 96 && stageHeight() > 0) render(done);
+    else requestRender(done);
+    if (!done) zoomAnimation = requestAnimationFrame(tick);
   };
   zoomAnimation = requestAnimationFrame(tick);
 }
