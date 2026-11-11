@@ -6238,8 +6238,13 @@ async function saveDisplaySettings(presentation: TimePresentation) {
           title: saved.title,
           description: saved.description,
           presentation,
+          // Every other setting as saved: one left out would be cleared, and a measure left out
+          // refused (#572).
           ...(saved.plugins ? { plugins: saved.plugins } : {}),
           ...(saved.tags ? { tags: saved.tags } : {}),
+          ...(saved.image ? { image: saved.image } : {}),
+          ...(saved.view ? { view: saved.view } : {}),
+          ...(saved.measures ? { measures: saved.measures } : {}),
           ...(saved.assets ? { assets: saved.assets } : {}),
         },
         changes: [],
@@ -8880,6 +8885,10 @@ if (!offlineHtml)
       if (info.presentation) info.presentation = validatePresentation(info.presentation);
       if (info.plugins) info.plugins = validateInstalledPlugins(info.plugins);
       if (info.assets) info.assets = validateAssets(info.assets);
+      if (info.tags) info.tags = validateTags(info.tags);
+      info.image = info.image ? validateTimelineImage(info.image) : undefined;
+      info.view = readTimelineView(info.view);
+      info.measures = info.measures ? validateMeasures(info.measures) : undefined;
       const added =
         info.event_generation !== undefined &&
         BigInt(info.event_generation) > BigInt(remote.event_generation ?? '0');
@@ -8894,6 +8903,10 @@ if (!offlineHtml)
             presentation: info.presentation,
             plugins: info.plugins,
             tags: info.tags,
+            // Kept, so the next save keeps them (#572).
+            image: info.image,
+            view: info.view,
+            measures: info.measures,
             assets: info.assets,
             events: [],
           })
