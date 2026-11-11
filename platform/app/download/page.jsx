@@ -1,21 +1,30 @@
 // Copyright (c) 2026 Athan Clark. SPDX-License-Identifier: GPL-3.0-only
-// The download page at /download (#111): the desktop app for the visitor's system first,
-// then the offline file and the server, from the latest release (lib/releases.js).
+// The download page at /download (#111): "I run… Windows | Mac | Linux" for the desktop app and
+// the server, the visitor's system chosen first, then every download, from the latest release
+// (lib/releases.js).
 import { headers } from 'next/headers';
 import CopyCommand from '../../components/copy-command.jsx';
+import DownloadChooser from '../../components/download-chooser.jsx';
 import {
   DESKTOP,
+  DESKTOP_SYSTEMS,
+  DOCKER_COMMAND,
+  DOCS,
   OFFLINE,
+  SERVER_SYSTEMS,
   SERVERS,
   OTHER_ASSETS,
   RELEASES,
   REPOSITORY,
   assetLink,
   assetSize,
+  desktopGuides,
   detectDistribution,
+  detectLinux,
   detectPlatform,
   editionFile,
   installCommand,
+  serverGuides,
 } from '../../lib/releases.js';
 import { EDITIONS } from '../../../dist/core.mjs';
 import { latestRelease } from '../../lib/latest-release.js';
@@ -36,8 +45,6 @@ export function generateMetadata() {
 }
 /** The desktop app's operating systems, by the key `detectPlatform` gives. */
 const NAMES = { windows: 'Windows', macos: 'macOS', linux: 'Linux' };
-/** Where the setup guides are read: the repository's main branch on GitHub. */
-const DOCS = `https://github.com/${REPOSITORY}/blob/main`;
 
 /**
  * An asset's size, such as "84 MB", or nothing when the release is unknown (GitHub could not
@@ -76,8 +83,9 @@ function File({ release, file, primary = false }) {
  * The download page (/download).
  *
  * Guesses the visitor's system from the User-Agent and the `Sec-CH-UA-Platform` client hint,
- * and their Linux distribution from the User-Agent, to recommend a file and order the cards;
- * every file is listed whatever the guess. The latest release comes from GitHub
+ * and their Linux distribution from the User-Agent, to choose the tabs of the desktop and
+ * server guides (components/download-chooser.jsx) and order the cards; every file is listed
+ * under "All downloads" whatever the guess. The latest release comes from GitHub
  * (lib/latest-release.js, cached), for its version, date and sizes; without it the links
  * still work, pointing at GitHub's "latest release" downloads by file name.
  */
@@ -95,14 +103,18 @@ export default async function Download() {
           ? 'freebsd15'
           : null;
   const release = await latestRelease();
-  // The desktop app's system, if the visitor's is one (not FreeBSD, phones and so on), and
-  // its files for that system, the first of which is the recommended one.
+  // The desktop app's system, if the visitor's is one (not FreeBSD, phones and so on).
   const desktop = Object.keys(NAMES).includes(platform) ? platform : null;
-  const yours = DESKTOP.filter((file) => file.os === desktop);
   // Each operating system's files, the visitor's first.
   const systems = Object.keys(NAMES).sort((a, b) => (b === desktop) - (a === desktop));
   // The server packages, the visitor's distribution first.
   const servers = [...SERVERS].sort((a, b) => (b.key === distribution) - (a.key === distribution));
+  // The tabs chosen first: the visitor's system, and its Linux family when the browser says.
+  const linux = platform === 'linux' ? detectLinux(userAgent) : null;
+  const initial = (systems) => {
+    const system = systems.some((s) => s.key === platform) ? platform : null;
+    return { system, variant: system === 'linux' ? linux : null, detected: !!system };
+  };
   const published = release?.published
     ? new Date(release.published).toLocaleDateString('en', { dateStyle: 'long' })
     : null;
@@ -133,48 +145,51 @@ export default async function Download() {
         )}
       </p>
 
-      <section className="download-recommended" aria-labelledby="recommended-heading">
-        {yours.length ? (
-          <>
-            <h2 id="recommended-heading">{`Desktop app for ${NAMES[desktop]}`}</h2>
-            <p>
-              Work with local timeline files, offline, and connect to OpenChronology servers when
-              you want to share.
-            </p>
-            <div className="download-actions">
-              <File release={release} file={yours[0]} primary />
-              {yours.slice(1).map((file) => (
-                <File key={file.key} release={release} file={file} />
-              ))}
-            </div>
-            {desktop === 'macos' ? (
-              <p className="muted">
-                Most Macs since 2020 have Apple silicon; choose Intel for older ones (Apple menu →
-                About This Mac).
-              </p>
-            ) : null}
-          </>
-        ) : (
-          <>
-            <h2 id="recommended-heading">Use OpenChronology in your browser</h2>
-            <p>
-              The desktop app runs on Windows, macOS and Linux. On this device, open the website, or
-              download the offline file to use without a network.
-            </p>
-            <div className="download-actions">
-              <a className="button primary download-primary" href="/">
-                Open OpenChronology
-              </a>
-              <a className="download-file" href={assetLink(release, OFFLINE.asset)}>
-                Offline browser file (.html)
-              </a>
-            </div>
-          </>
-        )}
+      {desktop ? null : (
+        <section className="download-recommended" aria-labelledby="browser-heading">
+          <h2 id="browser-heading">Use OpenChronology in your browser</h2>
+          <p>
+            The desktop app runs on Windows, macOS and Linux. On this device, open the website, or
+            download the offline file to use without a network.
+          </p>
+          <div className="download-actions">
+            <a className="button primary download-primary" href="/">
+              Open OpenChronology
+            </a>
+            <a className="download-file" href={assetLink(release, OFFLINE.asset)}>
+              Offline browser file (.html)
+            </a>
+          </div>
+        </section>
+      )}
+
+      <section id="desktop" className="download-recommended" aria-labelledby="desktop-heading">
+        <h2 id="desktop-heading">Desktop app</h2>
+        <DownloadChooser
+          id="desktop-choice"
+          label="Your operating system, for the desktop app"
+          systems={DESKTOP_SYSTEMS}
+          guides={desktopGuides(release)}
+          initial={initial(DESKTOP_SYSTEMS)}
+          all="#all-downloads"
+        />
       </section>
 
-      <section id="desktop" aria-labelledby="desktop-heading">
-        <h2 id="desktop-heading">Desktop</h2>
+      <section id="server" className="download-recommended" aria-labelledby="server-heading">
+        <h2 id="server-heading">Server</h2>
+        <DownloadChooser
+          id="server-choice"
+          label="Your operating system, for the server"
+          systems={SERVER_SYSTEMS}
+          guides={serverGuides(release, distribution)}
+          initial={initial(SERVER_SYSTEMS)}
+          all="#all-server-downloads"
+        />
+      </section>
+
+      <h2 id="all-downloads">All downloads</h2>
+      <section aria-labelledby="all-desktop-heading">
+        <h3 id="all-desktop-heading">Desktop</h3>
         <div className="download-grid">
           {systems.map((os) => (
             <article
@@ -217,14 +232,8 @@ export default async function Download() {
         </div>
       </section>
 
-      <section id="server" aria-labelledby="server-heading">
-        <h2 id="server-heading">Server</h2>
-        <p>
-          Run your own OpenChronology server for your organization or community. The package
-          installs PostgreSQL, sets up the database and starts the service on port 5173; put an
-          HTTPS proxy in front of it and set your address in{' '}
-          <code>/etc/openchronology/openchronology.env</code>.
-        </p>
+      <section id="all-server-downloads" aria-labelledby="all-server-heading">
+        <h3 id="all-server-heading">Server</h3>
         <div className="download-grid">
           {servers.map((server) => (
             <article
@@ -274,10 +283,7 @@ export default async function Download() {
               On any system with Docker Engine and Compose: build and run the server and its
               database from the source.
             </p>
-            <CopyCommand
-              command={`git clone https://github.com/${REPOSITORY}.git && cd timeline-app && cp .env.example .env && docker compose up --build --wait`}
-              label="Run with Docker Compose"
-            />
+            <CopyCommand command={DOCKER_COMMAND} label="Run with Docker Compose" />
             <a className="download-file" href={`${DOCS}/docs/docker.md`}>
               Docker deployment guide
             </a>
@@ -287,7 +293,7 @@ export default async function Download() {
       </section>
 
       <section aria-labelledby="more-heading">
-        <h2 id="more-heading">Verify and build</h2>
+        <h3 id="more-heading">Verify and build</h3>
         <ul className="download-more">
           <li>
             <a href={assetLink(release, OTHER_ASSETS.checksums)}>SHA-256 checksums</a> of every file

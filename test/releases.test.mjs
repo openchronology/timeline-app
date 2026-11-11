@@ -10,10 +10,15 @@ import {
   assetLink,
   editionFile,
   assetSize,
+  DESKTOP_SYSTEMS,
+  SERVER_SYSTEMS,
+  desktopGuides,
   detectDistribution,
+  detectLinux,
   detectPlatform,
   installCommand,
   releaseFrom,
+  serverGuides,
 } from '../platform/lib/releases.js';
 import { targets } from '../scripts/desktop/packages.mjs';
 import { serverPackage, serverTargets } from '../scripts/server-targets.mjs';
@@ -124,4 +129,40 @@ test('links come from the latest release, or by name before there is one', () =>
     ),
     'curl -fLO https://github.com/openchronology/timeline-app/releases/latest/download/openchronology-server-fedora44-amd64.rpm && sudo dnf install ./openchronology-server-fedora44-amd64.rpm',
   );
+});
+
+test('the guides: one per system and Linux family, Arch included, each with a way to install', () => {
+  assert.equal(detectLinux('Mozilla/5.0 (X11; Ubuntu; Linux x86_64; rv:143.0)'), 'debian');
+  assert.equal(detectLinux('Mozilla/5.0 (X11; Fedora; Linux x86_64)'), 'fedora');
+  assert.equal(detectLinux('Mozilla/5.0 (X11; Arch Linux; Linux x86_64)'), 'arch');
+  assert.equal(detectLinux('Mozilla/5.0 (X11; Manjaro; Linux x86_64)'), 'arch');
+  assert.equal(detectLinux('Mozilla/5.0 (X11; Linux x86_64)'), null);
+  const keys = (systems) =>
+    systems.flatMap((s) => (s.variants ? s.variants.map((v) => `${s.key}/${v.key}`) : [s.key]));
+  const desktop = desktopGuides(null),
+    server = serverGuides(null, 'ubuntu24.04');
+  assert.deepEqual(Object.keys(desktop).sort(), keys(DESKTOP_SYSTEMS).sort());
+  assert.deepEqual(Object.keys(server).sort(), keys(SERVER_SYSTEMS).sort());
+  for (const guide of [...Object.values(desktop), ...Object.values(server)]) {
+    assert(guide.heading);
+    assert(guide.files.length || guide.steps.some((s) => s.command), guide.heading);
+    for (const f of guide.files) assert.match(f.href, /^https:\/\/github\.com\//);
+  }
+  // Every desktop guide's primary file names its system; every desktop file has one.
+  for (const guide of Object.values(desktop))
+    assert.equal(guide.files.filter((f) => f.primary).length, 1);
+  // Arch: the AppImage with FUSE 2, and the server in Docker, started with sudo.
+  assert.match(desktop['linux/arch'].steps[0].command, /pacman -S --needed fuse2/);
+  assert.match(
+    desktop['linux/arch'].steps[1].command,
+    /chmod \+x openchronology-desktop-linux-amd64\.AppImage/,
+  );
+  assert.match(
+    server['linux/arch'].steps[0].command,
+    /pacman -S --needed docker docker-compose git/,
+  );
+  assert.match(server['linux/arch'].steps[1].command, /sudo docker compose up --build --wait/);
+  // The browser's distribution first among Debian and Ubuntu.
+  assert.match(server['linux/debian'].steps[0].command, /ubuntu24\.04/);
+  assert.match(serverGuides(null, 'debian13')['linux/debian'].steps[0].command, /debian13/);
 });
