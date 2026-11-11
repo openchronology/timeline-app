@@ -151,16 +151,16 @@ export const schemas = {
     required: ['mode'],
     additionalProperties: false,
     description:
-      'How a measure’s values and totals are written and read (#573), exactly: shown value = stored × `scale`. Exact when absent.',
+      'How a measure’s values and totals are written and read, exactly (#573, #585): one of the official formats for its type, with shown value = stored × `scale`. An `mpq` measure uses `fraction` (the default), `decimal`, `scientific` or `engineering`; an `mpz` measure `fixed` (the default, with 0 places).',
     properties: {
-      mode: { enum: ['exact', 'fixed', 'decimal', 'scientific', 'si'] },
+      mode: { enum: ['fraction', 'decimal', 'scientific', 'engineering', 'fixed'] },
       scale: { type: 'string', description: 'A positive exact number, such as `1/100`.' },
       decimals: { type: 'integer', minimum: 0, maximum: 30, description: '`fixed` only.' },
       significantDigits: {
         type: 'integer',
         minimum: 1,
         maximum: 30,
-        description: '`decimal`, `scientific` and `si`.',
+        description: '`decimal`, `scientific` and `engineering`.',
       },
       prefix: { type: 'string', maxLength: 16, example: '$' },
       unit: { type: 'string', maxLength: 40, example: 'h' },

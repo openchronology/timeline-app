@@ -7,7 +7,11 @@
 // (remeasuredEntities), as one save.
 import { Rational as Q } from 'rational-ordered-map';
 import { timeDigitLimit } from './numeric.js';
-import { createMeasurePresenter, validateMeasurePresentation } from './measure-presentation.js';
+import {
+  DEFAULT_MEASURE_MODE,
+  createMeasurePresenter,
+  validateMeasurePresentation,
+} from './measure-presentation.js';
 import type { MeasurePresentation, MeasurePresenter } from './measure-presentation.js';
 
 /** `mpz`: unbounded integers; `mpq`: unbounded rationals. Both total exactly. */
@@ -65,17 +69,21 @@ export function validateMeasures(value: unknown): Measures {
     let presentation: MeasurePresentation | undefined;
     try {
       presentation =
-        d.presentation === undefined ? undefined : validateMeasurePresentation(d.presentation);
+        d.presentation === undefined
+          ? undefined
+          : validateMeasurePresentation(d.presentation, d.type);
     } catch (error) {
       throw new Error(`Measure ${name}: ${(error as Error).message}`);
     }
+    // The type's default format with nothing else is what no presentation means.
+    const plainDefault =
+      presentation &&
+      JSON.stringify(presentation) ===
+        JSON.stringify(validateMeasurePresentation({ mode: DEFAULT_MEASURE_MODE[d.type] }, d.type));
     measures[name] = {
       type: d.type,
       ...(d.label === undefined ? {} : { label: (d.label as string).trim() }),
-      // Exact with nothing else is what no presentation means.
-      ...(presentation && (presentation.mode !== 'exact' || Object.keys(presentation).length > 1)
-        ? { presentation }
-        : {}),
+      ...(presentation && !plainDefault ? { presentation } : {}),
     };
   }
   return measures;
