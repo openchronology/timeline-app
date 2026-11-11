@@ -21,7 +21,10 @@ jobs:
           - { os: ubuntu-24.04, target: linux-deb }
           # The native store needs SQLite 3.39+, so the AppImage uses the same baseline as the .deb.
           - { os: ubuntu-24.04, target: linux-appimage }
-          - { os: macos-15, target: macos-arm64 }
+          # The project's own Mac (label och-mac), except for pull requests from forks, whose
+          # code never runs there (docs/development.md).
+          - os: ${{ github.event.pull_request.head.repo.fork && 'macos-15' || 'och-mac' }}
+            target: macos-arm64
           - { os: macos-15-intel, target: macos-amd64 }
           - { os: windows-2025, target: windows-amd64 }
     runs-on: ${{ matrix.os }}
