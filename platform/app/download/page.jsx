@@ -6,6 +6,7 @@ import { headers } from 'next/headers';
 import CopyCommand from '../../components/copy-command.jsx';
 import DownloadChooser from '../../components/download-chooser.jsx';
 import {
+  AUR,
   DESKTOP,
   DESKTOP_SYSTEMS,
   DOCKER_COMMAND,
@@ -204,6 +205,11 @@ export default async function Download() {
               {DESKTOP.filter((file) => file.os === os).map((file) => (
                 <File key={file.key} release={release} file={file} />
               ))}
+              {os === 'linux' ? (
+                <a className="download-file" href={AUR.page(AUR.desktop)}>
+                  Arch Linux (AUR: {AUR.desktop})
+                </a>
+              ) : null}
             </article>
           ))}
           <article className="download-card" data-os="offline">
@@ -277,6 +283,22 @@ export default async function Download() {
               </a>
             </article>
           ))}
+          <article className="download-card" data-server="arch">
+            <h3>Arch Linux (AUR)</h3>
+            <p className="muted">
+              Build and install from the AUR, then set up PostgreSQL and the database:
+            </p>
+            <CopyCommand
+              command={`yay -S ${AUR.server} && sudo openchronology-setup`}
+              label="Install on Arch Linux"
+            />
+            <a className="download-file" href={AUR.page(AUR.server)}>
+              {AUR.server} on the AUR
+            </a>
+            <a className="download-file" href={`${DOCS}/deploy/arch/README.Arch`}>
+              Setup guide
+            </a>
+          </article>
           <article className="download-card" data-server="docker">
             <h3>Docker</h3>
             <p className="muted">

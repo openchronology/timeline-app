@@ -129,7 +129,9 @@ try {
     'Mozilla/5.0 (X11; Arch Linux; Linux x86_64; rv:143.0) Firefox/143.0',
   );
   assert.match(arch, /data-system="linux" data-variant="arch"/);
-  assert.match(arch, /sudo pacman -S --needed fuse2/);
+  assert.match(arch, /yay -S openchronology-desktop-bin/);
+  assert.match(arch, /yay -S openchronology-server/);
+  assert.match(arch, /data-server="arch"/);
   assert.match(arch, /Server for Arch/);
   const linux = await download('Mozilla/5.0 (X11; Linux x86_64; rv:143.0) Firefox/143.0');
   assert.match(linux, /does not say which distribution/);

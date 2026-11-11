@@ -148,20 +148,18 @@ test('the guides: one per system and Linux family, Arch included, each with a wa
     assert(guide.files.length || guide.steps.some((s) => s.command), guide.heading);
     for (const f of guide.files) assert.match(f.href, /^https:\/\/github\.com\//);
   }
-  // Every desktop guide's primary file names its system; every desktop file has one.
-  for (const guide of Object.values(desktop))
-    assert.equal(guide.files.filter((f) => f.primary).length, 1);
-  // Arch: the AppImage with FUSE 2, and the server in Docker, started with sudo.
-  assert.match(desktop['linux/arch'].steps[0].command, /pacman -S --needed fuse2/);
+  // Every desktop guide's primary file names its system, apart from Arch's AUR package.
+  for (const [key, guide] of Object.entries(desktop))
+    assert.equal(guide.files.filter((f) => f.primary).length, key === 'linux/arch' ? 0 : 1, key);
+  // Arch: the AUR packages, by helper or by hand; the server then set up.
+  assert.equal(desktop['linux/arch'].steps[0].command, 'yay -S openchronology-desktop-bin');
   assert.match(
     desktop['linux/arch'].steps[1].command,
-    /chmod \+x openchronology-desktop-linux-amd64\.AppImage/,
+    /^git clone https:\/\/aur\.archlinux\.org\/openchronology-desktop-bin\.git && cd openchronology-desktop-bin && makepkg -si$/,
   );
-  assert.match(
-    server['linux/arch'].steps[0].command,
-    /pacman -S --needed docker docker-compose git/,
-  );
-  assert.match(server['linux/arch'].steps[1].command, /sudo docker compose up --build --wait/);
+  assert.equal(server['linux/arch'].steps[0].command, 'yay -S openchronology-server');
+  assert.equal(server['linux/arch'].steps[2].command, 'sudo openchronology-setup');
+  assert.match(server['linux/arch'].links[1].href, /deploy\/arch\/README\.Arch$/);
   // The browser's distribution first among Debian and Ubuntu.
   assert.match(server['linux/debian'].steps[0].command, /ubuntu24\.04/);
   assert.match(serverGuides(null, 'debian13')['linux/debian'].steps[0].command, /debian13/);

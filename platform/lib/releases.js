@@ -210,8 +210,7 @@ export function installCommand(release, server) {
 
 /**
  * The Linux distributions the download page's guides tell apart, in the order it offers them:
- * each family installs the same way. Arch has no package of its own: the desktop app runs as
- * an AppImage there, and the server in Docker.
+ * each family installs the same way. Arch installs from the AUR (`AUR`).
  */
 export const LINUX_FAMILIES = [
   { key: 'debian', name: 'Debian / Ubuntu' },
@@ -228,6 +227,30 @@ export function detectLinux(userAgent = '') {
   if (/rocky|red hat|rhel|alma|centos/.test(ua)) return 'rocky';
   if (/arch ?linux|manjaro|endeavouros/.test(ua)) return 'arch';
   return null;
+}
+/**
+ * Arch's packages, on the AUR (deploy/arch): the desktop app from the release's .deb, and the
+ * server built for the system. They update with the system through an AUR helper.
+ */
+export const AUR = {
+  desktop: 'openchronology-desktop-bin',
+  server: 'openchronology-server',
+  page: (name) => `https://aur.archlinux.org/packages/${name}`,
+};
+/** Installing an AUR package: with a helper such as yay, or by hand with makepkg. */
+export function aurSteps(name) {
+  return [
+    {
+      text: 'With an AUR helper such as yay:',
+      command: `yay -S ${name}`,
+      label: `Install ${name} with yay`,
+    },
+    {
+      text: 'Or by hand, with makepkg:',
+      command: `git clone https://aur.archlinux.org/${name}.git && cd ${name} && makepkg -si`,
+      label: `Build and install ${name} with makepkg`,
+    },
+  ];
 }
 /** The desktop app's systems, as the download page's tabs name them. */
 export const DESKTOP_SYSTEMS = [
@@ -323,19 +346,10 @@ export function desktopGuides(release) {
     'linux/arch': {
       heading: 'Desktop app for Linux: Arch',
       intro,
-      files: [{ ...file('linux-appimage', true), name: 'Arch Linux' }],
-      steps: [
-        {
-          text: 'AppImages need FUSE 2, which Arch does not install by default:',
-          command: 'sudo pacman -S --needed fuse2',
-          label: 'Install FUSE 2 on Arch',
-        },
-        {
-          text: 'Then download the AppImage, make it executable and start it:',
-          command: desktopCommand(release, appImage, 'appimage'),
-          label: 'Run the AppImage on Arch',
-        },
-      ],
+      files: [],
+      steps: aurSteps(AUR.desktop),
+      links: [{ href: AUR.page(AUR.desktop), label: `${AUR.desktop} on the AUR` }],
+      note: 'Updating with your AUR helper (yay -Syu) brings each new release.',
     },
     'linux/other': {
       heading: 'Desktop app for Linux',
@@ -430,19 +444,21 @@ export function serverGuides(release, first = null) {
     'linux/arch': {
       heading: 'Server for Arch',
       intro:
-        'There is no Arch package yet: run the server and its database in Docker, which Arch packages.',
+        'The AUR package builds the server for this system; like Arch packages, it leaves PostgreSQL and the database to openchronology-setup.',
       steps: [
+        ...aurSteps(AUR.server),
         {
-          text: 'Install Docker, Compose and Git, and start Docker:',
-          command:
-            'sudo pacman -S --needed docker docker-compose git && sudo systemctl enable --now docker',
-          label: 'Install Docker on Arch',
+          text: 'Then set up PostgreSQL and the database, and start the server:',
+          command: 'sudo openchronology-setup',
+          label: 'Set up the server on Arch',
         },
-        // Not yet in the docker group, which needs a new login: Compose runs with sudo.
-        { ...docker, command: DOCKER_COMMAND.replace('docker compose', 'sudo docker compose') },
       ],
       files: [],
-      links: [dockerGuide],
+      links: [
+        { href: AUR.page(AUR.server), label: `${AUR.server} on the AUR` },
+        { href: `${DOCS}/deploy/arch/README.Arch`, label: 'Setup guide' },
+      ],
+      note: 'Updating with your AUR helper (yay -Syu) brings each new release and migrates the database.',
     },
     'linux/other': {
       heading: 'Server for other Linux distributions',
