@@ -5,7 +5,15 @@
 // plus the changes summed by hand, through edits.
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { Q, TimelineIndex, Viewport, validateDocument, validateMeasures } from '../dist/core.mjs';
+import {
+  Q,
+  TimelineIndex,
+  Viewport,
+  validateDocument,
+  validateMeasures,
+  viewBalances,
+} from '../dist/core.mjs';
+import { regroup } from '../dist/remote-cache.mjs';
 
 function random(seed) {
   let s = seed >>> 0;
@@ -160,11 +168,44 @@ test('totals partition the window and balances follow the changes, through edits
           }
           if (frame.groups.length)
             assert.equal(text(running), frame.balances[name].after, `${at}: ${name} ends`);
+          // Summaries the editor merges when they draw too close (regroup, coalesceGroups)
+          // keep the running balance: the later one's after.
+          for (const coarse of [q('5'), q('50'), q('400')]) {
+            const merged = regroup(frame, coarse).groups;
+            let running = q(frame.balances[name].before);
+            for (const g of merged) {
+              running = running.add(q(g.totals?.[name] ?? '0'));
+              assert.equal(
+                g.balanceAfter?.[name],
+                text(running),
+                `${at} merged within ${text(coarse)}: ${name} after a summary`,
+              );
+            }
+          }
         }
         assert(
           frame.groups.every((g) => !g.balanceAfter || !('cost' in g.balanceAfter)),
           'only anchored measures',
         );
+        // A narrower view shown from this window (as a server's or cached window is): from a
+        // summary's first time, its balance before is exact; to the window's end, its after.
+        for (let k = 1; k < frame.groups.length; k += Math.max(1, frame.groups.length >> 2)) {
+          const l = q(frame.groups[k].first);
+          if (l.compare(viewport.left) <= 0) continue;
+          const shown = viewBalances(frame.groups, frame.balances, l, viewport.right);
+          for (const name of ['fee', 'bank', 'level']) {
+            assert.equal(
+              shown[name].before,
+              balance(all, name, l, false),
+              `${at} from ${k}: ${name} before`,
+            );
+            assert.equal(
+              shown[name].after,
+              frame.balances[name].after,
+              `${at} from ${k}: ${name} after`,
+            );
+          }
+        }
       }
   };
   check('built');

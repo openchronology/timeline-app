@@ -49,7 +49,7 @@ import {
 } from './drafts.js';
 import type { DraftWrite } from './drafts.js';
 import { addMeasureRow, readMeasureRows, renderMeasureFields } from './measure-ui.js';
-import { BALANCES, groupBalanceSpans, measuredFrame } from './measure-balance.js';
+import { BALANCES, groupBalanceSpans, measuredFrame, viewBalances } from './measure-balance.js';
 import type { WindowBalance } from './measure-balance.js';
 import type { Advice, Measurements, Platform } from './capacity.js';
 import { createHoverPreview } from './hover-preview.js';
@@ -13622,7 +13622,7 @@ function renderBackgroundChart(host: HTMLElement) {
       ]
     : frame.groups;
   // A balance chart (#595) draws the measure's running balance across the view, as steps.
-  const balance = chart?.balance ? frame.balances?.[chart.balance] : undefined;
+  const balance = chart?.balance ? shownBalances()?.[chart.balance] : undefined;
   const steps =
     chart?.balance && balance && !comparison
       ? balanceSteps(
@@ -13705,6 +13705,13 @@ function renderBackgroundChart(host: HTMLElement) {
     drawn.line.setAttribute('d', d?.line ?? '');
   });
 }
+/**
+ * The balances at the view's edges (#595): the frame's are at the edges of the window it was
+ * fetched for, which a server's, a desktop file's or a cached one is wider than the view.
+ */
+function shownBalances() {
+  return viewBalances(frame.groups, frame.balances, viewport.left, viewport.right);
+}
 let balanceReadout: { box: HTMLElement; start: HTMLElement; end: HTMLElement } | null = null;
 /**
  * The view's balances at its edges (#595): each anchored measure's balance before the changes
@@ -13715,7 +13722,7 @@ function renderBalanceReadout(host: HTMLElement) {
   const measures = timelineMeasures();
   const shown =
     !comparison && measures
-      ? Object.entries(frame.balances ?? {}).filter(([name]) => measures[name])
+      ? Object.entries(shownBalances() ?? {}).filter(([name]) => measures[name])
       : [];
   if (!shown.length) {
     balanceReadout?.box.remove();
