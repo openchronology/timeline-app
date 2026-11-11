@@ -33,15 +33,24 @@ const dockerfiles = async () => {
   await walk('deploy');
   return files;
 };
-// Each stage's name, parent (an earlier stage or an image) and commands.
-const stages = (text) =>
-  text
+// Each stage's name, parent (an earlier stage or an image) and commands. A parent given by an
+// ARG whose default is a stage, such as the tools stages a published image can replace (#605),
+// is that stage.
+const stages = (text) => {
+  const all = text
     .split(/^(?=FROM )/m)
     .filter((part) => part.startsWith('FROM '))
     .map((part) => {
       const [, parent, name] = part.match(/^FROM\s+(\S+)(?:\s+AS\s+(\S+))?/i);
       return { name, parent, body: part };
     });
+  for (const stage of all) {
+    const arg = /^\$\{(\w+)\}$/.exec(stage.parent)?.[1];
+    const stageDefault = arg && text.match(new RegExp(`^ARG ${arg}=(\\S+)`, 'm'))?.[1];
+    if (stageDefault && all.some((s) => s.name === stageDefault)) stage.parent = stageDefault;
+  }
+  return all;
+};
 // Whether a stage, or a stage it starts from, configures the package manager before it runs.
 const configures = (all, stage, config, use) => {
   for (let s = stage; s; s = all.find((t) => t.name && t.name === s.parent)) {

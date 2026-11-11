@@ -434,6 +434,10 @@ jobs:
   # artifacts) and pull request.
   server:
     name: Server packages
+    # packages: read for the tools images the .deb and .rpm builds start from (#605).
+    permissions:
+      contents: read
+      packages: read
     uses: ./.github/workflows/server-packages.yml
   # The Nix flake's packages and the NixOS test of its module (#461).
   nix:

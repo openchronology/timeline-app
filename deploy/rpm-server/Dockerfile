@@ -5,6 +5,10 @@
 #   RPM_VERSION, RPM_RELEASE (1.el10, 1.fc44), OCH_BUILD_COMMIT, OCH_BUILD_VERSION
 # The services, configuration and commands are the Debian package's (deploy/debian-server).
 ARG BASE=fedora:44@sha256:15da97ed9aa94dd3d92c3925eb89520f6c80e07ea7ee24cba848d1f8b6912b3e
+# The tools stages below, or prebuilt images of them (#605): scripts/server-package.mjs passes
+# ghcr.io/openchronology/server-build images whose tag matches these stages, when they exist.
+ARG NATIVE_TOOLS=native-tools
+ARG PACKAGE_TOOLS=package-tools
 
 # The target distribution, as the native build and the package start from it.
 FROM ${BASE} AS base
@@ -14,9 +18,8 @@ RUN sed -i '/^\[main\]/a retries=3\ntimeout=30' /etc/dnf/dnf.conf && grep -qx 'r
 # 1 kB/s for 30 s or takes over 3 minutes (#367).
 RUN printf 'retry = 3\nretry-all-errors\nconnect-timeout = 30\nspeed-limit = 1024\nspeed-time = 30\nmax-time = 180\n' > /root/.curlrc
 
-# och-convert and pgmp, built on the target distribution against its own libraries and the
-# PostgreSQL it ships.
-FROM base AS native
+# The tools och-convert and pgmp are built with (scripts/build-images.mjs publishes this stage).
+FROM base AS native-tools
 # PostgreSQL's development files are in CodeReady Builder (CRB) on Rocky and RHEL. PGXS
 # builds with the distribution's compiler settings, from redhat-rpm-config.
 RUN set -eu; \
@@ -29,6 +32,10 @@ RUN set -eu; \
 # A fixed Rust release, as every build of the project uses (#514).
 RUN curl -fsSL https://sh.rustup.rs | sh -s -- -y --profile minimal --default-toolchain 1.99.0
 ENV PATH=/root/.cargo/bin:$PATH
+
+# och-convert and pgmp, built on the target distribution against its own libraries and the
+# PostgreSQL it ships.
+FROM ${NATIVE_TOOLS} AS native
 WORKDIR /build
 COPY native-store native-store
 COPY vendor/sqlite-rational vendor/sqlite-rational
@@ -85,15 +92,18 @@ RUN --mount=type=bind,target=/build-context \
 # with the tarball it caches. Without one, the package stage downloads it from nodejs.org.
 FROM scratch AS node-tarball
 
+# The tools the package stage uses (scripts/build-images.mjs publishes this stage).
+FROM base AS package-tools
+RUN dnf -y install rpm-build curl-minimal xz && dnf clean all
+
 # The package.
-FROM base AS package
+FROM ${PACKAGE_TOOLS} AS package
 ARG RPM_VERSION
 ARG RPM_RELEASE=1
 # Node.js runtime, pinned and checked (https://nodejs.org/dist/v24.21.0/SHASUMS256.txt). The
 # Debian Dockerfile's are the source (nodeRuntime, scripts/server-targets.mjs); this one matches.
 ARG NODE_VERSION=24.21.0
 ARG NODE_SHA256=fd8e59d5a511510f6a298afb548f18c7d2b1be404d8b4a27d94fbe49f56cb2d6
-RUN dnf -y install rpm-build curl-minimal xz && dnf clean all
 WORKDIR /root
 ENV ROOT=/root/package APP=/root/package/usr/lib/openchronology
 # The given tarball, else nodejs.org's; either is checked against the pinned SHA-256.
