@@ -131,7 +131,9 @@ jobs:
           if-no-files-found: error
   browser:
     name: Browser / ${{ matrix.browser }}
-    runs-on: ubuntu-24.04
+    # The project's own runner (label och-heavy: an isolated user with rootless Docker), except
+    # for pull requests from forks, whose code never runs there (docs/development.md).
+    runs-on: ${{ github.event.pull_request.head.repo.fork && 'ubuntu-24.04' || 'och-heavy' }}
     # Usually five to eight minutes; a hung test fails here rather than after GitHub's six hours.
     timeout-minutes: 30
     # Playwright's image has the browsers and their system packages, so no apt step depends on
