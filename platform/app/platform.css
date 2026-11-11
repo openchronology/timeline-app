@@ -1807,6 +1807,33 @@ dialog::backdrop {
   margin: 16px 0 0;
   font-weight: 600;
 }
+/* A newer release, for administrators (#601). */
+.update-banner {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px 18px;
+  padding: 10px 24px;
+  border-bottom: 1px solid var(--line);
+  background: var(--tint-strong);
+  color: var(--ink);
+  font-size: 14px;
+}
+.update-banner-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px 16px;
+}
+.update-banner .link-button {
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+.update-banner-error {
+  flex-basis: 100%;
+  color: var(--danger);
+}
 /* Reports and moderation (#115). */
 .report-categories {
   display: grid;

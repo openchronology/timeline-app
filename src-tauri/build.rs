@@ -26,10 +26,13 @@ const COMMANDS: &[&str] = &[
     "desktop_connect",
     "desktop_disconnect",
     "desktop_request",
+    "desktop_latest_release",
     "desktop_auth_start",
     "desktop_auth_poll",
 ];
 fn main() {
+    // A release build embeds its tag (main.rs, desktop_latest_release): build again when it changes.
+    println!("cargo:rerun-if-env-changed=OCH_BUILD_VERSION");
     tauri_build::try_build(
         tauri_build::Attributes::new()
             .app_manifest(tauri_build::AppManifest::new().commands(COMMANDS)),

@@ -73,3 +73,11 @@ export function analyticsPolicy(env = process.env) {
 export function transportSecurity(env = process.env) {
   return env.APP_ORIGIN?.startsWith('https:') ? 'max-age=31536000' : null;
 }
+
+/**
+ * Whether signed-in administrators are told of newer releases (#601): unless the environment
+ * sets UPDATE_NOTICES=off, for a server that keeps a version on purpose.
+ */
+export function updateNoticesEnabled(env = process.env) {
+  return (env.UPDATE_NOTICES ?? '').trim().toLowerCase() !== 'off';
+}

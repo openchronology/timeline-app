@@ -66,6 +66,8 @@ export async function checkPopulate(browser) {
       };
     }
     if (command === 'desktop_accept_open') return 1;
+    // Not a release build: it never asks for a newer one (#601).
+    if (command === 'desktop_latest_release') return { current: null };
     // A populated timeline is the user's own: trusted, as Rust keeps it.
     if (command === 'desktop_trust') return { trusted: true, images: true };
     if (command === 'desktop_document') return document;

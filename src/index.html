@@ -135,6 +135,19 @@
       <span id="capacity-actions" class="capacity-actions"></span>
       <button id="capacity-dismiss" type="button" aria-label="Dismiss this advice">×</button>
     </aside>
+    <!-- A newer release than the desktop app's (#601): dismissed until the next one. -->
+    <aside id="update-notice" class="memory-notice update-notice" role="status" hidden>
+      <span id="update-text"></span>
+      <span class="capacity-actions"
+        ><a id="update-notes" href="#">What’s new</a><a id="update-download" href="#">Download</a
+        ><button id="update-off" type="button" class="link-button">
+          Don’t check for updates
+        </button></span
+      >
+      <button id="update-dismiss" type="button" aria-label="Dismiss until the next release">
+        ×
+      </button>
+    </aside>
     <p id="guest-fork-status" class="guest-fork-status" role="alert" hidden></p>
     <a id="guest-fork-original" class="guest-fork-original" hidden>View original timeline</a>
     <section id="dashboard" class="dashboard" hidden>

@@ -26,6 +26,7 @@
     "allow-desktop-connect",
     "allow-desktop-disconnect",
     "allow-desktop-request",
+    "allow-desktop-latest-release",
     "allow-desktop-auth-start",
     "allow-desktop-auth-poll"
   ]

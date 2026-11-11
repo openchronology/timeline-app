@@ -462,6 +462,24 @@ export const paths = {
       },
     },
   },
+  '/api/admin/update-notice': {
+    post: {
+      operationId: 'dismissUpdateNotice',
+      tags: ['Administration'],
+      summary: 'Dismiss the update banner for a release',
+      description:
+        'For administrators only (#601). Hides the banner that tells of a newer release than the server’s, for this administrator, until a release after `version` is out. Needs the CSRF token.',
+      security: SIGNED_IN,
+      requestBody: body(ref('UpdateNoticeDismissal'), {
+        description: 'The release, at most 1 KiB.',
+      }),
+      responses: {
+        200: json(ref('Ok'), 'Dismissed.'),
+        ...errors(400, 401, 403, 413, 503),
+        ...notJson,
+      },
+    },
+  },
   '/api/admin/settings': {
     get: {
       operationId: 'getAdminSettings',
@@ -1016,6 +1034,19 @@ export const schemas = {
       featured: { type: 'boolean' },
       delete: { type: 'boolean', description: '`true` deletes the timeline and its history.' },
       ...confirmation,
+    },
+  },
+  UpdateNoticeDismissal: {
+    type: 'object',
+    additionalProperties: false,
+    required: ['version'],
+    properties: {
+      version: {
+        type: 'string',
+        maxLength: 64,
+        description: 'The release the banner named, such as `v0.26.0`.',
+        example: 'v0.26.0',
+      },
     },
   },
   AdminSettingsChange: {

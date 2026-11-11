@@ -75,6 +75,9 @@ import {
   validateTimelineImage,
 } from '../dist/core.mjs';
 const uuid = /^[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}$/i;
+/** A release tag (#601), as build-info.mjs and the update banner name them. */
+const releaseTag =
+  /^v?(0|[1-9]\d*)\.(0|[1-9]\d*)\.(0|[1-9]\d*)(?:-[0-9A-Za-z.-]+)?(?:\+[0-9A-Za-z.-]+)?$/;
 /**
  * How deeply a request's JSON may nest. Parsing deeply nested JSON is slow (seconds for a
  * large body of nested brackets), and no request needs more than a few levels.
@@ -821,6 +824,20 @@ export function createRequestHandler({
             );
           }
           throw new HttpError(404, 'Unknown administration action.');
+        }
+        // The update banner (#601): an administrator dismisses it for one release, with the
+        // CSRF token; it shows again for the next.
+        if (pathname === '/api/admin/update-notice' && method === 'POST') {
+          await administration.require(session);
+          auth.require(session, req);
+          const { version } = await body(req, 1024);
+          if (typeof version !== 'string' || !releaseTag.test(version))
+            throw new HttpError(400, 'Name the release, such as v1.2.3.');
+          await pool.query('UPDATE oc_users SET update_dismissed=$1 WHERE id=$2', [
+            version,
+            session.id,
+          ]);
+          return response(res, 200, { ok: true });
         }
         // Site administration (administration.mjs): administrators only, checked by
         // Administration. Lists of users or timelines (settings come with the users' list);
