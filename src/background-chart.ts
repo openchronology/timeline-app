@@ -2,6 +2,7 @@
 // The background chart (#289): how many moments lie across the view, as a smooth curve. It
 // reads the view's summaries, which every timeline has (in the browser, on the desktop and
 // from a server), so it costs what the view already cost: no moment is read again.
+import { Rational as Q } from 'rational-ordered-map';
 import type { FrameGroup } from './core.js';
 
 /** How far apart the curve's points are, in pixels. */
@@ -135,5 +136,62 @@ export function chartPaths(
     return { line, area };
   }
   const area = `M${r(pts[0][0])} ${r(base)}L${line.slice(1)}L${r(pts.at(-1)![0])} ${r(base)}Z`;
+  return { line, area };
+}
+
+/**
+ * A measure's balance across the view (#595) as steps: from `before` at the view's start, each
+ * group's change applied at its middle (as momentDensity places its moments), to `after`. Points are [x, value], relative from 0 (the lowest balance in view, or zero
+ * when that is higher) to 1 (the highest, or zero when that is lower). Null when it stays flat
+ * at zero.
+ */
+export function balanceSteps(
+  groups: readonly Pick<FrameGroup, 'first' | 'last' | 'balanceAfter'>[],
+  measure: string,
+  before: number,
+  after: number,
+  x: (time: string) => number,
+  width: number,
+): { steps: [number, number][]; zero: number } | null {
+  if (!(width > 0)) return null;
+  const raw: [number, number][] = [[0, before]];
+  for (const group of groups) {
+    const text = group.balanceAfter?.[measure];
+    if (text === undefined) continue;
+    const at = Math.max(0, Math.min(width, (x(group.first) + x(group.last)) / 2));
+    raw.push([at, rationalNumber(text)]);
+  }
+  // Changes in view with no summary to place them (only drawn durations'): at its end.
+  if (raw.at(-1)![1] !== after) raw.push([width, after]);
+  const values = raw.map(([, v]) => v);
+  const low = Math.min(0, ...values),
+    high = Math.max(0, ...values);
+  if (!(high > low)) return null;
+  const scale = (v: number) => (v - low) / (high - low);
+  return { steps: raw.map(([at, v]) => [at, scale(v)]), zero: scale(0) };
+}
+/** Canonical rational text ("-7/2", "12") as an approximate number. */
+export function rationalNumber(text: string) {
+  return Q.parse(text.includes('/') ? text : text + '/1').toApproximateNumber();
+}
+/**
+ * Steps as SVG paths (#595): `line`, level until each step's x and then straight up or down to
+ * its value, across `width` pixels from `left`; and `area`, closed down to the zero line. Its
+ * highest value is at `top`, its lowest at `base`.
+ */
+export function stepPaths(
+  steps: readonly [number, number][],
+  zero: number,
+  left: number,
+  width: number,
+  top: number,
+  base: number,
+) {
+  const r = (v: number) => Math.round(v * 10) / 10;
+  const y = (v: number) => r(base - v * (base - top));
+  let line = `M${r(left)} ${y(steps[0][1])}`;
+  for (const [at, v] of steps.slice(1)) line += `H${r(left + at)}V${y(v)}`;
+  line += `H${r(left + width)}`;
+  const area = `${line}V${y(zero)}H${r(left)}Z`;
   return { line, area };
 }

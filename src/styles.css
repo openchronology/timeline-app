@@ -772,6 +772,33 @@ html.timeline-fullscreen .timeline-stage {
   stroke-opacity: 0.55;
   stroke-width: 1.5;
 }
+/* A balance chart (#595): steps, so the line is crisp where the balance changes. */
+.timeline-chart.balance .timeline-chart-line {
+  stroke-linejoin: miter;
+  shape-rendering: crispEdges;
+}
+/* The view's balances at its edges (#595), in the stage's lower corners. */
+.balance-readout {
+  position: absolute;
+  bottom: 6px;
+  z-index: 100001;
+  display: flex;
+  justify-content: space-between;
+  gap: 16px;
+  pointer-events: none;
+  font-size: 12px;
+  font-variant-numeric: tabular-nums;
+  color: var(--timeline-text, var(--stage-text));
+}
+.balance-readout span {
+  padding: 1px 6px;
+  border-radius: 4px;
+  background: color-mix(in srgb, var(--timeline-background, var(--stage-ground)) 85%, transparent);
+  pointer-events: auto;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
 /* A chart's series (#434): lighter fills beneath the total, each line in its own color. */
 .timeline-chart-series-area {
   fill: currentColor;

@@ -137,6 +137,7 @@ A measure's values can be **changes**, such as payments in and out, with a runni
 - **Overviews:** they report each anchored measure's balance before the window's changes (excluding those exactly at its left edge) and after them (including those at its right edge), as `balances`. Each summary reports its balance after its changes, as `balanceAfter`.
 - **Summaries' totals split the window:** each summary covers from its first time up to the next one's, the first from the window's start and the last to its end. So every change in the window counts once, a long duration's too. A summary's total is the difference between its balance after and the balance before it.
 - **Comparisons:** each timeline keeps its own balance.
+- **In the editor:** the Measures dialog sets where each measure's durations apply and its balance: none, an opening or closing balance, or a balance at a time. The value is typed as the measure shows values, and the time as the timeline shows times.
 
 A balance is read from the timeline's change index in O(log n). The browser, servers and desktop files each keep one: a server's in PostgreSQL alongside its other trees, shared by forks, and a desktop file's as a SQLite index, built when an older file is opened.
 
@@ -144,15 +145,16 @@ A balance is read from the timeline's change index in O(log n). The browser, ser
 
 - **Summaries:** a summary's label says what it holds, then up to two of its totals, each labelled and shown as its measure shows totals: `3 moments · Cost $21.50`. Its tooltip and the name screen readers hear list them all.
 - **Single events:** an event's values are listed in the reader and in its hover card.
+- **Balances:** the view's balance before its changes and after them show in the stage's lower left and right corners, such as `Cost $100.00` and `Cost $121.50`. A summary's tooltip and screen-reader name add its balance before and after it: `3 moments · Cost $21.50 · Cost balance $100.00 → $121.50`. A moment's reader and hover card list it the same way. None show in a comparison.
 - **Separated tracks:** each track's summaries show their own totals. A track too narrow to draw collapses into another with its totals, as one timeline's.
 - **Comparisons:** a comparison never adds totals across its timelines ([#586](https://github.com/openchronology/timeline-app/issues/586)). Each timeline's measures are its own: two timelines' `cost` aren't the same quantity. Side by side, each track's summaries keep their own timeline's totals. Combined, a summary keeps its totals by timeline (`sourceTotals`), and plugins that use totals choose how to show each one. Labels show no totals in a comparison.
 
 Plugins can use measures too ([plugins](plugins.md)):
 
-- **Scripts:** `api.measure("cost")` reads a moment's value exactly, to compare with `api.compare`. A plugin that renders summaries (`renderSummaries`) reads their totals with `api.total("cost")`, and in a comparison each timeline's with `api.total("cost", n)` (#587).
+- **Scripts:** `api.measure("cost")` reads a moment's value exactly, to compare with `api.compare`. A plugin that renders summaries (`renderSummaries`) reads their totals with `api.total("cost")`, and in a comparison each timeline's with `api.total("cost", n)` (#587). `api.balance("cost")` reads a moment's or summary's balance after its changes, exactly, or empty text when the measure has no balance (#595), so a script can color what leaves an account overdrawn.
 - **Derived metadata:** a derivation's `{ "measure": "cost" }` source reads a value, or a summary's total.
 - **Sizes:** `sizeBy` sizes markers and summaries by a measure's total.
-- **Charts:** the background chart can draw a measure's totals across the view.
+- **Charts:** the background chart can draw a measure's totals across the view, or its running balance as steps.
 
 ## Where measures go
 

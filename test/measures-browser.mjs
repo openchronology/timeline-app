@@ -1,7 +1,8 @@
 // Copyright (c) 2026 Athan Clark. SPDX-License-Identifier: GPL-3.0-only
 // Measures in the editor (#573): declared in the Measures dialog with how each is shown, typed in
 // a moment's form as shown and stored exactly, read in the reader, and renamed with their
-// values as one Undo.
+// values as one Undo; and balances (#595): declared there, shown at the view's edges, on
+// summaries and in the reader.
 import assert from 'node:assert/strict';
 import { readFile } from 'node:fs/promises';
 import { closeMomentDetails } from './moment-dialog-browser.mjs';
@@ -150,5 +151,41 @@ export async function checkMeasures(page) {
   assert.match(
     await page.locator('.event-caption-title', { hasText: '3 moments' }).first().textContent(),
     /3 moments · Cost \$21\.50/,
+  );
+
+  // A balance (#595): an opening $100.00, declared as the measure shows values.
+  await input('measures-button').evaluate((button) => button.click());
+  await dialog.waitFor();
+  const costRow = dialog.locator('.measure-row').first();
+  assert(await costRow.locator('.measure-balance-value').isHidden());
+  await costRow.locator('.measure-balance').selectOption('start');
+  await costRow.locator('.measure-balance-value').fill('$100.00');
+  await input('measures-save').click();
+  await dialog.waitFor({ state: 'hidden' });
+  document = await exported();
+  assert.deepEqual(document.measures.cost.balance, { at: 'start', value: '10000' });
+  // The view's edges: $100.00 before everything, $121.50 after the three moments' $21.50.
+  const readout = page.locator('.balance-readout');
+  await readout.waitFor();
+  await page.waitForFunction(
+    () => document.querySelector('.balance-readout .balance-end')?.textContent === 'Cost $121.50',
+  );
+  assert.equal(await readout.locator('.balance-start').textContent(), 'Cost $100.00');
+  assert.match(
+    await summary.getAttribute('aria-label'),
+    /^3 moments · Cost \$21\.50 · Cost balance \$100\.00 → \$121\.50 near /,
+  );
+  // A balance at a time, typed as the timeline shows times, reads back as it was.
+  await input('measures-button').evaluate((button) => button.click());
+  await dialog.waitFor();
+  await costRow.locator('.measure-balance').selectOption('time');
+  await costRow.locator('.measure-balance-time').fill('10');
+  await costRow.locator('.measure-balance-value').fill('$50');
+  await input('measures-save').click();
+  await dialog.waitFor({ state: 'hidden' });
+  document = await exported();
+  assert.deepEqual(document.measures.cost.balance, { at: '10/1', value: '5000' });
+  await page.waitForFunction(
+    () => document.querySelector('.balance-readout .balance-start')?.textContent === 'Cost $28.50',
   );
 }
