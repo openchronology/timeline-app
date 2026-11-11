@@ -2293,6 +2293,9 @@ ALTER TABLE oc_users ADD COLUMN IF NOT EXISTS terms_version text;
 -- SQL that makes accounts which agreed, such as the tests'.
 CREATE OR REPLACE FUNCTION oc_policy_version() RETURNS text LANGUAGE sql IMMUTABLE AS $$ SELECT '2026-11-07' $$;
 ALTER TABLE oc_users ADD COLUMN IF NOT EXISTS terms_accepted_at timestamptz;
+-- update_dismissed: the release an administrator dismissed the update banner for (#601); the
+-- banner shows again for the next one.
+ALTER TABLE oc_users ADD COLUMN IF NOT EXISTS update_dismissed text CHECK(length(update_dismissed)<=64);
 ALTER TABLE oc_registrations ADD COLUMN IF NOT EXISTS terms_version text;
 ALTER TABLE oc_registrations ADD COLUMN IF NOT EXISTS terms_accepted_at timestamptz;
 -- A browser refused an account for its age (#166): asked again within a day, it is refused

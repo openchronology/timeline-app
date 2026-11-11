@@ -2535,6 +2535,12 @@ body[data-platform-editor] .app-header {
 .capacity-actions a {
   color: inherit;
 }
+/* A newer release (#601): the capacity notice's look, its dismiss button the same. */
+.update-notice .link-button {
+  color: inherit;
+  text-decoration: underline;
+}
+#update-dismiss,
 #capacity-dismiss {
   background: none;
   border: 0;
@@ -2554,10 +2560,12 @@ body[data-platform-editor] .app-header {
     align-items: flex-start;
     flex-direction: column;
   }
-  .capacity-notice {
+  .capacity-notice,
+  .update-notice {
     position: relative;
     padding-right: 2.6rem;
   }
+  #update-dismiss,
   #capacity-dismiss {
     position: absolute;
     top: 0.55rem;

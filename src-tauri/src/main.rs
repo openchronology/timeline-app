@@ -42,6 +42,58 @@ use tauri_plugin_dialog::DialogExt;
 fn desktop_open_image(url: String) -> Result<(), String> {
     server::open_image(&url)
 }
+/// Where the latest release is read (#601): GitHub's API for the project's releases.
+const LATEST_RELEASE: &str =
+    "https://api.github.com/repos/openchronology/timeline-app/releases/latest";
+/// The running release and, when `ask`, the latest published one (#601), for the editor's
+/// update banner: `{"current": tag, "latest": tag, "notes": url}`. A build that is not a
+/// release (no OCH_BUILD_VERSION when it was compiled) has `current` null and asks nothing.
+/// The request carries nothing but itself; when GitHub cannot be reached or answers oddly,
+/// `latest` is left out. Without `ask` it only says which release is running, so the editor
+/// keeps to one request a day.
+#[tauri::command]
+async fn desktop_latest_release(ask: bool) -> Result<serde_json::Value, String> {
+    let Some(current) = option_env!("OCH_BUILD_VERSION") else {
+        return Ok(serde_json::json!({ "current": null }));
+    };
+    if !ask {
+        return Ok(serde_json::json!({ "current": current }));
+    }
+    let read = async {
+        let client = reqwest::Client::builder()
+            .user_agent("OpenChronology")
+            .timeout(std::time::Duration::from_secs(10))
+            .build()
+            .ok()?;
+        let reply = client
+            .get(LATEST_RELEASE)
+            .header("Accept", "application/vnd.github+json")
+            .send()
+            .await
+            .ok()?;
+        if !reply.status().is_success() {
+            return None;
+        }
+        let body: serde_json::Value = reply.json().await.ok()?;
+        let tag = body.get("tag_name")?.as_str()?;
+        // A version tag (v1.2.3 and the like), short, so the editor shows nothing stranger.
+        if tag.len() > 64
+            || !tag
+                .chars()
+                .all(|c| c.is_ascii_alphanumeric() || matches!(c, '.' | '-' | '+'))
+        {
+            return None;
+        }
+        let notes = format!("https://github.com/openchronology/timeline-app/releases/tag/{tag}");
+        Some((tag.to_string(), notes))
+    };
+    Ok(match read.await {
+        Some((latest, notes)) => {
+            serde_json::json!({ "current": current, "latest": latest, "notes": notes })
+        }
+        None => serde_json::json!({ "current": current }),
+    })
+}
 /// The connected servers' origins, the one in use first, for the editor's server list.
 #[tauri::command]
 fn desktop_servers(state: tauri::State<'_, server::Server>) -> Result<Vec<String>, String> {
@@ -987,6 +1039,7 @@ fn main() {
         })
         .invoke_handler(tauri::generate_handler![
             desktop_open_image,
+            desktop_latest_release,
             desktop_open_file,
             desktop_reveal_file,
             desktop_thumbnails,

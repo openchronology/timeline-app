@@ -18,8 +18,18 @@ import { POLICY_VERSION } from '../../server/policies.mjs';
 import { currentSession } from '../lib/session.js';
 import { headers } from 'next/headers';
 import { SOFTWARE_NAME, siteOrigin, sitePreview } from '../lib/sharing.js';
-import { analyticsId, platformName, siteName, supportUrl } from '../../server/site.mjs';
+import {
+  analyticsId,
+  platformName,
+  siteName,
+  supportUrl,
+  updateNoticesEnabled,
+} from '../../server/site.mjs';
 import { landingEnabled } from '../../server/landing.mjs';
+import UpdateBanner from '../components/update-banner.jsx';
+import { latestRelease } from '../lib/latest-release.js';
+import { REPOSITORY } from '../lib/releases.js';
+import { newerRelease } from '../../src/updates.ts';
 // Marks the page as scripted before it paints, so a phone's header is a menu from the first
 // frame (components/site-menu.jsx) rather than once React arrives.
 const SCRIPTED = ";document.documentElement.classList.add('scripted')";
@@ -63,14 +73,24 @@ export default async function RootLayout({ children }) {
   // the site takes registrations; an account gets its menu. Without accounts, neither.
   let user = null,
     accounts = false,
-    registration = false;
+    registration = false,
+    dismissed = null;
   try {
     const current = await currentSession();
     user = current.user;
     accounts = !!current.services.auth;
     registration = !!current.services.auth?.security?.available;
+    dismissed = current.session?.update_dismissed ?? null;
   } catch (error) {
     console.error(error);
+  }
+  // A newer release than this server's (#601), for administrators only, until they dismiss it
+  // for that release. Builds that aren't releases never ask.
+  let update = null;
+  if (user?.isAdmin && build.version && updateNoticesEnabled()) {
+    const release = await latestRelease();
+    if (release && newerRelease(build.version, release.tag) && dismissed !== release.tag)
+      update = { current: build.version, latest: release.tag, notes: release.notes };
   }
   return (
     // The inline script sets data-theme on <html> before React hydrates it.
@@ -120,6 +140,12 @@ export default async function RootLayout({ children }) {
             </div>
           ) : null}
         </header>
+        {update ? (
+          <UpdateBanner
+            {...update}
+            upgrade={`https://github.com/${REPOSITORY}/blob/main/docs/administration.md#upgrading`}
+          />
+        ) : null}
         {user?.termsRequired ? <TermsPrompt version={POLICY_VERSION} /> : null}
         {children}
         <footer className="platform-footer">

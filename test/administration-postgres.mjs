@@ -126,6 +126,23 @@ try {
   assert.equal((await request('session', 'GET', undefined, admin)).user.termsRequired, true);
   await request('admin/settings', 'PATCH', { default_quota_bytes: '0', password }, admin, 403);
   await request('auth/terms', 'POST', { acceptTerms: POLICY_VERSION }, admin);
+  // The update banner (#601): an administrator dismisses it for one release, with the CSRF
+  // token; others may not, and the release must be a version tag.
+  await request('admin/update-notice', 'POST', { version: 'v9.9.9' }, owner.headers, 403);
+  await request(
+    'admin/update-notice',
+    'POST',
+    { version: 'v9.9.9' },
+    { Cookie: admin.Cookie },
+    403,
+  );
+  await request('admin/update-notice', 'POST', { version: 'latest' }, admin, 400);
+  await request('admin/update-notice', 'POST', { version: 'v9.9.9' }, admin);
+  assert.equal(
+    (await pool.query('SELECT update_dismissed FROM oc_users WHERE id=$1', [adminUser.id])).rows[0]
+      .update_dismissed,
+    'v9.9.9',
+  );
   await request(
     'admin/settings',
     'PATCH',

@@ -138,6 +138,7 @@ import {
   balanceSteps,
   stepPaths,
   rationalNumber,
+  newerRelease,
   pluginTheme,
   settingValue,
   TEXT_SIZE,
@@ -2807,6 +2808,78 @@ el('capacity-dismiss').onclick = () => {
     // Without storage the notice stays dismissed until the next change.
   }
   el('capacity-notice').hidden = true;
+};
+/** How often the desktop app asks whether a newer release is out (#601): once a day. */
+const UPDATE_INTERVAL = 24 * 60 * 60 * 1000;
+/** Storage for the update check (#601): read and written whole, and never trusted blindly. */
+function updateStorage(key: string, value?: string | null): string | null {
+  try {
+    if (value === undefined) return localStorage.getItem(key);
+    if (value === null) localStorage.removeItem(key);
+    else localStorage.setItem(key, value);
+  } catch {
+    // Without storage the app asks at each start, and a dismissal lasts until it closes.
+  }
+  return null;
+}
+/**
+ * The desktop app's update banner (#601): at most once a day, it asks GitHub (through the app,
+ * desktop_latest_release) for the latest release, and when it is newer than the one running
+ * says so, with its notes and the download page, until it is dismissed for that release or
+ * checks are turned off. Builds that aren't releases never ask.
+ */
+async function checkForUpdate(now = Date.now()) {
+  if (!desktop || updateStorage('och-update-checks') === 'off') return;
+  type Latest = { current: string | null; latest?: string; notes?: string };
+  const invoke = (ask: boolean) =>
+    window.__TAURI__!.core.invoke<Latest>('desktop_latest_release', { ask });
+  const { current } = await invoke(false);
+  if (!current) return;
+  let known: (Latest & { at: number }) | null = null;
+  try {
+    const saved = JSON.parse(updateStorage('och-update-known') ?? 'null');
+    if (
+      saved &&
+      saved.current === current &&
+      typeof saved.at === 'number' &&
+      now - saved.at < UPDATE_INTERVAL &&
+      typeof saved.latest === 'string' &&
+      typeof saved.notes === 'string' &&
+      saved.notes.startsWith('https://github.com/openchronology/timeline-app/releases/')
+    )
+      known = saved;
+  } catch {
+    // Unreadable: asked again.
+  }
+  if (!known) {
+    const answer = await invoke(true);
+    // Unreachable: asked again at the next start.
+    if (!answer.latest || !answer.notes) return;
+    known = { ...answer, at: now };
+    updateStorage('och-update-known', JSON.stringify(known));
+  }
+  const latest = known.latest!;
+  if (!newerRelease(current, latest) || updateStorage('och-update-dismissed') === latest) return;
+  text('update-text', `OpenChronology ${latest} is available. This app is ${current}.`);
+  el<HTMLAnchorElement>('update-notes').href = known.notes!;
+  el<HTMLAnchorElement>('update-download').href = 'https://timescale.info/download';
+  el('update-notice').dataset.release = latest;
+  el('update-notice').hidden = false;
+}
+for (const id of ['update-notes', 'update-download'])
+  el<HTMLAnchorElement>(id).onclick = (event) => {
+    event.preventDefault();
+    openHelp(el<HTMLAnchorElement>(id).href);
+  };
+el('update-dismiss').onclick = () => {
+  const latest = el('update-notice').dataset.release;
+  if (latest) updateStorage('och-update-dismissed', latest);
+  el('update-notice').hidden = true;
+};
+el('update-off').onclick = () => {
+  updateStorage('och-update-checks', 'off');
+  el('update-notice').hidden = true;
+  toast('The app won’t check for updates. Check the download page for new releases.');
 };
 /** The labels in fieldset `id` that are checked (#115). */
 function checkedLabels(id: string): string[] {
@@ -9106,6 +9179,8 @@ accountHeading();
 requestRender();
 void (async () => {
   if (desktop) {
+    // A newer release (#601), asked beside everything else; failing, it says nothing.
+    void checkForUpdate().catch(() => {});
     try {
       await nativeServers();
       useServer(connected[0] ?? null);

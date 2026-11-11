@@ -69,7 +69,9 @@ export async function checkDesktopCache(browser) {
     errors = [],
     prefetches = [],
     // Server requests: with no server connected, there should be none.
-    requests = [];
+    requests = [],
+    // Release checks (#601): whether each asked GitHub.
+    updateAsks = [];
   const header = () => ({
     document: { ...document, events: [], durations: [], relationships: undefined },
     generation,
@@ -80,6 +82,17 @@ export async function checkDesktopCache(browser) {
   });
   await context.exposeFunction('nativeInvoke', async (command, args) => {
     if (command === 'desktop_servers') return [];
+    // A release build, with a newer release out (#601).
+    if (command === 'desktop_latest_release') {
+      updateAsks.push(args.ask);
+      return args.ask
+        ? {
+            current: 'v0.1.0',
+            latest: 'v0.26.0',
+            notes: 'https://github.com/openchronology/timeline-app/releases/tag/v0.26.0',
+          }
+        : { current: 'v0.1.0' };
+    }
     if (command === 'desktop_open') return header();
     if (command === 'desktop_accept_open') return generation;
     // A file from someone else: neither trusted nor its images shown, until the reader asks.
@@ -211,6 +224,25 @@ export async function checkDesktopCache(browser) {
   };
   try {
     await page.goto('http://localhost:5173');
+    // A newer release (#601): said once, asked once a day, and dismissed for that release.
+    await page.locator('#update-notice').waitFor();
+    assert.equal(
+      await page.locator('#update-text').textContent(),
+      'OpenChronology v0.26.0 is available. This app is v0.1.0.',
+    );
+    assert.deepEqual(updateAsks, [false, true]);
+    await page.locator('#update-dismiss').click();
+    assert(await page.locator('#update-notice').isHidden());
+    assert.equal(
+      await page.evaluate(() => localStorage.getItem('och-update-dismissed')),
+      'v0.26.0',
+    );
+    await page.reload();
+    await page.waitForFunction(() => document.getElementById('account-button').disabled);
+    for (let i = 0; i < 40 && updateAsks.length < 3; i++) await page.waitForTimeout(25);
+    // The day's answer is kept: the reload asks only which release is running.
+    assert.deepEqual(updateAsks, [false, true, false]);
+    assert(await page.locator('#update-notice').isHidden());
     // Without a server connection, the desktop cannot sign in and file actions use plain names.
     assert(await page.locator('#account-button').isDisabled());
     assert.deepEqual(

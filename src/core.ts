@@ -112,6 +112,7 @@ export * from './track-summaries.js';
 export { clip } from './clip.js';
 export * from './plugins.js';
 export * from './background-chart.js';
+export * from './updates.js';
 export * from './suites.js';
 export * from './editions.js';
 export * from './capacity.js';
