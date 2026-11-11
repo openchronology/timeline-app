@@ -49,7 +49,8 @@ import {
 } from './drafts.js';
 import type { DraftWrite } from './drafts.js';
 import { addMeasureRow, readMeasureRows, renderMeasureFields } from './measure-ui.js';
-import { measuredFrame } from './measure-balance.js';
+import { BALANCES, groupBalanceSpans, measuredFrame } from './measure-balance.js';
+import type { WindowBalance } from './measure-balance.js';
 import type { Advice, Measurements, Platform } from './capacity.js';
 import { createHoverPreview } from './hover-preview.js';
 import { renderReader } from './event-reader.js';
@@ -86,6 +87,7 @@ import {
   normalizeMeasureMetadata,
   measureLabel,
   measurePresenter,
+  measureText,
   measuresCompatible,
   remeasuredEntities,
   validateTimelineView,
@@ -133,6 +135,9 @@ import {
   momentDensity,
   stackedCurves,
   chartPaths,
+  balanceSteps,
+  stepPaths,
+  rationalNumber,
   pluginTheme,
   settingValue,
   TEXT_SIZE,
@@ -1862,11 +1867,17 @@ function drawFrame() {
     summaryExpansion.update(button, group, expandSummaries);
     button.dataset.first = group.first;
     button.dataset.count = group.count;
-    const metadata = span
-      ? span.metadata
-      : group.id
-        ? ((!comparison ? model?.byId.get(group.id)?.metadata : undefined) ?? group.metadata ?? {})
-        : {};
+    // A moment's balances before and after it (#595) ride along for its card and scripts.
+    const metadata = withBalances(
+      span
+        ? span.metadata
+        : group.id
+          ? ((!comparison ? model?.byId.get(group.id)?.metadata : undefined) ??
+            group.metadata ??
+            {})
+          : {},
+      span ? undefined : groupBalance(group),
+    );
     const name = span
       ? 'Duration: ' + (span.metadata.title?.trim() || 'Untitled duration')
       : group.title?.trim() || 'Untitled moment';
@@ -1907,10 +1918,14 @@ function drawFrame() {
     button.style.borderColor = '';
     button.setAttribute(
       'aria-label',
-      count > 1n ? `${summaryName(group)}${totalsText(group, 32)} near ${presented(first)}` : name,
+      count > 1n
+        ? `${summaryName(group)}${totalsText(group, 32)}${balanceText(group)} near ${presented(first)}`
+        : name,
     );
     button.title =
-      count > 1n ? `${summaryName(group)}${totalsText(group, 32)}; select to explore` : name;
+      count > 1n
+        ? `${summaryName(group)}${totalsText(group, 32)}${balanceText(group)}; select to explore`
+        : name;
     const sourceLane = trackLanes.get(sourceKey ?? '') ?? 0;
     trackLanes.set(sourceKey ?? '', sourceLane + 1);
     // Labels below the axis go beneath the duration bands, whose titles they would cover; a
@@ -4533,7 +4548,12 @@ function eventForm(event?: PointEvent, time?: Q) {
     selected = event;
     requestRender();
     const read = separatedMoment(event);
-    return showReader('moment', read.id, read.metadata, presentedAlone(Q.parse(read.time)));
+    return showReader(
+      'moment',
+      read.id,
+      withBalances(read.metadata, momentBalance(read.id)),
+      presentedAlone(Q.parse(read.time)),
+    );
   }
   pendingEventEdit = false;
   eventEditHistory = null;
@@ -5968,6 +5988,13 @@ function calendarPresentation() {
   const presentation = model?.presentation ?? remote?.presentation;
   return presentation?.mode === 'gregorian' && !comparison ? presentation : undefined;
 }
+/** A balance's time in the Measures dialog (#595), as the timeline shows and reads times. */
+function measureTimes() {
+  return {
+    print: (t: string) => presented(Q.parse(t.includes('/') ? t : t + '/1'), 'input'),
+    parse: (text: string) => measureText(parseInputTime(text)),
+  };
+}
 function parseInputTime(value: string) {
   return timelinePresenter().parse(value, viewContext('input'));
 }
@@ -6955,7 +6982,7 @@ el('measures-button').onclick = () => {
     can = measuresEditable();
   list.replaceChildren();
   for (const name of Object.keys(measures ?? {}))
-    addMeasureRow(list, measures, name, describeMeasures);
+    addMeasureRow(list, measures, name, describeMeasures, measureTimes());
   for (const control of list.querySelectorAll<
     HTMLInputElement | HTMLSelectElement | HTMLButtonElement
   >('input, select, button'))
@@ -6967,7 +6994,13 @@ el('measures-button').onclick = () => {
   el<HTMLDialogElement>('measures-dialog').showModal();
 };
 el('measures-add').onclick = () => {
-  const row = addMeasureRow(el('measures-list'), timelineMeasures(), null, describeMeasures);
+  const row = addMeasureRow(
+    el('measures-list'),
+    timelineMeasures(),
+    null,
+    describeMeasures,
+    measureTimes(),
+  );
   row.querySelector<HTMLInputElement>('.measure-label')?.focus();
 };
 function setMeasuresBusy(busy: boolean) {
@@ -9202,6 +9235,57 @@ function parseTagInput(value: string): string[] {
   );
 }
 /** "3 moments", "2 durations" or "3 moments · 2 durations". */
+/** Each group of the frame shown, by object, with its balances before and after (#595). */
+const frameBalances = new WeakMap<Frame, Map<FrameGroup, Record<string, WindowBalance>>>();
+/**
+ * A group's balances before and after its changes (#595), by anchored measure; undefined
+ * without any, and in comparisons (each timeline keeps its own, in its own frame).
+ */
+function groupBalance(group: FrameGroup): Record<string, WindowBalance> | undefined {
+  if (comparison || !frame.balances) return undefined;
+  let spans = frameBalances.get(frame);
+  if (!spans) {
+    const list = groupBalanceSpans(frame.groups, frame.balances) ?? [];
+    spans = new Map(frame.groups.map((g, i) => [g, list[i]]));
+    frameBalances.set(frame, spans);
+  }
+  return spans.get(group);
+}
+/** `metadata` with a moment's or summary's balances (#595) for its card, reader and scripts. */
+function withBalances(
+  metadata: Record<string, unknown>,
+  balances: Record<string, WindowBalance> | undefined,
+): Record<string, unknown> {
+  return balances ? { ...metadata, [BALANCES]: balances } : metadata;
+}
+/** A measure's balance text, exact rationals as its measure shows totals. */
+function balancePrinted(measures: Measures, name: string, text: string) {
+  return measurePresenter(measures, name).print(
+    Q.parse(text.includes('/') ? text : text + '/1'),
+    'total',
+  );
+}
+/**
+ * A summary's balances before and after it (#595), as its label and tooltip add them: each
+ * anchored measure's, after " · ", as "Cost balance $10.00 → $25.00". Empty without any.
+ */
+function balanceText(group: FrameGroup): string {
+  const measures = timelineMeasures(),
+    balances = groupBalance(group);
+  if (!measures || !balances) return '';
+  return Object.entries(balances)
+    .filter(([name]) => measures[name])
+    .map(
+      ([name, b]) =>
+        ` · ${measureLabel(measures, name)} balance ${balancePrinted(measures, name, b.before)} → ${balancePrinted(measures, name, b.after)}`,
+    )
+    .join('');
+}
+/** The balances of the moment `id` before and after it (#595), when the view shows it alone. */
+function momentBalance(id: string) {
+  const group = frame.groups.find((g) => g.id === id && g.count === '1');
+  return group ? groupBalance(group) : undefined;
+}
 /**
  * A summary's measure totals as its label shows them (#575): each nonzero total, labelled, as
  * its measure shows totals, at most `limit` of them, after " · ". Empty without measures.
@@ -9262,6 +9346,7 @@ function summaryEffects(plugins: readonly InstalledPlugin[], group: FrameGroup) 
               : group.sourceTotals?.[key];
         }
       : undefined,
+    groupBalance(group),
   );
 }
 function summaryName(group: FrameGroup) {
@@ -13461,9 +13546,22 @@ function renderBackgroundChart(host: HTMLElement) {
         }),
       ]
     : frame.groups;
-  const density = chart && momentDensity(charted, x, width(), spread);
+  // A balance chart (#595) draws the measure's running balance across the view, as steps.
+  const balance = chart?.balance ? frame.balances?.[chart.balance] : undefined;
+  const steps =
+    chart?.balance && balance && !comparison
+      ? balanceSteps(
+          frame.groups,
+          chart.balance,
+          rationalNumber(balance.before),
+          rationalNumber(balance.after),
+          x,
+          width(),
+        )
+      : null;
+  const density = chart && !chart.balance ? momentDensity(charted, x, width(), spread) : null;
   const most = density ? Math.max(...density) : 0;
-  if (!chart || !(most > 0)) {
+  if (!chart || (chart.balance ? !steps : !(most > 0))) {
     timelineChart?.svg.remove();
     timelineChart = null;
     return;
@@ -13491,15 +13589,18 @@ function renderBackgroundChart(host: HTMLElement) {
     top = height * 0.2;
   svg.setAttribute('viewBox', `0 0 ${full} ${height}`);
   svg.style.color = chart.color ?? '';
-  const total = chartPaths(
-    density!.map((v) => v / most),
-    inset(),
-    width(),
-    top,
-    height,
-  );
+  const total = steps
+    ? stepPaths(steps.steps, steps.zero, inset(), width(), top, height)
+    : chartPaths(
+        density!.map((v) => v / most),
+        inset(),
+        width(),
+        top,
+        height,
+      );
   area.setAttribute('d', total.area);
   line.setAttribute('d', total.line);
+  svg.classList.toggle('balance', !!steps);
   // The series between the total's area and its line, in the plugin's order.
   while (timelineChart.series.length > chart.series.length) {
     const gone = timelineChart.series.pop()!;
@@ -13528,6 +13629,49 @@ function renderBackgroundChart(host: HTMLElement) {
     drawn.area.setAttribute('d', d?.area ?? '');
     drawn.line.setAttribute('d', d?.line ?? '');
   });
+}
+let balanceReadout: { box: HTMLElement; start: HTMLElement; end: HTMLElement } | null = null;
+/**
+ * The view's balances at its edges (#595): each anchored measure's balance before the changes
+ * at its start, in the stage's lower left corner, and after those at its end, in the lower
+ * right. None without anchored measures, and in comparisons.
+ */
+function renderBalanceReadout(host: HTMLElement) {
+  const measures = timelineMeasures();
+  const shown =
+    !comparison && measures
+      ? Object.entries(frame.balances ?? {}).filter(([name]) => measures[name])
+      : [];
+  if (!shown.length) {
+    balanceReadout?.box.remove();
+    balanceReadout = null;
+    return;
+  }
+  if (!balanceReadout) {
+    const box = document.createElement('div'),
+      start = document.createElement('span'),
+      end = document.createElement('span');
+    box.className = 'balance-readout';
+    start.className = 'balance-start';
+    end.className = 'balance-end';
+    box.append(start, end);
+    balanceReadout = { box, start, end };
+  }
+  const { box, start, end } = balanceReadout;
+  if (box.parentNode !== host || host.lastChild !== box) host.append(box);
+  box.style.left = `${inset() / uiScale}px`;
+  box.style.width = `${width() / uiScale}px`;
+  const line = (edge: 'before' | 'after') =>
+    shown
+      .map(
+        ([name, b]) =>
+          `${measureLabel(measures!, name)} ${balancePrinted(measures!, name, b[edge])}`,
+      )
+      .join(' · ');
+  start.textContent = line('before');
+  end.textContent = line('after');
+  start.title = 'Balance at the start of the view, before its changes';
+  end.title = 'Balance at the end of the view, after its changes';
 }
 let appliedTheme = '';
 /** How large the theme draws label and tick text (#267): 1 is the usual size. */
@@ -13617,6 +13761,7 @@ function renderDurationBackgrounds() {
       if (box.style.zIndex !== String(index + 1)) box.style.zIndex = String(index + 1);
     });
   renderBackgroundChart(host);
+  renderBalanceReadout(host);
   for (const [key, entry] of durationBackgrounds)
     if (!shown.has(key)) {
       entry.box.remove();

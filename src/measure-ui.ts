@@ -14,6 +14,8 @@ import {
   validateMeasures,
 } from './measures.js';
 import type { Measures, MeasureValues } from './measures.js';
+import { BALANCES } from './measure-balance.js';
+import type { WindowBalance } from './measure-balance.js';
 import {
   DEFAULT_MEASURE_MODE,
   MEASURE_FORMATS,
@@ -80,6 +82,18 @@ function select(className: string, options: [string, string][], value: string) {
 }
 
 /**
+ * How the dialog shows and reads a balance's time (#595): as the timeline shows times, to and
+ * from exact canonical text. Without one, times are typed exactly.
+ */
+export interface MeasureTimes {
+  print(time: string): string;
+  parse(text: string): string;
+}
+const EXACT_TIMES: MeasureTimes = { print: (t) => t, parse: (t) => t.trim() };
+/** Each row's way of reading its balance's time. */
+const rowTimes = new WeakMap<HTMLElement, MeasureTimes>();
+
+/**
  * Adds a row for measure `name` (as `measures` declares it), or a new one, to the dialog's
  * `list`. A row remembers the name it started with, so a changed name is a rename.
  */
@@ -88,6 +102,7 @@ export function addMeasureRow(
   measures: Measures | undefined,
   name: string | null,
   onChange: () => void,
+  times: MeasureTimes = EXACT_TIMES,
 ): HTMLFieldSetElement {
   const d = name && measures ? measures[name] : undefined;
   const p: MeasurePresentation = d?.presentation ?? {
@@ -138,6 +153,49 @@ export function addMeasureRow(
   grouping.checked = p.grouping !== false;
   const example = document.createElement('p');
   example.className = 'field-hint measure-example';
+  // Its values as changes (#595): where a duration's applies, and a balance they lead to.
+  const durations = select(
+    'measure-durations',
+    [
+      ['start', 'At their start'],
+      ['end', 'At their end'],
+    ],
+    d?.durations ?? 'start',
+  );
+  const anchor = d?.balance?.at;
+  const balance = select(
+    'measure-balance',
+    [
+      ['', 'No balance'],
+      ['start', 'An opening balance, before everything'],
+      ['end', 'A closing balance, after everything'],
+      ['time', 'A balance at a time'],
+    ],
+    anchor === undefined ? '' : anchor === 'start' || anchor === 'end' ? anchor : 'time',
+  );
+  const balanceValue = textInput('measure-balance-value', '', 200, '0');
+  if (d?.balance) {
+    const presenter = createMeasurePresenter(d.type, d.presentation);
+    balanceValue.value = presenter.print(
+      Q.parse(d.balance.value.includes('/') ? d.balance.value : d.balance.value + '/1'),
+      'input',
+    );
+    balanceValue.dataset.printed = balanceValue.value;
+    balanceValue.dataset.exact = d.balance.value;
+  }
+  const balanceTime = textInput('measure-balance-time', '', 200);
+  if (anchor && anchor !== 'start' && anchor !== 'end') {
+    balanceTime.value = times.print(anchor);
+    balanceTime.dataset.printed = balanceTime.value;
+    balanceTime.dataset.exact = anchor;
+  }
+  rowTimes.set(row, times);
+  const balanceValueField = field(
+      'Balance',
+      balanceValue,
+      'Typed as the measure shows values; the balance just after that time’s changes',
+    ),
+    balanceTimeField = field('At', balanceTime);
   const remove = document.createElement('button');
   remove.type = 'button';
   remove.className = 'button-danger measure-remove';
@@ -151,6 +209,8 @@ export function addMeasureRow(
     decimalsField.hidden = mode.value !== 'fixed';
     digitsField.hidden = !SIGNIFICANT.includes(mode.value);
     groupingField.hidden = !['fixed', 'decimal'].includes(mode.value);
+    balanceValueField.hidden = !balance.value;
+    balanceTimeField.hidden = balance.value !== 'time';
     if (id.dataset.auto) {
       const taken = new Set(
         [...list.querySelectorAll<HTMLInputElement>('.measure-name')]
@@ -181,7 +241,21 @@ export function addMeasureRow(
     id.dataset.auto = '';
     refresh();
   });
-  for (const control of [label, type, mode, scale, decimals, digits, prefix, unit, grouping])
+  for (const control of [
+    label,
+    type,
+    mode,
+    scale,
+    decimals,
+    digits,
+    prefix,
+    unit,
+    grouping,
+    durations,
+    balance,
+    balanceValue,
+    balanceTime,
+  ])
     control.addEventListener('input', refresh);
   remove.onclick = () => {
     row.remove();
@@ -204,6 +278,14 @@ export function addMeasureRow(
     field('Unit after it', unit),
     groupingField,
     example,
+    field(
+      'Durations’ values apply',
+      durations,
+      'A duration’s value changes the balance when it starts, or when it ends',
+    ),
+    field('Balance', balance, 'A known balance the values lead to or from'),
+    balanceValueField,
+    balanceTimeField,
     remove,
   );
   list.append(row);
@@ -226,6 +308,36 @@ function rowPresentation(row: HTMLElement): MeasurePresentation | undefined {
   if (unit) raw.unit = unit;
   if (!row.querySelector<HTMLInputElement>('.measure-grouping')!.checked) raw.grouping = false;
   return validateMeasurePresentation(raw, value('measure-type') as MeasureType);
+}
+
+/**
+ * A row's balance (#595): where it is and its value, read as the row shows them (text left as
+ * it was printed keeps its exact value); undefined for none.
+ */
+function rowBalance(
+  row: HTMLElement,
+  presentation: MeasurePresentation | undefined,
+): { at: string; value: string } | undefined {
+  const control = (cls: string) => row.querySelector<HTMLInputElement>('.' + cls)!;
+  const kind = control('measure-balance').value;
+  if (!kind) return undefined;
+  const valueInput = control('measure-balance-value');
+  const value =
+    valueInput.dataset.printed !== undefined && valueInput.value === valueInput.dataset.printed
+      ? valueInput.dataset.exact!
+      : measureText(
+          createMeasurePresenter(control('measure-type').value as MeasureType, presentation).parse(
+            valueInput.value,
+          ),
+        );
+  if (kind !== 'time') return { at: kind, value };
+  const timeInput = control('measure-balance-time');
+  if (!timeInput.value.trim()) throw new Error('give the time of its balance.');
+  const at =
+    timeInput.dataset.printed !== undefined && timeInput.value === timeInput.dataset.printed
+      ? timeInput.dataset.exact!
+      : (rowTimes.get(row) ?? EXACT_TIMES).parse(timeInput.value);
+  return { at, value };
 }
 
 /**
@@ -257,10 +369,18 @@ export function readMeasureRows(list: HTMLElement): {
     } catch (error) {
       throw new Error(`${which}: ${(error as Error).message}`);
     }
+    let balance: { at: string; value: string } | undefined;
+    try {
+      balance = rowBalance(row, presentation);
+    } catch (error) {
+      throw new Error(`${which}: ${(error as Error).message}`);
+    }
     raw[name] = {
       type: value('measure-type'),
       ...(label ? { label } : {}),
       ...(presentation ? { presentation } : {}),
+      ...(value('measure-durations') === 'end' ? { durations: 'end' } : {}),
+      ...(balance ? { balance } : {}),
     };
     const original = row.dataset.original;
     if (original && original !== name) renames[original] = name;
@@ -355,6 +475,23 @@ export function measureRows(
     detail.textContent = presenter.print(value);
     const exact = presenter.print(value, 'tooltip');
     if (exact !== detail.textContent) detail.title = exact;
+    list.append(term, detail);
+  }
+  // Its balances before and after its changes (#595), where the view gives them.
+  const balances = (metadata as Record<PropertyKey, unknown>)[BALANCES] as
+    Record<string, WindowBalance> | undefined;
+  for (const [name, balance] of Object.entries(balances ?? {})) {
+    if (!measures[name]) continue;
+    const presenter = measurePresenter(measures, name);
+    const q = (text: string) => Q.parse(text.includes('/') ? text : text + '/1');
+    const term = document.createElement('dt'),
+      detail = document.createElement('dd');
+    term.textContent = `${measureLabel(measures, name)} balance`;
+    detail.textContent =
+      balance.before === balance.after
+        ? presenter.print(q(balance.after), 'total')
+        : `${presenter.print(q(balance.before), 'total')} → ${presenter.print(q(balance.after), 'total')}`;
+    detail.classList.add('measure-balance');
     list.append(term, detail);
   }
   return list.childElementCount ? list : null;
