@@ -75,6 +75,7 @@ import {
   pluginHeading,
   pluginSize,
   pluginSizeMeasure,
+  pluginSummaryEffects,
   PLUGIN_EXAMPLE,
   validateTags,
   validateEntityTags,
@@ -1858,17 +1859,26 @@ function drawFrame() {
       renderPluginHeading(button, null, '');
       renderPluginMarker(button, imageSource(pluginMarker(plugins, metadata)), count);
       markSensitive(button, metadata);
-      const color = count === 1n ? pluginColor(plugins, metadata) : null;
+      // A summary takes what scripts that render summaries return from its totals (#587).
+      const summary = count > 1n && !span ? summaryEffects(plugins, group) : {};
+      const color = count === 1n ? pluginColor(plugins, metadata) : (summary.color ?? null);
       button.style.backgroundColor = color ?? '';
       button.dataset.size =
         sizedBy && !span
           ? sizedBy(group)
           : count === 1n && !span
             ? pluginSize(plugins, metadata)
-            : 'medium';
-      renderPluginShape(button, count === 1n && !span ? pluginShape(plugins, metadata) : 'circle');
-      // Dashed for a presumptive moment or collapsed duration (#325); summaries stay solid.
-      renderPluginOutline(button, count === 1n ? pluginOutline(plugins, metadata) : 'solid');
+            : (summary.size ?? 'medium');
+      renderPluginShape(
+        button,
+        count === 1n && !span ? pluginShape(plugins, metadata) : (summary.shape ?? 'circle'),
+      );
+      // Dashed for a presumptive moment or collapsed duration (#325); summaries stay solid
+      // unless a script that renders them says otherwise.
+      renderPluginOutline(
+        button,
+        count === 1n ? pluginOutline(plugins, metadata) : (summary.outline ?? 'solid'),
+      );
     }
     button.style.borderColor = '';
     button.setAttribute(
@@ -5065,23 +5075,27 @@ function animateView(destination: Viewport, automatic = false) {
     // it would redraw the unchanged view at full cost and the zoom would show a frame late
     // (#319).
     const progress = Math.min(1, Math.max(1000 / 60, now - started) / 220);
-    if (progress === 1) {
+    const done = progress === 1;
+    if (done) {
+      // The last frame, which on a stalled page (a frame arriving 220 ms or more after the
+      // key) is also the first: drawn in this frame like the others, not scheduled for the
+      // next, or the zoom would show a frame late (#319).
       cancelZoomAnimation();
-      navigate(destination, false);
-      return;
+      viewport = destination.rasterize(width());
+    } else {
+      const amount = Q.from(BigInt(Math.round((1 - (1 - progress) ** 3) * 1_000_000)), 1_000_000n);
+      viewport = new Viewport(
+        from.left.add(destination.left.sub(from.left).mul(amount)),
+        from.span.add(destination.span.sub(from.span).mul(amount)),
+      ).rasterize(width());
     }
-    const amount = Q.from(BigInt(Math.round((1 - (1 - progress) ** 3) * 1_000_000)), 1_000_000n);
-    viewport = new Viewport(
-      from.left.add(destination.left.sub(from.left).mul(amount)),
-      from.span.add(destination.span.sub(from.span).mul(amount)),
-    ).rasterize(width());
     renderAxis();
     if (model && !sparseWorkspace()) frame = model.frame(viewport, width(), pixels());
     // Draw the moments in this frame, with the axis: a frame later they would trail it.
-    // Reuse confirmed server data; fetch the final window once.
-    if (stageWidth() > 96 && stageHeight() > 0) render(false);
-    else requestRender(false);
-    zoomAnimation = requestAnimationFrame(tick);
+    // Reuse confirmed server data until the last frame, which fetches the final window once.
+    if (stageWidth() > 96 && stageHeight() > 0) render(done);
+    else requestRender(done);
+    if (!done) zoomAnimation = requestAnimationFrame(tick);
   };
   zoomAnimation = requestAnimationFrame(tick);
 }
@@ -6238,8 +6252,13 @@ async function saveDisplaySettings(presentation: TimePresentation) {
           title: saved.title,
           description: saved.description,
           presentation,
+          // Every other setting as saved: one left out would be cleared, and a measure left out
+          // refused (#572).
           ...(saved.plugins ? { plugins: saved.plugins } : {}),
           ...(saved.tags ? { tags: saved.tags } : {}),
+          ...(saved.image ? { image: saved.image } : {}),
+          ...(saved.view ? { view: saved.view } : {}),
+          ...(saved.measures ? { measures: saved.measures } : {}),
           ...(saved.assets ? { assets: saved.assets } : {}),
         },
         changes: [],
@@ -8880,6 +8899,10 @@ if (!offlineHtml)
       if (info.presentation) info.presentation = validatePresentation(info.presentation);
       if (info.plugins) info.plugins = validateInstalledPlugins(info.plugins);
       if (info.assets) info.assets = validateAssets(info.assets);
+      if (info.tags) info.tags = validateTags(info.tags);
+      info.image = info.image ? validateTimelineImage(info.image) : undefined;
+      info.view = readTimelineView(info.view);
+      info.measures = info.measures ? validateMeasures(info.measures) : undefined;
       const added =
         info.event_generation !== undefined &&
         BigInt(info.event_generation) > BigInt(remote.event_generation ?? '0');
@@ -8894,6 +8917,10 @@ if (!offlineHtml)
             presentation: info.presentation,
             plugins: info.plugins,
             tags: info.tags,
+            // Kept, so the next save keeps them (#572).
+            image: info.image,
+            view: info.view,
+            measures: info.measures,
             assets: info.assets,
             events: [],
           })
@@ -9189,6 +9216,29 @@ function measureSizes(groups: readonly FrameGroup[], plugins: readonly Installed
         ? 'medium'
         : 'small';
   };
+}
+/**
+ * What plugins' scripts set on a summary from its totals (#587). In a comparison,
+ * `api.total(name, n)` reads its nth timeline's totals: a track's own, or a combined summary's
+ * by timeline, never added across them (#586).
+ */
+function summaryEffects(plugins: readonly InstalledPlugin[], group: FrameGroup) {
+  const keys = comparison && !separation ? comparison.tracks.map((t) => t.source.key) : [];
+  const own = (group as ComparisonGroup).sourceKey;
+  return pluginSummaryEffects(
+    plugins,
+    keys.length ? undefined : group.totals,
+    keys.length
+      ? (n) => {
+          const key = keys[n - 1];
+          return key === undefined
+            ? undefined
+            : key === own
+              ? group.totals
+              : group.sourceTotals?.[key];
+        }
+      : undefined,
+  );
 }
 function summaryName(group: FrameGroup) {
   const moments = BigInt(group.count),

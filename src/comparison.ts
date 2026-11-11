@@ -529,7 +529,16 @@ export class ComparisonView {
       groups: frames.flatMap((f) => f.groups),
       visitedNodes: frames.reduce((n, f) => n + f.visitedNodes, 0),
     };
-    return this.combined ? regroup(frame, threshold) : frame;
+    if (!this.combined) return frame;
+    // Combined, groups of several timelines merge; their measures belong each to its own
+    // timeline, so totals are kept by timeline, never added across them (#586).
+    frame.groups = frame.groups.map((g) => {
+      const { totals, ...rest } = g as ComparisonGroup;
+      return totals && rest.sourceKey
+        ? { ...rest, sourceTotals: { [rest.sourceKey]: totals } }
+        : rest;
+    });
+    return regroup(frame, threshold);
   }
   /**
    * One page of the moments in a group, for the group inspector (disposable 25-moment pages).

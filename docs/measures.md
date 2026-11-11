@@ -67,26 +67,28 @@ A value is exact, so `0.1` is exactly one tenth, not the closest binary fraction
 
 ## How values are shown
 
-Each measure has its own presentation, the counterpart of the [time display](time-presentation.md). It sets how values and totals are written, and how what you type is read. Both are exact: nothing passes through floating point.
+Measures are written and read by an official library of formats, the counterpart of the [time displays](time-presentation.md) such as Gregorian dates ([#585](https://github.com/openchronology/timeline-app/issues/585)). Each format serves one type, and sets how values and totals are written and how what you type is read. All are exact: nothing passes through floating-point arithmetic. Plugins don't provide formats.
 
 ```json
 "cost": { "type": "mpz", "label": "Cost", "presentation": { "mode": "fixed", "scale": "1/100", "decimals": 2, "prefix": "$" } }
 ```
 
-| Mode         | Shows                                                                    | Example (stored → shown)       |
-| ------------ | ------------------------------------------------------------------------ | ------------------------------ |
-| `exact`      | The value as it is: a whole number or a fraction. This is the default.   | `3/2` → `3/2`                  |
-| `fixed`      | A fixed number of decimal places (`decimals`, 2 by default), as money is | `123456` → `$1,234.56`         |
-| `decimal`    | `significantDigits` significant digits (6 by default)                    | `1/3` → `0.333333`             |
-| `scientific` | Scientific notation                                                      | `123456` → `1.23456e+5`        |
-| `si`         | SI prefixes before the unit                                              | `1500` (unit `Wh`) → `1.5 kWh` |
+| Type  | Format (`mode`) | Shows                                                                                    | Example (stored → shown)                         |
+| ----- | --------------- | ---------------------------------------------------------------------------------------- | ------------------------------------------------ |
+| `mpq` | `fraction`      | An improper fraction, or a whole number alone. The default for `mpq`.                    | `7/2` → `7/2`                                    |
+| `mpq` | `decimal`       | Floating point: `significantDigits` significant digits (6 by default)                    | `1/3` → `0.333333`                               |
+| `mpq` | `scientific`    | Scientific notation                                                                      | `123456` → `1.23456e+5`                          |
+| `mpq` | `engineering`   | Engineering notation: exponents in multiples of three                                    | `123456` → `123.456e3`                           |
+| `mpz` | `fixed`         | Fixed decimal places (`decimals`, 0 by default), as money is. The only format for `mpz`. | `123456` → `$1,234.56` (scale `1/100`, 2 places) |
+
+A format that doesn't serve the measure's type is refused. Widening a measure from `mpz` to `mpq` chooses one of the `mpq` formats with it.
 
 - **`scale`:** the shown value is the stored value × scale, an exact number such as `1/100` (cents shown as dollars) or `1/3600` (seconds shown as hours). It is 1 by default.
 - **`prefix`:** written before the number, such as `$`.
 - **`unit`:** written after it, such as `h`.
-- **`grouping`:** separates thousands with commas in the `fixed` and `decimal` modes. Set it to `false` to turn that off.
+- **`grouping`:** separates thousands with commas in the `fixed` and `decimal` formats. Set it to `false` to turn that off.
 
-Typed values can be written with or without the prefix, unit and commas. With fixed decimals, a value with more decimal places than the measure shows (`$12.345`) is refused rather than rounded. So is a value of a whole-number measure that isn't a whole number of its steps, such as half a cent. Where a label rounds a fraction, its tooltip gives the exact value, and editing a field you haven't changed keeps the exact value.
+Typed values can be written with or without the prefix, unit and commas. With fixed decimals, a value with more decimal places than the measure shows (`$12.345`) is refused rather than rounded. So is a value of a whole-number measure that isn't a whole number of its steps, such as half a cent. Where a label rounds a value, its tooltip gives the exact value, and editing a field you haven't changed keeps the exact value.
 
 ## Changing declarations
 
@@ -125,12 +127,13 @@ A duration's values count entirely **where it starts**, as if it were a moment a
 
 - **Summaries:** a summary's label says what it holds, then up to two of its totals, each labelled and shown as its measure shows totals: `3 moments · Cost $21.50`. Its tooltip and the name screen readers hear list them all.
 - **Single events:** an event's values are listed in the reader and in its hover card.
-- **Separated tracks:** each track's summaries show their own totals.
-- **Comparisons:** a comparison of several timelines doesn't show totals, since each timeline declares its own measures.
+- **Separated tracks:** each track's summaries show their own totals. A track too narrow to draw collapses into another with its totals, as one timeline's.
+- **Comparisons:** a comparison never adds totals across its timelines ([#586](https://github.com/openchronology/timeline-app/issues/586)). Each timeline's measures are its own: two timelines' `cost` aren't the same quantity. Side by side, each track's summaries keep their own timeline's totals. Combined, a summary keeps its totals by timeline (`sourceTotals`), and plugins that use totals choose how to show each one. Labels show no totals in a comparison.
 
 Plugins can use measures too ([plugins](plugins.md)):
 
-- **Scripts:** `api.measure("cost")` reads a moment's value exactly, to compare with `api.compare`.
+- **Scripts:** `api.measure("cost")` reads a moment's value exactly, to compare with `api.compare`. A plugin that renders summaries (`renderSummaries`) reads their totals with `api.total("cost")`, and in a comparison each timeline's with `api.total("cost", n)` (#587).
+- **Derived metadata:** a derivation's `{ "measure": "cost" }` source reads a value, or a summary's total.
 - **Sizes:** `sizeBy` sizes markers and summaries by a measure's total.
 - **Charts:** the background chart can draw a measure's totals across the view.
 

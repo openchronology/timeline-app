@@ -1,26 +1,47 @@
 // Copyright (c) 2026 Athan Clark. SPDX-License-Identifier: GPL-3.0-only
-// How a measure's values and totals are written and read (#573), the analogue of the time
-// presentation: exactly, as fixed decimals (currency: `$1,234.56` for 123456 cents), as
-// significant digits, scientifically or with SI prefixes, each with a scale (displayed =
-// stored × scale), a prefix and a unit. Printing and parsing never pass through binary
-// floating point; parsing refuses what it would have to round.
+// The official measure formats (#573, #585): how a measure's values and totals are written and
+// read, the analogue of the time presentations. Each format serves one type. Fractions
+// (`mpq`) are written as floating point, in scientific or engineering notation, or as improper
+// fractions; whole numbers (`mpz`) as fixed decimal values, such as currency (`$1,234.56` for
+// 123456 cents). Every format has a scale (shown = stored × scale), a prefix and a unit, and
+// prints and parses exactly: nothing passes through binary floating point, and parsing refuses
+// what it would have to round. Plugins never provide formats.
 import { Rational as Q } from 'rational-ordered-map';
-import { parseNumber, printNumber, printSI, parseSI, fixedDecimal } from './numeric.js';
+import { parseNumber, printNumber, fixedDecimal, decimalExponent, power } from './numeric.js';
+import type { MeasureType } from './measures.js';
 
-export type MeasureMode = 'exact' | 'fixed' | 'decimal' | 'scientific' | 'si';
+export type MeasureMode = 'decimal' | 'scientific' | 'engineering' | 'fraction' | 'fixed';
+/** The official formats, by the type each serves, in the order the editor offers them. */
+export const MEASURE_FORMATS: readonly {
+  mode: MeasureMode;
+  type: MeasureType;
+  label: string;
+  example: string;
+}[] = [
+  { mode: 'decimal', type: 'mpq', label: 'Floating point', example: '1,234.57' },
+  { mode: 'scientific', type: 'mpq', label: 'Scientific notation', example: '1.23457e+3' },
+  { mode: 'engineering', type: 'mpq', label: 'Engineering notation', example: '1.23457e3' },
+  { mode: 'fraction', type: 'mpq', label: 'Improper fraction', example: '7/2' },
+  { mode: 'fixed', type: 'mpz', label: 'Fixed decimal (such as currency)', example: '$1,234.56' },
+];
+/** The format a measure of `type` has when it names none. */
+export const DEFAULT_MEASURE_MODE: Record<MeasureType, MeasureMode> = {
+  mpq: 'fraction',
+  mpz: 'fixed',
+};
 export interface MeasurePresentation {
   mode: MeasureMode;
   /** Displayed value per stored one, an exact rational: `1/100` shows cents as dollars. */
   scale?: string;
   /** Fixed: the decimal places shown (0 to 30); typed values may have no more. */
   decimals?: number;
-  /** Decimal, scientific and SI: the significant digits shown (1 to 30). */
+  /** Floating point, scientific and engineering: the significant digits shown (1 to 30). */
   significantDigits?: number;
   /** Written before the number, such as `$`. */
   prefix?: string;
-  /** Written after it, such as `h` or `kWh` (SI prefixes go in front of it). */
+  /** Written after it, such as `h` or `kWh`. */
   unit?: string;
-  /** Thousands separated by commas (fixed and decimal). Absent means true. */
+  /** Thousands separated by commas (fixed and floating point). Absent means true. */
   grouping?: boolean;
 }
 /**
@@ -35,18 +56,30 @@ export interface MeasurePresenter {
   parse(text: string): Q;
 }
 
-const MODES: MeasureMode[] = ['exact', 'fixed', 'decimal', 'scientific', 'si'];
 const PRINTABLE = /^[^\u0000-\u001f\u007f]*$/;
-/** A presentation, validated and in canonical form (only what its mode reads is kept). */
-export function validateMeasurePresentation(value: unknown): MeasurePresentation {
+/** The formats a measure of `type` may use. */
+export function measureModes(type: MeasureType): MeasureMode[] {
+  return MEASURE_FORMATS.filter((f) => f.type === type).map((f) => f.mode);
+}
+/**
+ * A presentation of a measure of `type`, validated and in canonical form: an official format
+ * for its type, and only what that format reads.
+ */
+export function validateMeasurePresentation(
+  value: unknown,
+  type: MeasureType,
+): MeasurePresentation {
   if (!value || typeof value !== 'object' || Array.isArray(value))
     throw new Error('A measure’s presentation must be an object.');
   const raw = value as Record<string, unknown>;
   const known = ['mode', 'scale', 'decimals', 'significantDigits', 'prefix', 'unit', 'grouping'];
   if (Object.keys(raw).some((k) => !known.includes(k)))
     throw new Error(`A measure’s presentation has only ${known.join(', ')}.`);
-  if (!MODES.includes(raw.mode as MeasureMode))
-    throw new Error(`A measure’s presentation mode is one of ${MODES.join(', ')}.`);
+  const modes = measureModes(type);
+  if (!modes.includes(raw.mode as MeasureMode))
+    throw new Error(
+      `A ${type === 'mpz' ? 'whole-number (mpz)' : 'fraction (mpq)'} measure’s format is ${modes.join(' or ')}.`,
+    );
   const mode = raw.mode as MeasureMode;
   const result: MeasurePresentation = { mode };
   if (raw.scale !== undefined) {
@@ -65,8 +98,8 @@ export function validateMeasurePresentation(value: unknown): MeasurePresentation
   };
   const decimals = whole('decimals', 0, 30),
     digits = whole('significantDigits', 1, 30);
-  if (mode === 'fixed') result.decimals = decimals ?? 2;
-  if (mode === 'decimal' || mode === 'scientific' || mode === 'si')
+  if (mode === 'fixed') result.decimals = decimals ?? 0;
+  if (mode === 'decimal' || mode === 'scientific' || mode === 'engineering')
     result.significantDigits = digits ?? 6;
   for (const [key, max] of [
     ['prefix', 16],
@@ -115,7 +148,23 @@ function decimalPlaces(value: Q): number | null {
 function exactText(value: Q, minPlaces = 0): string {
   const places = decimalPlaces(value);
   if (places !== null && places <= 30) return fixedDecimal(value, Math.max(places, minPlaces));
+  return fractionText(value);
+}
+/** An improper fraction: `7/2`, or a whole number alone. */
+function fractionText(value: Q): string {
   return value.denominator === 1n ? value.numerator.toString() : value.toString();
+}
+/**
+ * Engineering notation: `digits` significant digits and an exponent that is a multiple of
+ * three, so the mantissa is at least 1 and below 1000 (`12.3e3`).
+ */
+function printEngineering(value: Q, digits: number): string {
+  if (value.numerator === 0n) return '0e0';
+  // Rounded to the digits first, which may carry it up an order of magnitude.
+  const rounded = parseNumber(printNumber(value, digits, true));
+  const exponent = Math.floor(decimalExponent(rounded) / 3) * 3;
+  const mantissa = printNumber(rounded.div(power(exponent)), digits);
+  return `${mantissa}e${exponent}`;
 }
 const ABBREVIATIONS: [bigint, string][] = [
   [10n ** 12n, 'T'],
@@ -125,19 +174,20 @@ const ABBREVIATIONS: [bigint, string][] = [
 ];
 
 /**
- * The printer and parser of a measure of `type` with presentation `presentation` (exact when
- * absent). Values are stored values; each is shown as stored × scale.
+ * The printer and parser of a measure of `type` with presentation `presentation` (its type's
+ * default format when absent). Values are stored values; each is shown as stored × scale.
  */
 export function createMeasurePresenter(
-  type: 'mpz' | 'mpq',
+  type: MeasureType,
   presentation?: MeasurePresentation,
   label = 'This measure',
 ): MeasurePresenter {
-  const p = presentation ?? { mode: 'exact' };
+  const p: MeasurePresentation = presentation ?? { mode: DEFAULT_MEASURE_MODE[type] };
   const scale = p.scale ? Q.parse(p.scale) : Q.from(1n);
   const prefix = p.prefix ?? '',
     unit = p.unit ?? '';
   const grouped = p.grouping !== false && (p.mode === 'fixed' || p.mode === 'decimal');
+  const digits = p.significantDigits ?? 6;
   const decorate = (number: string) => {
     const negative = number.startsWith('-');
     const body = negative ? number.slice(1) : number;
@@ -146,48 +196,35 @@ export function createMeasurePresenter(
   const rounded = (shown: Q): string => {
     switch (p.mode) {
       case 'fixed': {
-        const text = fixedDecimal(shown, p.decimals ?? 2);
+        const text = fixedDecimal(shown, p.decimals ?? 0);
         return grouped ? text.replace(/[\d.]+/, group) : text;
       }
       case 'decimal': {
-        const text = printNumber(shown, p.significantDigits ?? 6);
+        const text = printNumber(shown, digits);
         return grouped && !/e/.test(text) ? text.replace(/[\d.]+/, group) : text;
       }
       case 'scientific':
-        return printNumber(shown, p.significantDigits ?? 6, true);
-      case 'exact':
-        return shown.denominator === 1n ? shown.numerator.toString() : shown.toString();
-      default:
-        return '';
+        return printNumber(shown, digits, true);
+      case 'engineering':
+        return printEngineering(shown, digits);
+      case 'fraction':
+        return fractionText(shown);
     }
   };
   const print = (value: Q, purpose: MeasurePurpose = 'value'): string => {
     const shown = value.mul(scale);
-    if (purpose === 'input') {
-      const text =
-        p.mode === 'exact'
-          ? rounded(shown)
-          : exactText(shown, p.mode === 'fixed' ? (p.decimals ?? 2) : 0);
-      return text;
-    }
-    if (p.mode === 'si') {
-      const number = printSI(shown, purpose === 'axis' ? 3 : (p.significantDigits ?? 6), unit);
-      const negative = number.startsWith('-');
-      const text = (negative ? '−' : '') + prefix + (negative ? number.slice(1) : number);
-      return purpose === 'tooltip' && !parseSI(number, unit).equals(shown)
-        ? `${text} (exactly ${decorate(exactText(shown))})`
-        : text;
-    }
-    if (purpose === 'axis' && p.mode !== 'exact' && p.mode !== 'scientific') {
+    if (purpose === 'input')
+      return p.mode === 'fraction'
+        ? fractionText(shown)
+        : exactText(shown, p.mode === 'fixed' ? (p.decimals ?? 0) : 0);
+    if (purpose === 'axis' && (p.mode === 'fixed' || p.mode === 'decimal')) {
       const magnitude = shown.abs();
       for (const [size, letter] of ABBREVIATIONS)
-        if (magnitude.compare(Q.from(size)) >= 0) {
-          const short = printNumber(shown.div(Q.from(size)), 3);
-          return decorate(short + letter);
-        }
+        if (magnitude.compare(Q.from(size)) >= 0)
+          return decorate(printNumber(shown.div(Q.from(size)), 3) + letter);
     }
     const text = decorate(rounded(shown));
-    if (purpose === 'tooltip' && p.mode !== 'exact') {
+    if (purpose === 'tooltip' && p.mode !== 'fraction') {
       const plain = rounded(shown).replace(/,/g, '');
       if (!parseNumber(plain).equals(shown))
         return `${text} (exactly ${decorate(exactText(shown))})`;
@@ -207,23 +244,23 @@ export function createMeasurePresenter(
       negative = text[0] === '-';
       text = text.slice(1).trim();
     }
-    if (p.mode !== 'si' && unit && text.endsWith(unit)) text = text.slice(0, -unit.length).trim();
+    if (unit && text.endsWith(unit)) text = text.slice(0, -unit.length).trim();
     // Thousands separators, only between digits in threes.
     if (/^\d{1,3}(,\d{3})+(\.\d*)?$/.test(text)) text = text.replace(/,/g, '');
-    if (!text || /[^\d./eE+\-\sa-zA-Zµμ]/.test(text))
-      throw new Error(`${label}: “${input.trim()}” isn't a number.`);
+    const fail = () => new Error(`${label}: “${input.trim()}” isn't a number.`);
+    if (!text || /[^\d./eE+-]/.test(text)) throw fail();
     let shown: Q;
     try {
-      shown = p.mode === 'si' ? parseSI(text, unit) : parseNumber(text);
+      shown = parseNumber(text);
     } catch {
-      throw new Error(`${label}: “${input.trim()}” isn't a number.`);
+      throw fail();
     }
     if (negative) shown = shown.neg();
-    if (p.mode === 'fixed' && !text.includes('/')) {
+    if (p.mode === 'fixed' && !text.includes('/') && !/e/i.test(text)) {
       const places = /\.(\d*)/.exec(text)?.[1].length ?? 0;
-      if (!/e/i.test(text) && places > (p.decimals ?? 2))
+      if (places > (p.decimals ?? 0))
         throw new Error(
-          `${label} takes at most ${p.decimals ?? 2} decimal places: “${input.trim()}” would be rounded.`,
+          `${label} takes at most ${p.decimals ?? 0} decimal places: “${input.trim()}” would be rounded.`,
         );
     }
     const stored = shown.div(scale);

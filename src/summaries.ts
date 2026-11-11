@@ -61,6 +61,14 @@ export function coalesceGroups(groups: readonly FrameGroup[], threshold: Q): Fra
     ) {
       const durations = BigInt(prev.durationCount ?? '0') + BigInt(group.durationCount ?? '0');
       const totals = addTotals(prev.totals, group.totals);
+      // A combined comparison's totals stay by timeline, added only within one (#586).
+      let sourceTotals = prev.sourceTotals;
+      for (const [key, sums] of Object.entries(group.sourceTotals ?? {})) {
+        const merged = addTotals(sourceTotals?.[key], sums);
+        sourceTotals = { ...sourceTotals };
+        if (merged) sourceTotals[key] = merged;
+        else delete sourceTotals[key];
+      }
       out[out.length - 1] = {
         first: prev.first,
         last: Q.parse(group.last).compare(Q.parse(prev.last)) > 0 ? group.last : prev.last,
@@ -71,6 +79,7 @@ export function coalesceGroups(groups: readonly FrameGroup[], threshold: Q): Fra
           (prev.distinct && group.distinct && prev.last === group.first ? 1 : 0),
         ...(durations ? { durationCount: durations.toString() } : {}),
         ...(totals ? { totals } : {}),
+        ...(sourceTotals && Object.keys(sourceTotals).length ? { sourceTotals } : {}),
       };
     } else out.push(group);
   }

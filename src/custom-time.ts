@@ -608,6 +608,7 @@ export function compilePluginScript(source: string) {
     none: [0],
     // A moment's measure value (#575) and exact arithmetic to compare it.
     measure: [1],
+    total: [1, 2],
     rational: [1],
     compare: [2],
     add: [2],
