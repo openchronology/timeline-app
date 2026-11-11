@@ -351,6 +351,7 @@ jobs:
       - run: node test/time-map-postgres.mjs
       - run: node test/measures-postgres.mjs
       - run: node test/measure-totals-postgres.mjs
+      - run: node test/measure-balance-postgres.mjs
       - run: node test/openapi-postgres.mjs
       # As root, so the system journal is readable whatever the runner's groups.
       - name: Following the systemd journal

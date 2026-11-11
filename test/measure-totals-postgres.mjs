@@ -81,9 +81,9 @@ const named = (sums) =>
       .map(([n, v]) => [n, text(v)]),
   );
 /**
- * Every overview group's totals against the document's values summed by hand: a group of
- * moments alone exactly; and across all groups, every moment and every collapsed duration
- * reaching the window once, each duration's where it starts (#576).
+ * Overview groups' totals against the document's values summed by hand: across all groups,
+ * every moment and every duration starting in the window once, each duration's where it
+ * starts (#576, #595). How the window is split between groups is test/measure-balance-postgres's.
  */
 async function check(id, label, filter) {
   const { document } = await request(`timelines/${id}/document`);
@@ -103,15 +103,10 @@ async function check(id, label, filter) {
     });
     const all = {};
     for (const e of events) add(all, e.metadata.measures);
-    const limit = q(frame.threshold);
+    // Every duration starting in the window (#576), summarized or drawn as a band (#595).
     for (const d of durations) {
-      const first = q(d.start),
-        last = q(d.end);
-      if (
-        last.sub(first).compare(limit) < 0 &&
-        last.compare(q('-1')) >= 0 &&
-        first.compare(q('401')) <= 0
-      )
+      const first = q(d.start);
+      if (first.compare(q('-1')) >= 0 && first.compare(q('401')) <= 0)
         add(all, d.metadata.measures);
     }
     const summed = {};
@@ -119,22 +114,7 @@ async function check(id, label, filter) {
       for (const [name, v] of Object.entries(group.totals ?? {}))
         summed[name] = (summed[name] ?? Q.zero).add(q(v));
     assert.deepEqual(named(summed), named(all), `${label} at ${threshold}: every value once`);
-    for (const group of frame.groups) {
-      if (BigInt(group.count) === 0n || group.durationCount) continue;
-      groups++;
-      const expected = {};
-      for (const e of events) {
-        const t = q(e.time);
-        if (t.compare(q(group.first)) < 0 || t.compare(q(group.last)) > 0) continue;
-        for (const [name, v] of Object.entries(e.metadata.measures ?? {}))
-          expected[name] = (expected[name] ?? Q.zero).add(q(v));
-      }
-      assert.deepEqual(
-        group.totals ?? {},
-        named(expected),
-        `${label} at ${threshold}: ${group.first}..${group.last}`,
-      );
-    }
+    groups += frame.groups.length;
   }
   assert(groups > 0, label);
 }

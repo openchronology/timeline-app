@@ -154,3 +154,59 @@ export function groupBalances<G extends { totals?: Record<string, string> }>(
     return { ...group, balanceAfter };
   });
 }
+
+/** A duration's changes (#595): [time, values] at its start and end, as `measures` say. */
+export function durationContributions(
+  band: { first: string; last: string; end?: unknown; metadata: Record<string, unknown> },
+  measures: Measures | undefined,
+): [string, Record<string, string>][] {
+  const values = band.metadata?.measures;
+  if (!measures || !values || typeof values !== 'object' || Array.isArray(values)) return [];
+  const ongoing = !!band.end && typeof band.end === 'object' && 'ongoing' in (band.end as object);
+  const start: Record<string, string> = {},
+    end: Record<string, string> = {};
+  for (const [name, value] of Object.entries(values as Record<string, string>)) {
+    const d = measures[name];
+    if (!d || typeof value !== 'string') continue;
+    if (d.durations === 'end') {
+      if (!ongoing) end[name] = value;
+    } else start[name] = value;
+  }
+  return [
+    ...(Object.keys(start).length ? [[band.first, start] as [string, Record<string, string>]] : []),
+    ...(Object.keys(end).length ? [[band.last, end] as [string, Record<string, string>]] : []),
+  ];
+}
+
+/**
+ * A timeline's changes by time (#595), to build a change index whole: moments' at their times
+ * and durations' (resolved `bands`) where their measures say, added up per time, in time
+ * order, times with no change left out.
+ */
+export function changePoints(
+  moments: Iterable<{ time: string; metadata: Record<string, unknown> }>,
+  bands: Iterable<{
+    first: string;
+    last: string;
+    end?: unknown;
+    metadata: Record<string, unknown>;
+  }>,
+  measures: Measures | undefined,
+): [string, Record<string, string>][] {
+  if (!measures || !Object.keys(measures).length) return [];
+  const byTime = new Map<string, Record<string, string> | undefined>();
+  const add = (time: string, values: Record<string, string> | undefined) => {
+    const key = Q.parse(time).toString();
+    byTime.set(key, addMeasureTotals(byTime.get(key), values));
+  };
+  for (const m of moments) {
+    const values = m.metadata?.measures;
+    if (values && typeof values === 'object' && !Array.isArray(values))
+      add(m.time, values as Record<string, string>);
+  }
+  for (const band of bands)
+    for (const [time, values] of durationContributions(band, measures)) add(time, values);
+  return [...byTime]
+    .filter((entry): entry is [string, Record<string, string>] => !!entry[1])
+    .sort((a, b) => Q.parse(a[0]).compare(Q.parse(b[0])));
+}

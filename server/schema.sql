@@ -204,6 +204,18 @@ ALTER TABLE oc_nodes ADD COLUMN IF NOT EXISTS height integer;
 -- trees built before measures. avl.mjs and tree.mjs compute them as they do event_count.
 ALTER TABLE oc_nodes ADD COLUMN IF NOT EXISTS own_totals jsonb;
 ALTER TABLE oc_nodes ADD COLUMN IF NOT EXISTS totals jsonb;
+-- The change index (#595): a persistent AVL tree per timeline of the times its measures' changes
+-- apply (avl.mjs CHANGE_TREE; written by store.mjs and incremental.mjs, read by
+-- oc_change_prefixes). A moment's values change at its time, a duration's at its start or end
+-- as each measure says. own_totals: the changes at the node's time; totals: its subtree's.
+-- {name: exact value as text}, zeros left out; a time with none has no node. The timeline row
+-- names the root (change_root).
+CREATE TABLE IF NOT EXISTS oc_change_nodes (
+  timeline_id uuid NOT NULL REFERENCES oc_timelines ON DELETE CASCADE, id bigint NOT NULL,
+  time mpq NOT NULL, left_id bigint, right_id bigint, height integer NOT NULL,
+  own_totals jsonb NOT NULL, totals jsonb, PRIMARY KEY(timeline_id,id)
+);
+ALTER TABLE oc_timelines ADD COLUMN IF NOT EXISTS change_root bigint;
 ALTER TABLE oc_nodes ALTER COLUMN events DROP NOT NULL;
 -- Older installations kept whole moments inside nodes; move them out once: copy each node's
 -- events into oc_moments, then keep their IDs in stored order and clear events. Both
@@ -257,6 +269,41 @@ LANGUAGE sql IMMUTABLE PARALLEL SAFE AS $$
         UNION ALL SELECT key,value#>>'{}' FROM jsonb_each(b)) s GROUP BY k) t
       WHERE v<>'0'::mpq) END
 $$;
+-- The changes of timeline tid's measures up to each of `times` (#595), from its change index
+-- (oc_change_nodes): up to and including the time where `inclusive` says so, else before it;
+-- a NULL time is after everything. Each is one path from the root: a node at or before the
+-- time adds its own changes and its left subtree's totals, and the walk goes right; otherwise
+-- left. {name: exact value as text}, NULL for none.
+CREATE OR REPLACE FUNCTION oc_change_prefixes(tid uuid, times mpq[], inclusive boolean[])
+RETURNS jsonb[] LANGUAGE plpgsql AS $$
+DECLARE result jsonb[]:=ARRAY[]::jsonb[]; root_id bigint; nid bigint; n record; l record;
+  sums jsonb; i integer;
+BEGIN
+  SELECT change_root INTO root_id FROM oc_timelines WHERE id=tid;
+  FOR i IN 1..coalesce(cardinality(times),0) LOOP
+    sums:=NULL; nid:=root_id;
+    IF times[i] IS NULL THEN
+      IF nid IS NOT NULL THEN
+        SELECT node.totals INTO l FROM oc_change_nodes node WHERE node.timeline_id=tid AND node.id=nid;
+        sums:=l.totals;
+      END IF;
+      nid:=NULL;
+    END IF;
+    WHILE nid IS NOT NULL LOOP
+      SELECT node.time,node.left_id,node.right_id,node.own_totals INTO n FROM oc_change_nodes node WHERE node.timeline_id=tid AND node.id=nid;
+      IF NOT FOUND THEN RAISE EXCEPTION 'Broken change index'; END IF;
+      IF n.time<times[i] OR (inclusive[i] AND n.time=times[i]) THEN
+        IF n.left_id IS NOT NULL THEN
+          SELECT node.totals INTO l FROM oc_change_nodes node WHERE node.timeline_id=tid AND node.id=n.left_id;
+          sums:=oc_add_totals(sums,l.totals);
+        END IF;
+        sums:=oc_add_totals(sums,n.own_totals); nid:=n.right_id;
+      ELSE nid:=n.left_id; END IF;
+    END LOOP;
+    result:=array_append(result,sums);
+  END LOOP;
+  RETURN result;
+END $$;
 -- The overview's result gained totals (#574): a function's result type can't be replaced, so
 -- older versions (and their generated view and fork variants) go first.
 DO $$ BEGIN
@@ -1330,8 +1377,15 @@ ALTER TABLE oc_view_nodes ADD COLUMN IF NOT EXISTS moment_ids text[];
 ALTER TABLE oc_view_nodes ADD COLUMN IF NOT EXISTS height integer;
 ALTER TABLE oc_view_nodes ADD COLUMN IF NOT EXISTS own_totals jsonb;
 ALTER TABLE oc_view_nodes ADD COLUMN IF NOT EXISTS totals jsonb;
+-- Mirrors oc_change_nodes (#595); and the view's change root.
+CREATE TABLE IF NOT EXISTS oc_view_change_nodes (
+  timeline_id uuid NOT NULL REFERENCES oc_views ON DELETE CASCADE, id bigint NOT NULL,
+  time mpq NOT NULL, left_id bigint, right_id bigint, height integer NOT NULL,
+  own_totals jsonb NOT NULL, totals jsonb, PRIMARY KEY(timeline_id,id)
+);
 ALTER TABLE oc_view_nodes ALTER COLUMN events DROP NOT NULL;
 ALTER TABLE oc_views ADD COLUMN IF NOT EXISTS duration_root integer;
+ALTER TABLE oc_views ADD COLUMN IF NOT EXISTS change_root bigint;
 -- Mirrors oc_moments.
 CREATE TABLE IF NOT EXISTS oc_view_moments (
   timeline_id uuid NOT NULL REFERENCES oc_views ON DELETE CASCADE, id text NOT NULL,
@@ -1370,12 +1424,14 @@ BEGIN
   FOR generated IN SELECT * FROM (VALUES
     ('oc_overview_v2(uuid,mpq,mpq,mpq)', 'oc_overview_v2(', 'oc_view_overview('),
     ('oc_events(uuid,mpq,mpq,mpq,text,integer)', 'oc_events(', 'oc_view_events('),
-    ('oc_duration_overview(uuid,mpq,mpq,mpq)', 'oc_duration_overview(', 'oc_view_duration_overview(')
+    ('oc_duration_overview(uuid,mpq,mpq,mpq)', 'oc_duration_overview(', 'oc_view_duration_overview('),
+    ('oc_change_prefixes(uuid,mpq[],boolean[])', 'oc_change_prefixes(', 'oc_view_change_prefixes(')
   ) AS f(signature, name, view_name) LOOP
     -- The original's definition, renamed and pointed at the view tables.
-    EXECUTE replace(replace(replace(replace(replace(
+    EXECUTE replace(replace(replace(replace(replace(replace(
       pg_get_functiondef(generated.signature::regprocedure),
       generated.name, generated.view_name),
+      'oc_change_nodes', 'oc_view_change_nodes'),
       'oc_duration_nodes', 'oc_view_duration_nodes'),
       'oc_nodes', 'oc_view_nodes'),
       'oc_moments', 'oc_view_moments'),
@@ -1664,6 +1720,7 @@ ALTER TABLE oc_moments ADD COLUMN IF NOT EXISTS hidden boolean NOT NULL DEFAULT 
 ALTER TABLE oc_nodes ADD COLUMN IF NOT EXISTS hidden boolean NOT NULL DEFAULT false;
 ALTER TABLE oc_duration_nodes ADD COLUMN IF NOT EXISTS hidden boolean NOT NULL DEFAULT false;
 ALTER TABLE oc_edge_nodes ADD COLUMN IF NOT EXISTS hidden boolean NOT NULL DEFAULT false;
+ALTER TABLE oc_change_nodes ADD COLUMN IF NOT EXISTS hidden boolean NOT NULL DEFAULT false;
 ALTER TABLE oc_relationships ADD COLUMN IF NOT EXISTS hidden boolean NOT NULL DEFAULT false;
 ALTER TABLE oc_entity_search ADD COLUMN IF NOT EXISTS hidden boolean NOT NULL DEFAULT false;
 -- For each index table, every run (re)creates: its since column, defaulting to the clock;
@@ -1677,7 +1734,7 @@ ALTER TABLE oc_entity_search ADD COLUMN IF NOT EXISTS hidden boolean NOT NULL DE
 DO $do$
 DECLARE live text; col record; names text; olds text; retire text;
 BEGIN
-  FOREACH live IN ARRAY ARRAY['oc_moments','oc_nodes','oc_duration_nodes','oc_edge_nodes',
+  FOREACH live IN ARRAY ARRAY['oc_moments','oc_nodes','oc_duration_nodes','oc_edge_nodes','oc_change_nodes',
     'oc_relationships','oc_entity_search'] LOOP
     -- Added without a default (no rewrite of existing rows), then defaulted to the clock:
     -- a write outside beginIndexWrite fails rather than recording no version.
@@ -1750,7 +1807,7 @@ DO $do$
 DECLARE live text; keys text[]; names text; eq text; levels integer:=4; k integer;
   body text; seen text; shadows text; idx record;
 BEGIN
-  FOREACH live IN ARRAY ARRAY['oc_moments','oc_nodes','oc_duration_nodes','oc_edge_nodes',
+  FOREACH live IN ARRAY ARRAY['oc_moments','oc_nodes','oc_duration_nodes','oc_edge_nodes','oc_change_nodes',
     'oc_relationships','oc_entity_search'] LOOP
     -- Rows outlive their timeline while forks read them (oc_release_index below).
     EXECUTE format('ALTER TABLE %I DROP CONSTRAINT IF EXISTS %I', live, live || '_timeline_id_fkey');
@@ -1835,7 +1892,7 @@ BEGIN
       UPDATE oc_timelines SET index_pinned=pins[cardinality(pins)]
       WHERE id=b AND index_pinned IS DISTINCT FROM pins[cardinality(pins)];
     END IF;
-    FOREACH live IN ARRAY ARRAY['oc_moments','oc_nodes','oc_duration_nodes','oc_edge_nodes',
+    FOREACH live IN ARRAY ARRAY['oc_moments','oc_nodes','oc_duration_nodes','oc_edge_nodes','oc_change_nodes',
       'oc_relationships','oc_entity_search'] LOOP
       -- Only versions the released clock saw can have lost their last reader.
       EXECUTE format('DELETE FROM %I r WHERE r.timeline_id=$1 AND ($2::bigint IS NULL
@@ -2010,6 +2067,20 @@ BEGIN
     oc_lineage_lookup('node.time,node.left_id,node.right_id','n','oc_nodes','node','nid','1','lv','found_retired','false'));
   EXECUTE src;
 
+  -- oc_change_prefixes_lineage (#595): like oc_recent_times', each lookup starts at level 1.
+  src:=pg_get_functiondef('oc_change_prefixes(uuid,mpq[],boolean[])'::regprocedure);
+  src:=oc_rewrite(src,'oc_change_prefixes(','oc_change_prefixes_lineage(');
+  src:=oc_rewrite(src,'DECLARE result jsonb[]','DECLARE ' || levels || 'result jsonb[]');
+  src:=oc_rewrite(src,'SELECT change_root INTO root_id FROM oc_timelines WHERE id=tid;',
+    'SELECT change_root,' || lineage || ' INTO root_id,tids,clocks FROM oc_timelines WHERE id=tid;');
+  src:=oc_rewrite(src,'SELECT node.totals INTO l FROM oc_change_nodes node WHERE node.timeline_id=tid AND node.id=nid;',
+    oc_lineage_lookup('node.totals','l','oc_change_nodes','node','nid','1','lv','found_retired','false'));
+  src:=oc_rewrite(src,'SELECT node.time,node.left_id,node.right_id,node.own_totals INTO n FROM oc_change_nodes node WHERE node.timeline_id=tid AND node.id=nid;',
+    oc_lineage_lookup('node.time,node.left_id,node.right_id,node.own_totals','n','oc_change_nodes','node','nid','1','lv','found_retired','false'));
+  src:=oc_rewrite(src,'SELECT node.totals INTO l FROM oc_change_nodes node WHERE node.timeline_id=tid AND node.id=n.left_id;',
+    oc_lineage_lookup('node.totals','l','oc_change_nodes','node','n.left_id','1','lv','found_retired','false'));
+  EXECUTE src;
+
   -- oc_event_text_lineage: durations come from oc_duration_nodes_at for the fork's levels.
   src:=pg_get_functiondef('oc_event_text(uuid)'::regprocedure);
   src:=oc_rewrite(src,'oc_event_text(','oc_event_text_lineage(');
@@ -2029,7 +2100,8 @@ BEGIN
   -- level's retired versions were few would scan them whole, and keep doing so as they grow
   -- until statistics catch up; every lookup they make has an index to use.
   FOR src IN SELECT p.oid::regprocedure::text FROM pg_proc p WHERE p.proname IN ('oc_overview_lineage',
-    'oc_events_lineage','oc_duration_overview_lineage','oc_recent_times_lineage','oc_event_text_lineage') LOOP
+    'oc_events_lineage','oc_duration_overview_lineage','oc_recent_times_lineage','oc_event_text_lineage',
+    'oc_change_prefixes_lineage') LOOP
     EXECUTE format('ALTER FUNCTION %s SET jit=off SET enable_seqscan=off', src);
   END LOOP;
 
@@ -2042,6 +2114,8 @@ BEGIN
   EXECUTE regexp_replace(src,E'\nBEGIN\n',E'\nBEGIN\n  IF EXISTS(SELECT 1 FROM oc_timelines WHERE id=tid AND index_bases<>''{}'') THEN RETURN QUERY SELECT * FROM oc_events_lineage(tid,lo,hi,after_time,after_id,max_rows); RETURN; END IF;\n');
   src:=pg_get_functiondef('oc_duration_overview(uuid,mpq,mpq,mpq)'::regprocedure);
   EXECUTE regexp_replace(src,E'\nBEGIN\n',E'\nBEGIN\n  IF EXISTS(SELECT 1 FROM oc_timelines WHERE id=tid AND index_bases<>''{}'') THEN RETURN QUERY SELECT * FROM oc_duration_overview_lineage(tid,lo,hi,threshold); RETURN; END IF;\n');
+  src:=pg_get_functiondef('oc_change_prefixes(uuid,mpq[],boolean[])'::regprocedure);
+  EXECUTE regexp_replace(src,E'\nBEGIN\n',E'\nBEGIN\n  IF EXISTS(SELECT 1 FROM oc_timelines WHERE id=tid AND index_bases<>''{}'') THEN RETURN oc_change_prefixes_lineage(tid,times,inclusive); END IF;\n');
   src:=pg_get_functiondef('oc_recent_times(uuid,boolean)'::regprocedure);
   EXECUTE regexp_replace(src,E'\nBEGIN\n',E'\nBEGIN\n  IF EXISTS(SELECT 1 FROM oc_timelines WHERE id=tid AND index_bases<>''{}'') THEN RETURN QUERY SELECT * FROM oc_recent_times_lineage(tid,oldest); RETURN; END IF;\n');
   src:=pg_get_functiondef('oc_event_text(uuid)'::regprocedure);
@@ -2091,9 +2165,9 @@ ALTER TABLE oc_timelines ADD COLUMN IF NOT EXISTS index_events text NOT NULL DEF
 DO $do$
 DECLARE big text; current text[]; wanted text; missing text[];
 BEGIN
-  FOREACH big IN ARRAY ARRAY['oc_moments','oc_nodes','oc_duration_nodes','oc_edge_nodes',
+  FOREACH big IN ARRAY ARRAY['oc_moments','oc_nodes','oc_duration_nodes','oc_edge_nodes','oc_change_nodes',
     'oc_relationships','oc_entity_search','oc_moments_retired','oc_nodes_retired',
-    'oc_duration_nodes_retired','oc_edge_nodes_retired','oc_relationships_retired',
+    'oc_duration_nodes_retired','oc_edge_nodes_retired','oc_change_nodes_retired','oc_relationships_retired',
     'oc_entity_search_retired','oc_history_moments','oc_history_durations',
     'oc_history_relationships','oc_history_moment_overrides','oc_history_duration_overrides',
     'oc_history_relationship_overrides'] LOOP

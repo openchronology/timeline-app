@@ -1081,10 +1081,24 @@ export const schemas = {
                 totals: {
                   ...ref('MeasureValues'),
                   description:
-                    'The exact totals of the timeline’s measures over the group’s moments (#574), by name; zeros, and the field when all are zero, are left out.',
+                    'The exact changes of the timeline’s measures in the group’s part of the window (#574, #595), by name: from its first time to the next group’s (the first from the window’s start, the last to its end), so every change in the window counts once. Zeros, and the field when all are zero, are left out.',
+                },
+                balanceAfter: {
+                  ...ref('MeasureValues'),
+                  description:
+                    'The balance after the group’s changes of each measure with a balance (#595).',
                 },
               },
             },
+          },
+          balances: {
+            type: 'object',
+            additionalProperties: {
+              type: 'object',
+              properties: { before: { type: 'string' }, after: { type: 'string' } },
+            },
+            description:
+              'Each measure with a balance (#595): its balance before the window’s changes (those at its lower bound excluded) and after them (those at its upper bound included), exact.',
           },
           durations: {
             type: 'array',

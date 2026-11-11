@@ -27,6 +27,7 @@ export const VERSIONED_TABLES = [
   'oc_nodes',
   'oc_duration_nodes',
   'oc_edge_nodes',
+  'oc_change_nodes',
   'oc_relationships',
   'oc_entity_search',
 ];
@@ -106,6 +107,7 @@ const KEYS = {
   oc_nodes: ['id'],
   oc_duration_nodes: ['id'],
   oc_edge_nodes: ['id'],
+  oc_change_nodes: ['id'],
   oc_relationships: ['a_kind', 'a_id', 'b_kind', 'b_id'],
   oc_entity_search: ['kind', 'entity_id'],
 };
