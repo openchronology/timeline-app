@@ -7,6 +7,7 @@
  */
 import { Rational as Q } from 'rational-ordered-map';
 import type { DurationBand, Frame, FrameGroup } from './core.js';
+import { addMeasureTotals, entityTotals } from './measures.js';
 
 /** A group on the shared axis of separated tracks: its track, and where its members are. */
 export interface TrackGroup extends FrameGroup {
@@ -35,16 +36,20 @@ const summed = (groups: readonly TrackGroup[], bands: readonly DurationBand[], k
     if (!first || from.compare(first) < 0) first = from;
     if (!last || to.compare(last) > 0) last = to;
   };
+  // One timeline's tracks: their totals add, a band's values counting where it starts (#576).
+  let totals: Record<string, string> | undefined;
   for (const g of groups) {
     count += BigInt(g.count);
     durations += BigInt(g.durationCount ?? '0');
     distinct += g.distinct;
+    totals = addMeasureTotals(totals, g.totals);
     extend(Q.parse(g.first), Q.parse(g.last));
     for (const source of membersOf(g)) sources.add(source);
   }
   for (const b of bands) {
     extend(Q.parse(b.first), Q.parse(b.first));
     sources.add(b.sourceKey ?? key);
+    totals = addMeasureTotals(totals, entityTotals(b.metadata));
   }
   return {
     first: first! as Q,
@@ -53,6 +58,7 @@ const summed = (groups: readonly TrackGroup[], bands: readonly DurationBand[], k
       count: count.toString(),
       distinct,
       ...(durations ? { durationCount: durations.toString() } : {}),
+      ...(totals ? { totals } : {}),
       sources: [...sources].sort(),
     },
   };

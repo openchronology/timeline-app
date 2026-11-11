@@ -220,3 +220,83 @@ test("collapsed durations' values count where they start, once, beside moments' 
       );
   }
 });
+
+test('comparisons never add totals across timelines; separated tracks keep theirs (#586)', async () => {
+  const { ComparisonView } = await import('../dist/comparison.mjs');
+  const { collapseTrackSpans } = await import('../dist/core.mjs');
+  const measured = (key, cost) => {
+    const index = new TimelineIndex(
+      validateDocument({
+        format: 'openchronology',
+        version: 1,
+        title: key,
+        description: '',
+        measures: { cost: { type: 'mpz' } },
+        events: [
+          { id: 'a', time: '1/1', metadata: { measures: { cost } } },
+          { id: 'b', time: '2/1', metadata: { measures: { cost } } },
+        ],
+      }),
+    );
+    return { key, title: key, index, first: '1/1', last: '2/1' };
+  };
+  const view = new ComparisonView([measured('dollars', '100'), measured('hours', '3')]);
+  const viewport = new Viewport(q('0'), q('3'));
+  // Side by side: each track's summary totals its own timeline.
+  let frame = await view.frame(viewport, 10, 24);
+  assert.deepEqual(Object.fromEntries(frame.groups.map((g) => [g.sourceKey, g.totals])), {
+    dollars: { cost: '200' },
+    hours: { cost: '6' },
+  });
+  // Combined: one summary, its totals by timeline, never 206.
+  view.combined = true;
+  frame = await view.frame(viewport, 10, 24);
+  assert.equal(frame.groups.length, 1);
+  assert.equal(frame.groups[0].totals, undefined);
+  assert.deepEqual(frame.groups[0].sourceTotals, {
+    dollars: { cost: '200' },
+    hours: { cost: '6' },
+  });
+
+  // One timeline's separated tracks: a narrow track collapsing into another adds its totals,
+  // a band's values counting at its start.
+  const collapsed = collapseTrackSpans(
+    {
+      groups: [
+        {
+          first: '1/1',
+          last: '1/1',
+          count: '1',
+          distinct: 1,
+          totals: { cost: '5' },
+          sourceKey: 'upper',
+        },
+        {
+          first: '1/1',
+          last: '2/1',
+          count: '2',
+          distinct: 2,
+          totals: { cost: '7' },
+          sourceKey: 'upper',
+        },
+      ],
+      durations: [
+        {
+          id: 'd',
+          start: '1/1',
+          end: '9/1',
+          first: '1/1',
+          last: '9/1',
+          startTime: '1/1',
+          endTime: '9/1',
+          metadata: { measures: { cost: '30' } },
+          sourceKey: 'upper',
+        },
+      ],
+      visitedNodes: 0,
+    },
+    [{ key: 'upper', into: 'rest', begins: q('0'), ends: q('3') }],
+    q('100'),
+  ).frame;
+  assert.deepEqual(collapsed.groups.find((g) => g.sourceKey === 'rest').totals, { cost: '42' });
+});

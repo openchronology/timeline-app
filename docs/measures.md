@@ -127,8 +127,8 @@ A duration's values count entirely **where it starts**, as if it were a moment a
 
 - **Summaries:** a summary's label says what it holds, then up to two of its totals, each labelled and shown as its measure shows totals: `3 moments · Cost $21.50`. Its tooltip and the name screen readers hear list them all.
 - **Single events:** an event's values are listed in the reader and in its hover card.
-- **Separated tracks:** each track's summaries show their own totals.
-- **Comparisons:** a comparison of several timelines doesn't show totals, since each timeline declares its own measures.
+- **Separated tracks:** each track's summaries show their own totals. A track too narrow to draw collapses into another with its totals, as one timeline's.
+- **Comparisons:** a comparison never adds totals across its timelines ([#586](https://github.com/openchronology/timeline-app/issues/586)). Each timeline's measures are its own: two timelines' `cost` aren't the same quantity. Side by side, each track's summaries keep their own timeline's totals. Combined, a summary keeps its totals by timeline (`sourceTotals`), and plugins that use totals choose how to show each one. Labels show no totals in a comparison.
 
 Plugins can use measures too ([plugins](plugins.md)):
 
