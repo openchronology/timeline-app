@@ -35,12 +35,18 @@ import {
   TIMELINE_UUID,
   DURATION_COUNT_CAP,
   clip,
+  addTotals,
+  negateTotals,
+  changePoints,
+  partitionTotals,
+  windowBalances,
+  groupBalances,
 } from '../dist/core.mjs';
 import { randomUUID } from 'node:crypto';
 import { pluginCompiler } from './plugin-sandbox.mjs';
 import { indexedNodes } from './tree.mjs';
 import { cursorRows, documentChunks, inSnapshot, RELATIONSHIP_ORDER } from './document-stream.mjs';
-import { MOMENT_TREE, INTERVAL_TREE, intervalPayload, upsertRows } from './avl.mjs';
+import { MOMENT_TREE, INTERVAL_TREE, CHANGE_TREE, intervalPayload, upsertRows } from './avl.mjs';
 import { applyIncrementally, incremental, slicePatch, timelineSettings } from './incremental.mjs';
 import { rebaseSave } from './save-merge.mjs';
 import { pruneLinks } from './timeline-links.mjs';
@@ -231,6 +237,7 @@ const TIMELINE_INDEX = [
   'event_count',
   'duration_root',
   'edge_root',
+  'change_root',
   'index_version',
   'search_version',
   'event_text',
@@ -909,6 +916,8 @@ export class PostgresStore {
       );
     }
     const edges = await writeEdgeNodes(client, id, document);
+    // The change index (#595): moments' and durations' changes by the time each applies.
+    const changes = await writeChangeNodes(client, 'oc_change_nodes', id, document, bands);
     // What it read through to may be deleted, and now kept for nothing.
     if (rows.depth)
       await client.query('SELECT oc_release_index($1::uuid[],$2::bigint[])', [
@@ -920,10 +929,10 @@ export class PostgresStore {
     // The row's description of the index, in one update: settings, the three trees' roots,
     // the moment count, catalogue text (fresh, so event_text_stale is cleared), comparison,
     // storage size (the same as set above, so its charge is unchanged), event_generation when
-    // moments were added, updated_at when `touch`, and index_version 3 (current: trees with
-    // measures' totals, #574).
+    // moments were added, updated_at when `touch`, and index_version 4 (current: the change
+    // index, #595).
     await client.query(
-      'UPDATE oc_timelines SET title=$2,description=$3,root=$4,event_count=$5,presentation=$6::jsonb,plugins=$7::jsonb,tags=$8,assets=$9::jsonb,event_text=$10,comparison=$11::jsonb,storage_bytes=$12,event_generation=event_generation+CASE WHEN $13 THEN 1 ELSE 0 END,updated_at=CASE WHEN $14 THEN now() ELSE updated_at END,duration_root=$15,edge_root=$16,index_version=3,event_text_stale=false,image=$17::jsonb,view=$18::jsonb,measures=$19::jsonb WHERE id=$1',
+      'UPDATE oc_timelines SET title=$2,description=$3,root=$4,event_count=$5,presentation=$6::jsonb,plugins=$7::jsonb,tags=$8,assets=$9::jsonb,event_text=$10,comparison=$11::jsonb,storage_bytes=$12,event_generation=event_generation+CASE WHEN $13 THEN 1 ELSE 0 END,updated_at=CASE WHEN $14 THEN now() ELSE updated_at END,duration_root=$15,edge_root=$16,index_version=4,event_text_stale=false,image=$17::jsonb,view=$18::jsonb,measures=$19::jsonb,change_root=$20 WHERE id=$1',
       [
         id,
         document.title,
@@ -944,6 +953,7 @@ export class PostgresStore {
         document.image ? JSON.stringify(document.image) : null,
         document.view ? JSON.stringify(document.view) : null,
         document.measures ? JSON.stringify(document.measures) : null,
+        changes,
       ],
     );
   }
@@ -2089,7 +2099,18 @@ export class PostgresStore {
         await writeMoments(c, 'oc_view_moments', viewId, document.events);
         await writeNodes(c, 'oc_view_nodes', viewId, tree);
         const durations = await writeDurationNodes(c, 'oc_view_duration_nodes', viewId, document);
-        await c.query('UPDATE oc_views SET duration_root=$2 WHERE id=$1', [viewId, durations.root]);
+        const changes = await writeChangeNodes(
+          c,
+          'oc_view_change_nodes',
+          viewId,
+          document,
+          durations.bands,
+        );
+        await c.query('UPDATE oc_views SET duration_root=$2,change_root=$3 WHERE id=$1', [
+          viewId,
+          durations.root,
+          changes,
+        ]);
         // Keeps the timeline's eight newest views (this one included); older ones go, their
         // rows with them (ON DELETE CASCADE).
         await c.query(
@@ -2528,23 +2549,32 @@ export class PostgresStore {
         };
         // Ongoing durations (#537): their placeholders out, resolved at the server's clock in.
         // Bands leave out their notes unless a plugin shows them (#565): opening one reads it.
+        // Measures (#595): summaries' totals split the window, and balances follow.
         return lighterBands(
-          frameWithOngoing(
-            {
-              ...bands,
-              edges,
-              edgesTruncated: arcs.rows.length > 256,
-              revision: t.revision,
-              threshold,
-              groups: durationClusters.length
-                ? coalesceGroups([...momentGroups, ...durationClusters], Q.parse(threshold))
-                : momentGroups,
-              visitedNodes: rows.at(-1)?.visited_nodes ?? 0,
-            },
-            await ongoing(),
+          await withChanges(
+            c,
+            names.changePrefixes,
+            tree,
             Q.parse(query.lower),
             Q.parse(query.upper),
-            Q.parse(threshold),
+            t.measures,
+            frameWithOngoing(
+              {
+                ...bands,
+                edges,
+                edgesTruncated: arcs.rows.length > 256,
+                revision: t.revision,
+                threshold,
+                groups: durationClusters.length
+                  ? coalesceGroups([...momentGroups, ...durationClusters], Q.parse(threshold))
+                  : momentGroups,
+                visitedNodes: rows.at(-1)?.visited_nodes ?? 0,
+              },
+              await ongoing(),
+              Q.parse(query.lower),
+              Q.parse(query.upper),
+              Q.parse(threshold),
+            ),
           ),
           query.plugins ?? t.plugins,
         );
@@ -2954,6 +2984,84 @@ async function endsInView(c, view, edges) {
   ]);
 }
 /**
+ * `frame` with its measures' totals and balances from the change index (#595) of timeline (or
+ * view) `tree`, read by SQL function `fn` (oc_change_prefixes): each summary's totals are the
+ * changes in its part of the window [lower, upper] (partitionTotals), and each anchored
+ * measure's balances follow (windowBalances, groupBalances). The changes up to each time the
+ * two need are read in one call: a first pass records which, the second uses them.
+ */
+async function withChanges(c, fn, tree, lower, upper, measures, frame) {
+  if (!measures || !Object.keys(measures).length) return frame;
+  const key = (time, inclusive) => `${time?.toString() ?? '∞'}|${inclusive}`;
+  const wanted = new Map();
+  const prefixes = new Map();
+  // The changes up to `time` (all of them when undefined), including it when `inclusive`.
+  const prefix = (time, inclusive) => {
+    const k = key(time, inclusive);
+    if (!wanted.has(k)) wanted.set(k, { time, inclusive });
+    return prefixes.get(k);
+  };
+  const sum = (from, to, { includeLower, includeUpper }) =>
+    addTotals(
+      to === undefined ? prefix(undefined, true) : prefix(to, includeUpper),
+      from === undefined ? undefined : negateTotals(prefix(from, !includeLower)),
+    );
+  const measure = () => {
+    const groups = partitionTotals(frame.groups, lower, upper, sum);
+    const balances = windowBalances(measures, lower, upper, sum);
+    return { groups, balances };
+  };
+  measure();
+  const asked = [...wanted.values()];
+  if (asked.length) {
+    const { rows } = await c.query(`SELECT ${fn}($1,$2::mpq[],$3::boolean[]) AS sums`, [
+      tree,
+      asked.map((a) => a.time?.toString() ?? null),
+      asked.map((a) => a.inclusive),
+    ]);
+    const sums = rows[0].sums ?? [];
+    asked.forEach((a, i) => prefixes.set(key(a.time, a.inclusive), sums[i] ?? undefined));
+  }
+  const { groups, balances } = measure();
+  return {
+    ...frame,
+    groups: groupBalances(groups, balances),
+    ...(balances ? { balances } : {}),
+  };
+}
+/**
+ * The change index (#595) of `document`, whose resolved bands are `bands`, written whole into
+ * `table` for timeline (or view) `id`: a perfectly balanced tree of its change points, numbered
+ * in order from 1, each node with its own changes and its subtree's totals. Returns the root's
+ * ID (null for none).
+ */
+async function writeChangeNodes(client, table, id, document, bands) {
+  await client.query(`DELETE FROM ${table} WHERE timeline_id=$1`, [id]);
+  const points = changePoints(document.events, bands, document.measures);
+  const rows = [];
+  const build = (start, end) => {
+    if (start >= end) return null;
+    const mid = (start + end) >> 1,
+      left = build(start, mid),
+      right = build(mid + 1, end);
+    const [time, own] = points[mid];
+    const n = {
+      id: mid + 1,
+      time,
+      left: left?.id ?? null,
+      right: right?.id ?? null,
+      height: 1 + Math.max(left?.height ?? 0, right?.height ?? 0),
+      own,
+      totals: addTotals(addTotals(left?.totals, own), right?.totals),
+    };
+    rows.push(CHANGE_TREE.encode(id, n));
+    return n;
+  };
+  const root = build(0, points.length);
+  await upsertRows(client, table, CHANGE_TREE.columns, CHANGE_TREE.casts, rows, false);
+  return root?.id ?? null;
+}
+/**
  * Relationship arcs placed between their endpoints' times (a duration's start), written as
  * an interval tree into oc_edge_nodes; returns its root (for edge_root) and bands.
  */
@@ -3025,6 +3133,7 @@ function treeNames(view) {
         overview: 'oc_view_overview',
         events: 'oc_view_events',
         durationOverview: 'oc_view_duration_overview',
+        changePrefixes: 'oc_view_change_prefixes',
         roots: 'oc_views',
       }
     : {
@@ -3034,6 +3143,7 @@ function treeNames(view) {
         overview: 'oc_overview_v2',
         events: 'oc_events',
         durationOverview: 'oc_duration_overview',
+        changePrefixes: 'oc_change_prefixes',
         roots: 'oc_timelines',
       };
 }
@@ -3167,7 +3277,7 @@ export async function releaseIndexes(client) {
 }
 /**
  * Rebuilds indexes stored before persistent AVL trees (index_version 2), and those of
- * timelines with measures stored before trees kept their totals (index_version 3, #574),
+ * timelines with measures stored before their change index (index_version 4, #574, #595),
  * each from its document read whole, without touching `updated_at`; comparisons, rebuilt from
  * their sources, are only marked current. Run by migrate.mjs in its transaction `client`.
  * Returns how many timelines it rebuilt.
@@ -3175,7 +3285,7 @@ export async function releaseIndexes(client) {
 export async function rebuildIndexes(client) {
   const store = new PostgresStore(null);
   const { rows } = await client.query(
-    'SELECT t.* FROM oc_timelines t WHERE (t.index_version<2 OR (t.index_version<3 AND t.measures IS NOT NULL)) AND t.comparison IS NULL',
+    'SELECT t.* FROM oc_timelines t WHERE (t.index_version<2 OR (t.index_version<4 AND t.measures IS NOT NULL)) AND t.comparison IS NULL',
   );
   for (const timeline of rows)
     await store.replace(client, timeline.id, await store.branchDocument(client, timeline), {

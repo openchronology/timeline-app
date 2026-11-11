@@ -90,6 +90,19 @@ const pathNodes = (node) => `SELECT n.* FROM (
     ) ids(node_id) CROSS JOIN LATERAL ${node('ids.node_id')} n`;
 
 /**
+ * Paths from the root towards keys by time (with every node's children), for prefetch: the
+ * moment tree's and the change index's (see MOMENT_TREE's `path`).
+ */
+const MOMENT_TREE_PATH = (node) => `WITH RECURSIVE path(id,keys) AS (
+      SELECT $3::bigint,$2::mpq[]
+      UNION ALL SELECT c.id,c.keys FROM path p CROSS JOIN LATERAL ${node('p.id')} n
+      CROSS JOIN LATERAL (VALUES
+        (n.left_id,ARRAY(SELECT k FROM unnest(p.keys) k WHERE k<n.time)),
+        (n.right_id,ARRAY(SELECT k FROM unnest(p.keys) k WHERE k>n.time))) c(id,keys)
+      WHERE c.id IS NOT NULL AND cardinality(c.keys)>0
+    ), visited AS (SELECT id FROM path)
+    ${pathNodes(node)}`;
+/**
  * The moment tree's spec for PersistentTree (rows of oc_nodes): one node per distinct moment
  * time, holding its moment IDs in "C" order, ordered by time. Each node summarizes its
  * subtree: its first and last times, the ID of its leftmost node (firstId), its own bucket
@@ -206,15 +219,53 @@ export const MOMENT_TREE = {
   // equal to a node's time stops there (that node is its own). The recursion ends where a
   // child is missing or no key goes that way. Every node is reached from one parent, so
   // `path` has no duplicates.
-  path: (node) => `WITH RECURSIVE path(id,keys) AS (
-      SELECT $3::bigint,$2::mpq[]
-      UNION ALL SELECT c.id,c.keys FROM path p CROSS JOIN LATERAL ${node('p.id')} n
-      CROSS JOIN LATERAL (VALUES
-        (n.left_id,ARRAY(SELECT k FROM unnest(p.keys) k WHERE k<n.time)),
-        (n.right_id,ARRAY(SELECT k FROM unnest(p.keys) k WHERE k>n.time))) c(id,keys)
-      WHERE c.id IS NOT NULL AND cardinality(c.keys)>0
-    ), visited AS (SELECT id FROM path)
-    ${pathNodes(node)}`,
+  path: MOMENT_TREE_PATH,
+  pathParams: (keys) => [keys.map((k) => k.time)],
+};
+
+/**
+ * The change index's spec (#595; see MOMENT_TREE for the parts of a spec): one node per time
+ * at which the timeline's measures change (oc_change_nodes), ordered by time. A node keeps the
+ * changes at its time (own) and its subtree's totals, so oc_change_prefixes reads the changes
+ * up to any time along one path. Changes arrive as `{time, values}`: joining a time adds them;
+ * taking them away (remove with a `keep` that subtracts) leaves the node while any remain.
+ */
+export const CHANGE_TREE = {
+  columns: ['timeline_id', 'id', 'time', 'left_id', 'right_id', 'height', 'own_totals', 'totals'],
+  casts: { time: '::mpq', own_totals: '::jsonb', totals: '::jsonb' },
+  select: 'id,oc_qtext(time) AS time,left_id,right_id,height,own_totals,totals',
+  decode: (r) => ({
+    id: Number(r.id),
+    time: r.time,
+    left: id(r.left_id),
+    right: id(r.right_id),
+    height: r.height,
+    own: r.own_totals ?? undefined,
+    totals: r.totals ?? undefined,
+  }),
+  encode: (owner, n) => [
+    owner,
+    n.id,
+    n.time,
+    n.left,
+    n.right,
+    n.height,
+    JSON.stringify(n.own ?? {}),
+    n.totals ? JSON.stringify(n.totals) : null,
+  ],
+  compare: (key, n) => parsed(key, 'time').compare(parsed(n, 'time')),
+  create: (nodeId, { time, values }) => ({ id: nodeId, time, own: values }),
+  merge(n, { values }) {
+    n.own = addTotals(n.own, values);
+  },
+  copy(to, from) {
+    to.time = from.time;
+    to.own = from.own;
+  },
+  summarize(n, l, r) {
+    n.totals = addTotals(addTotals(l?.totals, n.own), r?.totals);
+  },
+  path: MOMENT_TREE_PATH,
   pathParams: (keys) => [keys.map((k) => k.time)],
 };
 
@@ -534,6 +585,17 @@ export class PersistentTree {
       nodeId = c < 0 ? n.left : n.right;
     }
     throw new Error('Broken timeline index');
+  }
+  /** The node with `key`, or null when the tree has none. */
+  async find(key) {
+    let nodeId = this.root;
+    while (nodeId !== null) {
+      const n = await this.get(nodeId),
+        c = this.spec.compare(key, n);
+      if (c === 0) return n;
+      nodeId = c < 0 ? n.left : n.right;
+    }
+    return null;
   }
   /** Makes the node with `key` and the path to it a fork's own (see the class). */
   async own(key) {

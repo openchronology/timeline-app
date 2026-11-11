@@ -115,14 +115,16 @@ export function frameWithOngoing<F extends Frame>(
     const left = BigInt(group.durationCount!) - 1n;
     if (left > 0n) group.durationCount = left.toString();
     else delete group.durationCount;
-    // Its values leave with it (#576), and return with it below when it is still short.
-    const totals = addTotals(group.totals, negateTotals(entityTotals(band.metadata)));
-    if (totals) group.totals = totals;
-    else delete group.totals;
+    // Totals stay: they are the changes in the group's part of the window (#595), the
+    // ongoing duration's among them wherever its measures say it applies.
     if (group.duration?.id === band.id) delete group.duration;
   }
   groups = groups.filter((g) => BigInt(g.count) > 0n || BigInt(g.durationCount ?? '0') > 0n);
-  const added = durationGroups(summariesWithOngoing([], ongoing, lower, upper, threshold));
+  // Resolved summaries carry no totals of their own: the window's totals already count
+  // their changes (#595).
+  const added = durationGroups(summariesWithOngoing([], ongoing, lower, upper, threshold)).map(
+    ({ totals: _totals, ...group }) => group,
+  );
   if (added.length) groups = coalesceGroups([...groups, ...added], threshold);
   const durations = (frame.durations ?? []).filter((band) => !isOngoing(band.end));
   const bands = withOngoing(

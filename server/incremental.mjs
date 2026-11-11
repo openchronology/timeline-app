@@ -16,6 +16,7 @@ import {
   measuresCompatible,
   addTotals,
   negateTotals,
+  durationContributions,
   resolveDuration,
   isOngoing,
   relationshipKey,
@@ -26,7 +27,14 @@ import {
   entryLimitText,
 } from '../dist/core.mjs';
 import { HttpError } from './store.mjs';
-import { PersistentTree, MOMENT_TREE, INTERVAL_TREE, intervalPayload, upsertRows } from './avl.mjs';
+import {
+  PersistentTree,
+  MOMENT_TREE,
+  INTERVAL_TREE,
+  CHANGE_TREE,
+  intervalPayload,
+  upsertRows,
+} from './avl.mjs';
 
 /** The UTF-8 size of a value's JSON: what the timeline's storage charge counts. */
 const bytes = (value) => Buffer.byteLength(JSON.stringify(value));
@@ -89,6 +97,26 @@ const REBUILD_SHARE = 0.5;
 export function incremental(t, patch) {
   // Indexes older than the AVL trees (version 2) and comparison timelines are rebuilt.
   if (t.index_version < 2 || t.comparison || patch.settings.comparison) return false;
+  // Measures need the change index (#595, index version 4), and changing where a measure's
+  // durations apply moves every one of their changes: both rebuild it.
+  const measures = patch.settings.measures;
+  if (measures && Object.keys(measures).length) {
+    if (t.index_version < 4) return false;
+    // By name: the stored row's keys come back in PostgreSQL's order, not the save's.
+    const where = (m) =>
+      JSON.stringify(
+        Object.keys(m ?? {})
+          .sort()
+          .map((name) => [name, m[name].durations ?? 'start']),
+      );
+    const before = Object.fromEntries(
+      Object.entries(t.measures ?? {}).filter(([name]) => name in measures),
+    );
+    const after = Object.fromEntries(
+      Object.entries(measures).filter(([name]) => name in (t.measures ?? {})),
+    );
+    if (where(before) !== where(after)) return false;
+  }
   const size =
     patch.changes.length +
     (patch.durationChanges?.length ?? 0) +
@@ -269,6 +297,23 @@ export async function applyIncrementally(c, t, patch) {
     else if (event && index.depth) edited.push({ time: event.time, id: momentId });
   }
   await moments.prefetch([...removals, ...insertions, ...edited, ...revalued]);
+  // The change index's deltas (#595), by time: each changed moment's old values taken away at
+  // its old time and its new ones added at its new time.
+  const changeDeltas = new Map();
+  const delta = (time, values, sign = 1) => {
+    if (!values || !Object.keys(values).length || !measured) return;
+    const key = parseTime(time).toString();
+    changeDeltas.set(
+      key,
+      addTotals(changeDeltas.get(key), sign < 0 ? negateTotals(values) : values),
+    );
+  };
+  const measured = !!settings.measures && Object.keys(settings.measures).length > 0;
+  for (const [momentId, event] of momentChanges) {
+    const before = saved.get(momentId);
+    if (before) delta(before.time, valuesOf(before), -1);
+    if (event) delta(event.time, valuesOf(event));
+  }
   for (const r of removals)
     await moments.remove(r, (n) => {
       n.ids = n.ids.filter((x) => x !== r.id);
@@ -384,6 +429,14 @@ export async function applyIncrementally(c, t, patch) {
       ...(band ? [{ first: band.first, id: durationId }] : []),
     ]),
   );
+  for (const { before, band } of durationOps) {
+    // A duration's changes, where its measures say they apply (#595).
+    for (const [time, values] of durationContributions(before?.band ?? {}, settings.measures))
+      delta(time, values, -1);
+    if (band)
+      for (const [time, values] of durationContributions(band, settings.measures))
+        delta(time, values);
+  }
   for (const { durationId, before, band } of durationOps) {
     if (before && band && before.first === band.first && before.last === band.last) {
       // In place; when its measure values change (#576), so do the totals above it.
@@ -597,9 +650,26 @@ export async function applyIncrementally(c, t, patch) {
 
   // The trees' changed nodes are written last, after every check that can refuse the save
   // (a refusal rolls the whole transaction back).
+  // The change index (#595): each time's net change added to its node, which goes when nothing
+  // changes there any more, or comes when something now does.
+  const changes = new PersistentTree(c, CHANGE_TREE, 'oc_change_nodes', t, t.change_root, index);
+  const deltas = [...changeDeltas].filter(([, values]) => values);
+  if (deltas.length) {
+    await changes.prefetch(deltas.map(([time]) => ({ time })));
+    for (const [time, values] of deltas) {
+      const node = await changes.find({ time });
+      if (!node) await changes.insert({ time }, { time, values });
+      else {
+        const own = addTotals(node.own, values);
+        if (own) await changes.adjust({ time }, (n) => (n.own = own));
+        else await changes.remove({ time });
+      }
+    }
+  }
   await moments.flush();
   await durations.flush();
   await edges.flush();
+  await changes.flush();
   // Columns feeding the catalogue search vector are set only when they change, since
   // setting them recomputes the vector over the whole catalogue text.
   const vector = [
@@ -627,6 +697,7 @@ export async function applyIncrementally(c, t, patch) {
     ['event_count', momentCount],
     ['duration_root', durations.root],
     ['edge_root', edges.root],
+    ['change_root', changes.root],
     ['storage_bytes', Math.max(storage, 0)],
     ...vector,
   ];
