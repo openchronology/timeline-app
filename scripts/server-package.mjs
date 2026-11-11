@@ -11,7 +11,10 @@
 //   OCH_NODE_TARBALL=<dir>/node-v<version>-linux-x64.tar.xz gives the .deb and .rpm builds the
 //   Node.js tarball they bundle (scripts/node-tarball.mjs downloads it), instead of their
 //   downloading it from nodejs.org; either way they check its pinned SHA-256 (#369).
+//   The .deb and .rpm builds start from the published images of their tools stages when they
+//   match the Dockerfile (scripts/build-images.mjs, #605); OCH_TOOL_IMAGES=off builds them.
 import { execFile, spawn } from 'node:child_process';
+import { prebuiltToolArgs, targetArgs } from './build-images.mjs';
 import { mkdir, mkdtemp, readFile, readdir, rename, rm } from 'node:fs/promises';
 import { basename, dirname, join, resolve } from 'node:path';
 import { promisify } from 'node:util';
@@ -93,15 +96,11 @@ for (const name of chosen.length ? chosen : Object.keys(serverTargets)) {
           '--file',
           'deploy/debian-server/Dockerfile',
           '--build-arg',
-          `PG_MAJOR=${target.pg}`,
-          '--build-arg',
           `DEB_VERSION=${upstream}-1~${target.suffix}`,
-          // OCH_UBUNTU_MIRROR: an Ubuntu archive mirror closer than archive.ubuntu.com.
-          ...(process.env.OCH_UBUNTU_MIRROR
-            ? ['--build-arg', `UBUNTU_MIRROR=${process.env.OCH_UBUNTU_MIRROR}`]
-            : []),
         ];
   console.log(`Building openchronology-server ${upstream} for ${name} (${target.base})`);
+  // The published images of its tools stages, when they match the Dockerfile (#605).
+  const toolArgs = await prebuiltToolArgs(name);
   if (nodeTarball) console.log(`With Node.js from ${nodeTarball}`);
   await new Promise((done, fail) => {
     const build = spawn(
@@ -112,13 +111,13 @@ for (const name of chosen.length ? chosen : Object.keys(serverTargets)) {
         // Every step's output as it runs, so a log shows where a stalled build is (#367).
         '--progress=plain',
         ...formatArgs,
+        ...targetArgs(target),
+        ...toolArgs,
         ...nodeArgs,
         '--target',
         'export',
         '--output',
         `type=local,dest=${out}`,
-        '--build-arg',
-        `BASE=${target.base}`,
         '--build-arg',
         `OCH_BUILD_COMMIT=${commit}`,
         '--build-arg',

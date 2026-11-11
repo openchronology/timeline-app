@@ -25,6 +25,10 @@ jobs:
           - { target: fedora44, format: rpm }
     runs-on: ubuntu-24.04
     timeout-minutes: 90
+    # packages: read for the tools images (build-images.yml).
+    permissions:
+      contents: read
+      packages: read
     env:
       RELEASE_TAG: ${{ inputs.tag }}
     steps:
@@ -53,6 +57,14 @@ jobs:
         if: steps.node-cache.outputs.cache-hit != 'true'
         timeout-minutes: 5
         run: node scripts/node-tarball.mjs "$RUNNER_TEMP/node-tarball"
+      # The build starts from the published images of its Dockerfile's tools stages, when they
+      # match it (scripts/build-images.mjs, #605), and builds those stages itself otherwise, as
+      # it does if signing in fails.
+      - name: Sign in to GitHub's container registry
+        continue-on-error: true
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: echo "$GITHUB_TOKEN" | docker login ghcr.io -u "$GITHUB_ACTOR" --password-stdin
       - name: Build the package
         timeout-minutes: 15
         env:

@@ -4,6 +4,10 @@
 #   BASE      debian:trixie or ubuntu:24.04   PG_MAJOR  17 or 16 (that distribution's server)
 #   DEB_VERSION, OCH_BUILD_COMMIT, OCH_BUILD_VERSION
 ARG BASE=debian:trixie@sha256:9c6e381421d0f48d1b8133e573f33c185ee16cbf505eda9c4a8a4791b25ea8a6
+# The tools stages below, or prebuilt images of them (#605): scripts/server-package.mjs passes
+# ghcr.io/openchronology/server-build images whose tag matches these stages, when they exist.
+ARG NATIVE_TOOLS=native-tools
+ARG PACKAGE_TOOLS=package-tools
 
 # The target distribution, as the native build and the package start from it.
 FROM ${BASE} AS base
@@ -19,8 +23,8 @@ RUN if [ -n "$UBUNTU_MIRROR" ] && [ -f /etc/apt/sources.list.d/ubuntu.sources ];
       sed -i "s|http://archive.ubuntu.com/ubuntu/\?|$UBUNTU_MIRROR/|g" /etc/apt/sources.list.d/ubuntu.sources; \
     fi
 
-# och-convert and pgmp, built on the target distribution against its own libraries.
-FROM base AS native
+# The tools och-convert and pgmp are built with (scripts/build-images.mjs publishes this stage).
+FROM base AS native-tools
 ARG PG_MAJOR=17
 ENV DEBIAN_FRONTEND=noninteractive
 RUN apt-get update && apt-get install -y --no-install-recommends \
@@ -30,6 +34,10 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 # A fixed Rust release, as every build of the project uses (#514).
 RUN curl -fsSL https://sh.rustup.rs | sh -s -- -y --profile minimal --default-toolchain 1.99.0
 ENV PATH=/root/.cargo/bin:$PATH
+
+# och-convert and pgmp, built on the target distribution against its own libraries.
+FROM ${NATIVE_TOOLS} AS native
+ARG PG_MAJOR=17
 WORKDIR /build
 COPY native-store native-store
 COPY vendor/sqlite-rational vendor/sqlite-rational
@@ -85,16 +93,20 @@ RUN --mount=type=bind,target=/build-context \
 # with the tarball it caches. Without one, the package stage downloads it from nodejs.org.
 FROM scratch AS node-tarball
 
+# The tools the package stage uses (scripts/build-images.mjs publishes this stage).
+FROM base AS package-tools
+ENV DEBIAN_FRONTEND=noninteractive
+RUN apt-get update && apt-get install -y --no-install-recommends curl ca-certificates xz-utils \
+    && rm -rf /var/lib/apt/lists/*
+
 # The package.
-FROM base AS package
+FROM ${PACKAGE_TOOLS} AS package
 ARG PG_MAJOR=17
 ARG DEB_VERSION
 # Node.js runtime, pinned and checked (https://nodejs.org/dist/v24.21.0/SHASUMS256.txt).
 ARG NODE_VERSION=24.21.0
 ARG NODE_SHA256=fd8e59d5a511510f6a298afb548f18c7d2b1be404d8b4a27d94fbe49f56cb2d6
 ENV DEBIAN_FRONTEND=noninteractive
-RUN apt-get update && apt-get install -y --no-install-recommends curl ca-certificates xz-utils \
-    && rm -rf /var/lib/apt/lists/*
 WORKDIR /root
 ENV ROOT=/root/package APP=/root/package/usr/lib/openchronology
 # The given tarball, else nodejs.org's; either is checked against the pinned SHA-256.
