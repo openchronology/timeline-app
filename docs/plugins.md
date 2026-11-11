@@ -182,6 +182,7 @@ Plugins combine **JSON host component declarations** and an optional restricted 
 
 - Derived metadata: `derive` rules that work out values from the metadata an entity already has, for the other plugins to read ([derived metadata](#derived-metadata)).
 - Sizes by a measure: an optional `sizeBy: { "measure": "cost" }` sizes markers and summaries by their value or total of one of the timeline's [measures](measures.md) ([#575](https://github.com/openchronology/timeline-app/issues/575)), relative to the largest in view. The top third is large, the middle third medium and the rest small. It replaces the plugin's or the usual size while anything in view has a positive total.
+- Summaries: with `"renderSummaries": true`, a plugin's script also renders summaries ([#587](https://github.com/openchronology/timeline-app/issues/587)). It sets their color, shape, size and outline, and reads their [measures](measures.md)' totals with `api.total(name)`. In a comparison, it uses `api.total(name, n)` for the nth compared timeline's totals, since each timeline's measures are its own and are never added together. Without the flag, scripts render single moments only, as before.
 - Added shapes: an optional `shapes` array of the shapes added after the first twelve that the plugin draws, currently only `"ellipse"`. A shape field, shape marker or `api.shape(...)` of a plugin that doesn't list one treats it as unknown, as before it existed; the field's selector offers the plugin's shapes.
 
 A plugin can define fields without a marker effect, or an effect without a new editor field. Additional component kinds require an implementation and security review in the host; they are not arbitrary downloaded UI programs. New capabilities will use versioned contracts.
@@ -240,7 +241,7 @@ A plugin can work out metadata from what an event (a moment or a duration) alrea
 }
 ```
 
-- **Sources:** `{ "tag": "severity" }` reads the value of a tag such as `severity:err` (here `err`). `{ "path": "journald.severity" }` reads a text, number or true/false at one to four keys joined by dots. Sources are tried in order.
+- **Sources:** `{ "tag": "severity" }` reads the value of a tag such as `severity:err` (here `err`). `{ "path": "journald.severity" }` reads a text, number or true/false at one to four keys joined by dots. `{ "measure": "cost" }` reads a [measure](measures.md)'s value as exact text, or, for a summary rendered by a script, its total (#587). Sources are tried in order.
 - **Map:** with a `map`, a source's value becomes the mapped text; a value the map doesn't name passes to the next source. Without one, the value is used as it is.
 - **What the others see:** the key is set before any plugin draws, so the color, shape, icon and heading markers, hover cards and scripts all read it as if it were saved, whatever their order. A script reads a key its own plugin derives with `api.get`. Rules apply in plugin order, and a later rule can read what an earlier one set.
 - **Never over a saved value:** a rule sets its key only where the entity has none, saved or derived earlier. A color chosen for a moment wins over one derived for it.
@@ -375,19 +376,20 @@ function render(moment: string, api: PluginAPI): string {
 
 `moment` is reserved and currently an empty string. Use the explicit API:
 
-| Method                                                                 | Effect                                                                                                          |
-| ---------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------- |
-| `get(key)`                                                             | Read a declared field, title, or description as bounded text. Missing/structured values become empty text.      |
-| `shape(name)`                                                          | Choose a supported shape. Unrecognized/empty input contributes no effect.                                       |
-| `color(hex)`                                                           | Choose a six-digit hex color. Unrecognized/empty input contributes no effect.                                   |
-| `outline(style)`                                                       | Outline the marker or band `dashed` or `solid`. Unrecognized/empty input contributes no effect.                 |
-| `icon(key)`                                                            | Use the URL from a declared `image-url` field.                                                                  |
-| `card()`                                                               | Enable the title/notes/image hover card.                                                                        |
-| `none()`                                                               | Contribute no marker effects.                                                                                   |
-| `merge(a, b)`                                                          | Combine effect strings; the second overrides matching properties.                                               |
-| `trim`, `upper`, `lower`, `startsWith`, `endsWith`, `slice`, `replace` | Bounded string operations, as in the formatter language.                                                        |
-| `measure(name)`                                                        | The moment's value of a [measure](measures.md), as an exact rational; zero when it has none (#575).             |
-| `rational`, `compare`, `add`, `sub`, `mul`, `div`                      | Exact arithmetic, as in the formatter language: `api.compare(api.measure("cost"), api.rational("100000")) > 0`. |
+| Method                                                                 | Effect                                                                                                           |
+| ---------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------- |
+| `get(key)`                                                             | Read a declared field, title, or description as bounded text. Missing/structured values become empty text.       |
+| `shape(name)`                                                          | Choose a supported shape. Unrecognized/empty input contributes no effect.                                        |
+| `color(hex)`                                                           | Choose a six-digit hex color. Unrecognized/empty input contributes no effect.                                    |
+| `outline(style)`                                                       | Outline the marker or band `dashed` or `solid`. Unrecognized/empty input contributes no effect.                  |
+| `icon(key)`                                                            | Use the URL from a declared `image-url` field.                                                                   |
+| `card()`                                                               | Enable the title/notes/image hover card.                                                                         |
+| `none()`                                                               | Contribute no marker effects.                                                                                    |
+| `merge(a, b)`                                                          | Combine effect strings; the second overrides matching properties.                                                |
+| `trim`, `upper`, `lower`, `startsWith`, `endsWith`, `slice`, `replace` | Bounded string operations, as in the formatter language.                                                         |
+| `measure(name)`                                                        | The moment's value of a [measure](measures.md), as an exact rational; zero when it has none (#575).              |
+| `total(name)`, `total(name, n)`                                        | A summary's total of a measure, or a moment's value; in a comparison, with `n`, its nth timeline's total (#587). |
+| `rational`, `compare`, `add`, `sub`, `mul`, `div`                      | Exact arithmetic, as in the formatter language: `api.compare(api.measure("cost"), api.rational("100000")) > 0`.  |
 
 Scripts support `const` locals, ternary conditionals, string concatenation and comparisons. No loops, imports, globals, property access, arbitrary function calls, `eval`, `Function`, filesystem, session, DOM, or network access exist. Source is capped at 16,384 characters, AST nodes at 1,024, evaluation at 4,096 steps/128 API calls, individual text at 2,048 characters, and cumulative text allocation at 32,768 characters. Compiler caching is bounded. A runtime error discards that script's effects and preserves host rendering; other plugins continue. Later enabled plugins overwrite earlier matching effects. Missing effects leave earlier ones intact.
 

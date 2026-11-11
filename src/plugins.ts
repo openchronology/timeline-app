@@ -66,6 +66,12 @@ export interface PluginManifest {
    * in view, instead of the plugin's or the usual size.
    */
   sizeBy?: { measure: string };
+  /**
+   * Its script also renders summaries (#587), whose colors, shapes, sizes and outlines it may
+   * set: they read their totals with `api.total(name)` (or, in a comparison, `api.total(name,
+   * n)` for its nth timeline's). Without it, scripts render single moments only.
+   */
+  renderSummaries?: boolean;
   /** The timeline's colors and fonts (#230): each theme role's setting, by role. */
   theme?: PluginTheme;
   /** Entities the plugin applies to; omitted means moments, plus durations for colors/cards. */
@@ -123,7 +129,11 @@ export type PluginTheme = Partial<Record<ThemeRole, string>>;
 const themeKind = (role: ThemeRole): PluginSetting['kind'] =>
   role.endsWith('Font') ? 'font' : role.endsWith('Size') ? 'text-size' : 'color';
 /** Where a derived value is read: a tag's value (`severity` reads `severity:err`), or a path. */
-export type DerivationSource = { tag: string } | { path: string };
+/**
+ * Where a derivation reads: a tag's value, a metadata path, or a measure (#587): an entity's
+ * value, or a summary's total, as exact text.
+ */
+export type DerivationSource = { tag: string } | { path: string } | { measure: string };
 /**
  * A value derived from a moment's or duration's metadata (#122): the first source that has
  * one, through the map when given (sources whose value it doesn't map are passed over), set
@@ -363,6 +373,16 @@ type Effects = {
 };
 /** The text at a source: a tag's value, or a text, number or true/false at a path. */
 function sourceValue(source: DerivationSource, metadata: Record<string, unknown>): string | null {
+  if ('measure' in source) {
+    const values = metadata[MEASURES_KEY];
+    const value =
+      values && typeof values === 'object' && !Array.isArray(values)
+        ? (values as Record<string, unknown>)[source.measure]
+        : undefined;
+    return typeof value === 'string' && Object.hasOwn(values as object, source.measure)
+      ? value
+      : null;
+  }
   if ('tag' in source) {
     const prefix = source.tag + ':';
     const tags = Array.isArray(metadata.tags) ? metadata.tags : [];
@@ -419,12 +439,24 @@ export function derivationKeys(manifest: PluginManifest): string[] {
   const keys = new Set<string>();
   for (const rule of manifest.derive ?? []) {
     keys.add(rule.metadataKey);
-    for (const source of rule.from) keys.add('tag' in source ? 'tags' : source.path.split('.')[0]);
+    for (const source of rule.from)
+      keys.add(
+        'tag' in source ? 'tags' : 'measure' in source ? MEASURES_KEY : source.path.split('.')[0],
+      );
   }
   return [...keys];
 }
 const compiledScripts = new Map<string, ReturnType<typeof compilePluginScript>>();
-function manifestEffects(manifest: PluginManifest, metadata: Record<string, unknown>): Effects {
+/**
+ * What `api.total(name, n)` reads in a comparison (#586, #587): the totals of its nth timeline
+ * (1-based), or undefined where it has none.
+ */
+type TimelineTotals = (n: number) => Record<string, string> | undefined;
+function manifestEffects(
+  manifest: PluginManifest,
+  metadata: Record<string, unknown>,
+  timelines?: TimelineTotals,
+): Effects {
   if (!manifest.source) return {};
   let effects: Effects = {};
   try {
@@ -478,6 +510,16 @@ function manifestEffects(manifest: PluginManifest, metadata: Record<string, unkn
             throw new Error('Images must come from a declared image URL field.');
           const icon = imageURL(metadata[key]);
           return JSON.stringify(icon && icon.length < 1800 ? { icon } : {});
+        }
+        // A summary's total (#587), or a moment's value; with a second argument, in a comparison,
+        // its nth timeline's (each timeline's measures are its own, #586).
+        case 'total': {
+          const measure = text();
+          if (!MEASURE_NAME.test(measure)) throw new Error('Invalid measure name.');
+          if (args[1] === undefined) return measureValue(metadata, measure);
+          const n = Number(args[1]);
+          if (!Number.isInteger(n) || n < 1 || n > 8) throw new Error('Name a compared timeline.');
+          return measureValue({ [MEASURES_KEY]: timelines?.(n) }, measure);
         }
         // A measure's value on this moment (#575), exact; zero when it has none.
         case 'measure': {
@@ -595,6 +637,32 @@ function scriptEffects(
   return effects;
 }
 /** A moment shown as a heading: its level and font, or null for an ordinary moment. */
+/**
+ * What enabled plugins whose scripts render summaries (#587) set on a summary: its color,
+ * shape, size and outline. Scripts read `totals` as `api.total(name)` (and as a metadata
+ * `measures` path or `measure` derivation); in a comparison, `timelines(n)` gives its nth
+ * timeline's totals. Later plugins win.
+ */
+export function pluginSummaryEffects(
+  plugins: readonly InstalledPlugin[],
+  totals: Record<string, string> | undefined,
+  timelines?: TimelineTotals,
+): Pick<Effects, 'color' | 'shape' | 'size' | 'outline'> {
+  const summaryPlugins = plugins.filter((p) => p.enabled && p.manifest.renderSummaries);
+  if (!summaryPlugins.length) return {};
+  const metadata = derivedMetadata(plugins, totals ? { [MEASURES_KEY]: totals } : {});
+  const effects: Pick<Effects, 'color' | 'shape' | 'size' | 'outline'> = {};
+  for (const { manifest } of summaryPlugins) {
+    const { color, shape, size, outline } = manifestEffects(manifest, metadata, timelines);
+    Object.assign(effects, {
+      ...(color ? { color } : {}),
+      ...(shape ? { shape } : {}),
+      ...(size ? { size } : {}),
+      ...(outline ? { outline } : {}),
+    });
+  }
+  return effects;
+}
 export function pluginHeading(
   plugins: readonly InstalledPlugin[] = [],
   metadata: Record<string, unknown> = {},
@@ -669,8 +737,14 @@ function derivations(value: unknown): PluginDerivation[] {
     if (!Array.isArray(d.from) || !d.from.length || d.from.length > 16)
       throw new Error('A derived value has one to 16 sources.');
     const from = d.from.map((rawSource): DerivationSource => {
-      const source = object(rawSource, ['tag', 'path']);
-      if (Object.keys(source).length !== 1) throw new Error('A source is a tag or a path.');
+      const source = object(rawSource, ['tag', 'path', 'measure']);
+      if (Object.keys(source).length !== 1)
+        throw new Error('A source is a tag, a path or a measure.');
+      if (source.measure !== undefined) {
+        if (typeof source.measure !== 'string' || !MEASURE_NAME.test(source.measure))
+          throw new Error('A source measure is a measure name.');
+        return { measure: source.measure };
+      }
       if (source.tag !== undefined) {
         if (
           typeof source.tag !== 'string' ||
@@ -732,6 +806,7 @@ export function validatePluginManifest(value: unknown): PluginManifest {
     'backdrop',
     'chart',
     'sizeBy',
+    'renderSummaries',
     'theme',
     'targets',
     'derive',
@@ -896,6 +971,11 @@ export function validatePluginManifest(value: unknown): PluginManifest {
         ...(chart.setting === undefined ? {} : { setting: chart.setting as string }),
         ...(series ? { series } : {}),
       };
+  }
+  if (p.renderSummaries !== undefined) {
+    if (p.renderSummaries !== true || typeof p.source !== 'string')
+      throw new Error('Rendering summaries is true, for a plugin with a script.');
+    result.renderSummaries = true;
   }
   if (p.sizeBy !== undefined) {
     const sizeBy = object(p.sizeBy, ['measure']);
@@ -1368,6 +1448,8 @@ function projectSource(
   metadata: Record<string, unknown>,
   result: Record<string, unknown>,
 ) {
+  // Measure values travel whole with the overview (pluginMetadata).
+  if ('measure' in source) return;
   if ('tag' in source) {
     const prefix = source.tag + ':';
     const tags = (Array.isArray(metadata.tags) ? metadata.tags : []).filter(

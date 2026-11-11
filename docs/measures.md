@@ -130,7 +130,8 @@ A duration's values count entirely **where it starts**, as if it were a moment a
 
 Plugins can use measures too ([plugins](plugins.md)):
 
-- **Scripts:** `api.measure("cost")` reads a moment's value exactly, to compare with `api.compare`.
+- **Scripts:** `api.measure("cost")` reads a moment's value exactly, to compare with `api.compare`. A plugin that renders summaries (`renderSummaries`) reads their totals with `api.total("cost")`, and in a comparison each timeline's with `api.total("cost", n)` (#587).
+- **Derived metadata:** a derivation's `{ "measure": "cost" }` source reads a value, or a summary's total.
 - **Sizes:** `sizeBy` sizes markers and summaries by a measure's total.
 - **Charts:** the background chart can draw a measure's totals across the view.
 
