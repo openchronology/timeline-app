@@ -10,10 +10,15 @@ import {
   assetLink,
   editionFile,
   assetSize,
+  DESKTOP_SYSTEMS,
+  SERVER_SYSTEMS,
+  desktopGuides,
   detectDistribution,
+  detectLinux,
   detectPlatform,
   installCommand,
   releaseFrom,
+  serverGuides,
 } from '../platform/lib/releases.js';
 import { targets } from '../scripts/desktop/packages.mjs';
 import { serverPackage, serverTargets } from '../scripts/server-targets.mjs';
@@ -124,4 +129,38 @@ test('links come from the latest release, or by name before there is one', () =>
     ),
     'curl -fLO https://github.com/openchronology/timeline-app/releases/latest/download/openchronology-server-fedora44-amd64.rpm && sudo dnf install ./openchronology-server-fedora44-amd64.rpm',
   );
+});
+
+test('the guides: one per system and Linux family, Arch included, each with a way to install', () => {
+  assert.equal(detectLinux('Mozilla/5.0 (X11; Ubuntu; Linux x86_64; rv:143.0)'), 'debian');
+  assert.equal(detectLinux('Mozilla/5.0 (X11; Fedora; Linux x86_64)'), 'fedora');
+  assert.equal(detectLinux('Mozilla/5.0 (X11; Arch Linux; Linux x86_64)'), 'arch');
+  assert.equal(detectLinux('Mozilla/5.0 (X11; Manjaro; Linux x86_64)'), 'arch');
+  assert.equal(detectLinux('Mozilla/5.0 (X11; Linux x86_64)'), null);
+  const keys = (systems) =>
+    systems.flatMap((s) => (s.variants ? s.variants.map((v) => `${s.key}/${v.key}`) : [s.key]));
+  const desktop = desktopGuides(null),
+    server = serverGuides(null, 'ubuntu24.04');
+  assert.deepEqual(Object.keys(desktop).sort(), keys(DESKTOP_SYSTEMS).sort());
+  assert.deepEqual(Object.keys(server).sort(), keys(SERVER_SYSTEMS).sort());
+  for (const guide of [...Object.values(desktop), ...Object.values(server)]) {
+    assert(guide.heading);
+    assert(guide.files.length || guide.steps.some((s) => s.command), guide.heading);
+    for (const f of guide.files) assert.match(f.href, /^https:\/\/github\.com\//);
+  }
+  // Every desktop guide's primary file names its system, apart from Arch's AUR package.
+  for (const [key, guide] of Object.entries(desktop))
+    assert.equal(guide.files.filter((f) => f.primary).length, key === 'linux/arch' ? 0 : 1, key);
+  // Arch: the AUR packages, by helper or by hand; the server then set up.
+  assert.equal(desktop['linux/arch'].steps[0].command, 'yay -S openchronology-desktop-bin');
+  assert.match(
+    desktop['linux/arch'].steps[1].command,
+    /^git clone https:\/\/aur\.archlinux\.org\/openchronology-desktop-bin\.git && cd openchronology-desktop-bin && makepkg -si$/,
+  );
+  assert.equal(server['linux/arch'].steps[0].command, 'yay -S openchronology-server');
+  assert.equal(server['linux/arch'].steps[2].command, 'sudo openchronology-setup');
+  assert.match(server['linux/arch'].links[1].href, /deploy\/arch\/README\.Arch$/);
+  // The browser's distribution first among Debian and Ubuntu.
+  assert.match(server['linux/debian'].steps[0].command, /ubuntu24\.04/);
+  assert.match(serverGuides(null, 'debian13')['linux/debian'].steps[0].command, /debian13/);
 });

@@ -116,6 +116,25 @@ try {
     ),
   );
   assert.match(ubuntu, /docker compose up --build --wait/);
+  // Tabs chosen for the visitor's system (and Linux distribution), in both guides, with every
+  // download still listed.
+  assert.match(windows, /data-system="windows"/);
+  assert.match(windows, /I run…/);
+  assert.match(windows, /href="#all-downloads"/);
+  assert.match(windows, /href="#all-server-downloads"/);
+  assert.match(windows, /id="all-downloads"/);
+  assert.match(ubuntu, /data-system="linux" data-variant="debian"/);
+  assert.match(ubuntu, /Desktop app for Linux: Debian and Ubuntu/);
+  const arch = await download(
+    'Mozilla/5.0 (X11; Arch Linux; Linux x86_64; rv:143.0) Firefox/143.0',
+  );
+  assert.match(arch, /data-system="linux" data-variant="arch"/);
+  assert.match(arch, /yay -S openchronology-desktop-bin/);
+  assert.match(arch, /yay -S openchronology-server/);
+  assert.match(arch, /data-server="arch"/);
+  assert.match(arch, /Server for Arch/);
+  const linux = await download('Mozilla/5.0 (X11; Linux x86_64; rv:143.0) Firefox/143.0');
+  assert.match(linux, /does not say which distribution/);
   // Editions (#197) link to their page; this release has no file for them yet.
   assert.match(
     windows,

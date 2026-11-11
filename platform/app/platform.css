@@ -1724,6 +1724,89 @@ dialog::backdrop {
 .download-primary .download-size {
   color: color-mix(in srgb, var(--on-primary) 80%, transparent);
 }
+/* The guided choice: "I run… Windows | Mac | Linux", then the distribution, then the guide. */
+.download-tabs {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px 12px;
+  margin-top: 12px;
+}
+.download-tabs-prefix {
+  font-weight: 600;
+}
+.download-tabs [role='tablist'] {
+  display: inline-flex;
+  flex-wrap: wrap;
+  padding: 3px;
+  gap: 2px;
+  border: 1px solid var(--line-strong);
+  border-radius: 10px;
+  background: var(--paper);
+}
+.download-tabs [role='tab'] {
+  min-height: 36px;
+  padding: 0 14px;
+  border: 0;
+  border-radius: 7px;
+  background: none;
+  color: var(--ink);
+  font: inherit;
+  cursor: pointer;
+}
+.download-tabs [role='tab']:hover {
+  background: var(--hover);
+}
+.download-tabs [role='tab'][aria-selected='true'] {
+  background: var(--green);
+  color: var(--on-primary);
+}
+.download-tabs [role='tab']:focus-visible {
+  outline: 2px solid var(--green);
+  outline-offset: 2px;
+}
+.download-tabs + .download-tabs [role='tab'] {
+  min-height: 30px;
+  font-size: 14px;
+}
+@media (max-width: 480px) {
+  .download-tabs [role='tab'] {
+    padding: 0 10px;
+  }
+}
+.download-detected {
+  margin: 8px 0 0;
+  font-size: 13px;
+}
+.download-guide {
+  margin-top: 16px;
+  padding-top: 16px;
+  border-top: 1px solid var(--line);
+}
+.download-guide h3 {
+  margin: 0 0 6px;
+}
+.download-step {
+  display: grid;
+  gap: 6px;
+  margin-top: 14px;
+}
+.download-step p,
+.download-guide .download-links,
+.download-files {
+  margin: 0;
+}
+.download-files,
+.download-guide .download-links {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px 18px;
+  margin-top: 12px;
+}
+.download-all {
+  margin: 16px 0 0;
+  font-weight: 600;
+}
 /* Reports and moderation (#115). */
 .report-categories {
   display: grid;
