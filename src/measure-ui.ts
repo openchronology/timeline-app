@@ -14,16 +14,20 @@ import {
   validateMeasures,
 } from './measures.js';
 import type { Measures, MeasureValues } from './measures.js';
-import { createMeasurePresenter, validateMeasurePresentation } from './measure-presentation.js';
+import {
+  DEFAULT_MEASURE_MODE,
+  MEASURE_FORMATS,
+  createMeasurePresenter,
+  validateMeasurePresentation,
+} from './measure-presentation.js';
 import type { MeasureMode, MeasurePresentation } from './measure-presentation.js';
+import type { MeasureType } from './measures.js';
 
-const MODES: [MeasureMode, string][] = [
-  ['exact', 'Exact (fractions as they are)'],
-  ['fixed', 'Fixed decimal places, such as money'],
-  ['decimal', 'Significant digits'],
-  ['scientific', 'Scientific notation'],
-  ['si', 'SI prefixes (k, M, G…)'],
-];
+/** The official formats a measure of `type` may use (#585), as the dialog offers them. */
+const formatsFor = (type: MeasureType): [string, string][] =>
+  MEASURE_FORMATS.filter((f) => f.type === type).map((f) => [f.mode, `${f.label} (${f.example})`]);
+/** Notations written with significant digits. */
+const SIGNIFICANT = ['decimal', 'scientific', 'engineering'];
 /** A name for a measure from its label: lowercase, underscores, starting with a letter. */
 export function measureNameFor(label: string, taken: ReadonlySet<string>): string {
   let base = label
@@ -86,7 +90,9 @@ export function addMeasureRow(
   onChange: () => void,
 ): HTMLFieldSetElement {
   const d = name && measures ? measures[name] : undefined;
-  const p: MeasurePresentation = d?.presentation ?? { mode: 'exact' };
+  const p: MeasurePresentation = d?.presentation ?? {
+    mode: DEFAULT_MEASURE_MODE[d?.type ?? 'mpz'],
+  };
   const row = document.createElement('fieldset');
   row.className = 'measure-row';
   row.dataset.original = name ?? '';
@@ -105,9 +111,24 @@ export function addMeasureRow(
     ],
     d?.type ?? 'mpz',
   );
-  const mode = select('measure-mode', MODES, p.mode);
+  const mode = select('measure-mode', formatsFor(d?.type ?? 'mpz'), p.mode);
+  // Each type has its own formats: changing the type offers its, keeping the format if it fits.
+  type.addEventListener('input', () => {
+    const kept = mode.value;
+    mode.replaceChildren(
+      ...formatsFor(type.value as MeasureType).map(([value, text]) => {
+        const option = document.createElement('option');
+        option.value = value;
+        option.textContent = text;
+        return option;
+      }),
+    );
+    mode.value = [...mode.options].some((o) => o.value === kept)
+      ? kept
+      : DEFAULT_MEASURE_MODE[type.value as MeasureType];
+  });
   const scale = textInput('measure-scale', p.scale ?? '1', 200, '1');
-  const decimals = numberInput('measure-decimals', p.decimals ?? 2, 0, 30);
+  const decimals = numberInput('measure-decimals', p.decimals ?? 0, 0, 30);
   const digits = numberInput('measure-digits', p.significantDigits ?? 6, 1, 30);
   const prefix = textInput('measure-prefix', p.prefix ?? '', 16, '$');
   const unit = textInput('measure-unit', p.unit ?? '', 40, 'h, kWh…');
@@ -128,7 +149,7 @@ export function addMeasureRow(
   groupingField.append(grouping, ' Separate thousands with commas');
   const refresh = () => {
     decimalsField.hidden = mode.value !== 'fixed';
-    digitsField.hidden = !['decimal', 'scientific', 'si'].includes(mode.value);
+    digitsField.hidden = !SIGNIFICANT.includes(mode.value);
     groupingField.hidden = !['fixed', 'decimal'].includes(mode.value);
     if (id.dataset.auto) {
       const taken = new Set(
@@ -198,17 +219,13 @@ function rowPresentation(row: HTMLElement): MeasurePresentation | undefined {
   const scale = value('measure-scale').trim();
   if (scale && scale !== '1') raw.scale = scale;
   if (mode === 'fixed') raw.decimals = Number(value('measure-decimals'));
-  if (['decimal', 'scientific', 'si'].includes(mode))
-    raw.significantDigits = Number(value('measure-digits'));
+  if (SIGNIFICANT.includes(mode)) raw.significantDigits = Number(value('measure-digits'));
   const prefix = value('measure-prefix').trim(),
     unit = value('measure-unit').trim();
   if (prefix) raw.prefix = prefix;
   if (unit) raw.unit = unit;
   if (!row.querySelector<HTMLInputElement>('.measure-grouping')!.checked) raw.grouping = false;
-  const presentation = validateMeasurePresentation(raw);
-  return Object.keys(presentation).length === 1 && presentation.mode === 'exact'
-    ? undefined
-    : presentation;
+  return validateMeasurePresentation(raw, value('measure-type') as MeasureType);
 }
 
 /**

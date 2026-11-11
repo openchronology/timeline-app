@@ -44,6 +44,18 @@ export async function checkMeasures(page) {
   await row.locator('.measure-label').fill('Cost');
   assert.equal(await row.locator('.measure-name').inputValue(), 'cost');
   await row.locator('.measure-mode').selectOption('fixed');
+  await row.locator('.measure-decimals').fill('2');
+  // Fractions are offered their four notations, whole numbers fixed decimals (#585).
+  await row.locator('.measure-type').selectOption('mpq');
+  assert.deepEqual(
+    await row.locator('.measure-mode option').evaluateAll((o) => o.map((x) => x.value)),
+    ['decimal', 'scientific', 'engineering', 'fraction'],
+  );
+  await row.locator('.measure-type').selectOption('mpz');
+  assert.deepEqual(
+    await row.locator('.measure-mode option').evaluateAll((o) => o.map((x) => x.value)),
+    ['fixed'],
+  );
   await row.locator('.measure-scale').fill('1/100');
   await row.locator('.measure-prefix').fill('$');
   assert.match(await row.locator('.measure-example').textContent(), /123456 shows as \$1,234\.56/);
