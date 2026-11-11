@@ -114,6 +114,15 @@ The [GitHub workflow](../.github/workflows/ci.yml) runs Node 22/24 tests, Chromi
 
 This directory is self-contained and can be the root of its own GitHub repository. The two independent rational libraries are pinned under `vendor/`; no build depends on adjacent checkouts. [vendor/versions.json](../vendor/versions.json) records their source commits. Their independent upstream CI and the separate `rational-conformance` project remain responsible for library-level conformance. This app adds timeline-level tests.
 
+### The project's own runner
+
+The browser jobs (Chromium, Firefox and WebKit) run on the project's own machine, a self-hosted runner labelled `och-heavy`, rather than on GitHub's. Pull requests from forks still run them on GitHub's runners, so code from outside the project never runs there.
+
+- **Isolation:** the runner runs as its own user, `gh-runner`, which has no sudo, SSH keys or tokens. Jobs run in containers on that user's rootless Docker (`DOCKER_HOST` in each runner's `.env`), so a job is root only inside its container.
+- **Instances:** three runner services, `actions-runner`, `actions-runner-2` and `actions-runner-3` in `/home/gh-runner`, so a matrix runs in parallel. Each is a systemd unit named `actions.runner.openchronology-timeline-app.<name>.service`.
+- **Other jobs:** a job that needs `sudo` on its host, such as the PostgreSQL job, which installs packages and follows the system journal, stays on GitHub's runners. So do benchmarks whose budgets are calibrated there.
+- **Adding one:** register it with `config.sh --labels och-heavy`, using a token from `POST /repos/openchronology/timeline-app/actions/runners/registration-token`, then install it with `svc.sh install gh-runner`.
+
 ## Build identity
 
 Every platform, desktop and standalone HTML footer displays the exact version tag at the built commit, or its full Git hash when no version tag points at it. Local modifications are marked `modified`. The identity is baked into the assets, not taken from the server's runtime environment. Matching source archives include `build-info.json`, so rebuilding an archive without `.git` preserves its identity. Builds from unrelated source directories display `unversioned source` rather than inventing a version. `OCH_BUILD_COMMIT` and `OCH_BUILD_VERSION` can supply an explicit identity for external build systems.
