@@ -320,8 +320,22 @@ fn measure_types(measures: Option<&Value>) -> Result<HashMap<String, String>, St
         let label = d.get("label");
         if !measure_name(name)
             || !matches!(kind, Some("mpz" | "mpq"))
-            || d.keys()
-                .any(|k| !["type", "label", "presentation"].contains(&k.as_str()))
+            || d.keys().any(|k| {
+                !["type", "label", "presentation", "durations", "balance"].contains(&k.as_str())
+            })
+            || d.get("durations")
+                .is_some_and(|v| !matches!(v.as_str(), Some("start" | "end")))
+            // A balance (#595): {"at", "value"}, each text, checked further by the editor.
+            || d.get("balance").is_some_and(|b| {
+                b.as_object().is_none_or(|b| {
+                    b.len() != 2
+                        || ["at", "value"].iter().any(|k| {
+                            b.get(*k)
+                                .and_then(Value::as_str)
+                                .is_none_or(|t| t.is_empty() || t.len() > MEASURE_TEXT_LIMIT)
+                        })
+                })
+            })
             || label.is_some_and(|l| {
                 l.as_str()
                     .is_none_or(|l| l.trim().is_empty() || l.encode_utf16().count() > 80)
@@ -1320,8 +1334,7 @@ mod tests {
             }))
             .unwrap()
         };
-        let measures =
-            serde_json::json!({"cost":{"type":"mpz","label":"Cost"},"hours":{"type":"mpq"}});
+        let measures = serde_json::json!({"cost":{"type":"mpz","label":"Cost","durations":"end","balance":{"at":"end","value":"100"}},"hours":{"type":"mpq"}});
         let path = file("measures");
         let good = with(
             measures.clone(),
@@ -1352,6 +1365,8 @@ mod tests {
             serde_json::json!({"Cost":{"type":"mpz"}}),
             serde_json::json!({"cost":{"type":"f64"}}),
             serde_json::json!({"cost":{"type":"mpz","unit":"$"}}),
+            serde_json::json!({"cost":{"type":"mpz","durations":"middle"}}),
+            serde_json::json!({"cost":{"type":"mpz","balance":{"at":"end"}}}),
             serde_json::json!(["cost"]),
         ] {
             assert!(

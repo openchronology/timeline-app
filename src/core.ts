@@ -124,7 +124,20 @@ import { validateSavedViews, validateTimelineView } from './default-view.js';
 import type { SavedViewEntry, TimelineView } from './default-view.js';
 export * from './measures.js';
 export * from './measure-presentation.js';
-import { measureValue, normalizeMeasureMetadata, validateMeasures } from './measures.js';
+import {
+  addMeasureTotals,
+  measureValue,
+  normalizeMeasureMetadata,
+  validateMeasures,
+} from './measures.js';
+import {
+  durationChanges,
+  groupBalances,
+  partitionTotals,
+  windowBalances,
+} from './measure-balance.js';
+import type { ChangeDuration } from './measure-balance.js';
+export * from './measure-balance.js';
 import { MeasureTree } from './measure-tree.js';
 export { MeasureTree } from './measure-tree.js';
 import type { Measures } from './measures.js';
@@ -281,10 +294,14 @@ export interface FrameGroup {
    * timeline's measures are its own, so totals are never added across timelines.
    */
   sourceTotals?: Record<string, Record<string, string>>;
+  /** The balances after its changes (#595), of the measures with an anchor. */
+  balanceAfter?: Record<string, string>;
   /** The duration, when the group is exactly one collapsed duration and no moments. */
   duration?: DurationBand;
 }
 export interface Frame {
+  /** The balances before and after the window's changes (#595), of measures with an anchor. */
+  balances?: Record<string, { before: string; after: string }>;
   durations?: DurationBand[];
   durationsTruncated?: boolean;
   /**
@@ -462,7 +479,15 @@ export class TimelineIndex {
   private intervals: IntervalNode | null = null;
   /** Ongoing durations (#537): the tree leaves them out, and frames resolve them at "now". */
   private ongoing: Duration[] = [];
-  private intervalDirty = true;
+  #intervalDirty = true;
+  /** Whether the interval trees need rebuilding; durations' changes (#595) go with them. */
+  private get intervalDirty() {
+    return this.#intervalDirty;
+  }
+  private set intervalDirty(dirty: boolean) {
+    this.#intervalDirty = dirty;
+    if (dirty) this.#durationTotals = null;
+  }
   /** The current time in milliseconds since the Unix epoch, replaceable in tests. */
   clock: () => number = () => Date.now();
   private edges: IntervalNode | null = null;
@@ -496,12 +521,19 @@ export class TimelineIndex {
   #measures?: Measures;
   /** Moments' measure totals by time (#574): built when first read, then kept up to date. */
   #momentTotals: MeasureTree | null = null;
+  /**
+   * Durations' changes by the time each applies (#595): at its start or end, as each measure
+   * says. Rebuilt when durations, or the moments they follow, change.
+   */
+  #durationTotals: MeasureTree | null = null;
   get measures(): Measures | undefined {
     return this.#measures;
   }
   set measures(value: Measures | undefined) {
-    if (JSON.stringify(value ?? {}) !== JSON.stringify(this.#measures ?? {}))
+    if (JSON.stringify(value ?? {}) !== JSON.stringify(this.#measures ?? {})) {
       this.#momentTotals = null;
+      this.#durationTotals = null;
+    }
     this.#measures = value;
   }
   assets?: Record<string, string>;
@@ -777,6 +809,20 @@ export class TimelineIndex {
     };
   }
   frame(viewport: Viewport, width: number, pixels = 24): Frame {
+    const frame = this.#frame(viewport, width, pixels);
+    // Measures (#595): each summary's totals are the changes in its part of the window, and
+    // the balances follow from them.
+    if (!Object.keys(this.#measures ?? {}).length) return frame;
+    const sum = this.changeSum.bind(this);
+    const groups = partitionTotals(frame.groups, viewport.left, viewport.right, sum);
+    const balances = windowBalances(this.#measures, viewport.left, viewport.right, sum);
+    return {
+      ...frame,
+      groups: groupBalances(groups, balances),
+      ...(balances ? { balances } : {}),
+    };
+  }
+  #frame(viewport: Viewport, width: number, pixels: number): Frame {
     if (this.intervalDirty) {
       const all = [...this.durations.values()];
       this.ongoing = all.filter((d) => isOngoing(d.end));
@@ -795,18 +841,15 @@ export class TimelineIndex {
       includeUpper: true,
     });
     const collapsed = threshold.compare(Q.zero) > 0 ? threshold : null;
-    const totals = this.momentTotals();
     const moments = result.groups.map((group) => {
       const first = group.firstTime.toString(),
         only = group.entryCount === 1n ? this.points.get(group.firstTime)![0] : undefined;
-      const sums = totals?.named(totals.sum(group.firstTime, group.lastTime));
       return {
         first,
         last: group.lastTime.toString(),
         count: group.entryCount.toString(),
         distinct: group.distinctCount,
         ...(only ? { id: only.id, title: only.metadata.title ?? '' } : {}),
-        ...(sums ? { totals: sums } : {}),
       };
     });
     const arcs = durationWindow(this.edges, viewport.left, viewport.right, 256, collapsed);
@@ -858,13 +901,55 @@ export class TimelineIndex {
     );
     return this.#momentTotals;
   }
+  /** Durations' changes by time (#595), or null when the timeline has no measures. */
+  durationTotals(): MeasureTree | null {
+    const names = Object.keys(this.#measures ?? {});
+    if (!names.length) return null;
+    if (!this.#durationTotals) {
+      const now = this.now() ?? undefined;
+      const changes: ChangeDuration[] = [];
+      for (const d of this.durations.values()) {
+        const band = resolveDuration(d, (id) => this.momentTime(id), now);
+        if (band)
+          changes.push({
+            first: Q.parse(band.first),
+            last: Q.parse(band.last),
+            ongoing: isOngoing(d.end),
+            metadata: d.metadata,
+          });
+      }
+      this.#durationTotals = MeasureTree.of(
+        names,
+        durationChanges(changes, names, this.#measures!),
+      );
+    }
+    return this.#durationTotals;
+  }
   /**
-   * The totals of the timeline's measures over moments from `lower` to `upper`, both included
-   * (#574): canonical text by name, zeros left out.
+   * The changes of the timeline's measures from `lower` to `upper` (#595): moments' at their
+   * times, durations' at their start or end as each measure says; either bound may be left
+   * open. Canonical text by name, zeros left out; undefined for none.
+   */
+  changeSum(
+    lower: Q | undefined,
+    upper: Q | undefined,
+    { includeLower = true, includeUpper = true } = {},
+  ): Record<string, string> | undefined {
+    const moments = this.momentTotals(),
+      durations = this.durationTotals();
+    if (!moments || !durations) return undefined;
+    const options = { includeLower, includeUpper };
+    return addMeasureTotals(
+      moments.named(moments.sum(lower, upper, options)),
+      durations.named(durations.sum(lower, upper, options)),
+    );
+  }
+  /**
+   * The totals of the timeline's measures from `lower` to `upper`, both included (#574, #595):
+   * moments' and durations' changes, canonical text by name, zeros left out.
    */
   measureTotals(lower?: Q, upper?: Q): Record<string, string> {
-    const totals = this.momentTotals();
-    return totals?.named(totals.sum(lower, upper)) ?? {};
+    return this.changeSum(lower, upper) ?? {};
   }
   /**
    * The current time as a stored coordinate, where the timeline has one: under the Gregorian

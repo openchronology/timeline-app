@@ -22,6 +22,22 @@ export interface MeasureDeclaration {
   label?: string;
   /** How its values and totals are written and read (#573); exact when absent. */
   presentation?: MeasurePresentation;
+  /**
+   * Where a duration's value applies (#595): at its start (the default) or its end. It governs
+   * the measure's totals and its balance alike.
+   */
+  durations?: 'start' | 'end';
+  /**
+   * The measure's balance (#595), when its values are changes: its value at `at`, which is the
+   * start (an opening balance, before everything), the end (a closing balance, after
+   * everything) or an exact time (the balance just after that time's changes).
+   */
+  balance?: MeasureBalance;
+}
+/** A balance's anchor (#595): `value` at `at`, both exact canonical text. */
+export interface MeasureBalance {
+  at: 'start' | 'end' | string;
+  value: string;
 }
 export type Measures = Record<string, MeasureDeclaration>;
 /** An entity's values: canonical text by measure name, never zero. */
@@ -55,9 +71,14 @@ export function validateMeasures(value: unknown): Measures {
         `Measure names are lowercase letters, digits and underscores, starting with a letter, up to 40: ${JSON.stringify(name.slice(0, 50))}.`,
       );
     const d = value[name];
-    if (!plain(d) || Object.keys(d).some((k) => !['type', 'label', 'presentation'].includes(k)))
+    if (
+      !plain(d) ||
+      Object.keys(d).some(
+        (k) => !['type', 'label', 'presentation', 'durations', 'balance'].includes(k),
+      )
+    )
       throw new Error(
-        `Measure ${name} must be {"type": "mpz" | "mpq", "label"?, "presentation"?}.`,
+        `Measure ${name} must be {"type": "mpz" | "mpq", "label"?, "presentation"?, "durations"?, "balance"?}.`,
       );
     if (d.type !== 'mpz' && d.type !== 'mpq')
       throw new Error(`Measure ${name}'s type must be "mpz" (whole numbers) or "mpq" (fractions).`);
@@ -80,10 +101,37 @@ export function validateMeasures(value: unknown): Measures {
       presentation &&
       JSON.stringify(presentation) ===
         JSON.stringify(validateMeasurePresentation({ mode: DEFAULT_MEASURE_MODE[d.type] }, d.type));
+    if (d.durations !== undefined && d.durations !== 'start' && d.durations !== 'end')
+      throw new Error(`Measure ${name}'s durations count at their "start" or "end".`);
+    let balance: MeasureBalance | undefined;
+    if (d.balance !== undefined) {
+      const b = d.balance;
+      if (!plain(b) || Object.keys(b).some((k) => k !== 'at' && k !== 'value'))
+        throw new Error(`Measure ${name}'s balance is {"at", "value"}.`);
+      let at: string;
+      try {
+        at = b.at === 'start' || b.at === 'end' ? b.at : parseMeasureValue(b.at).toString();
+      } catch {
+        throw new Error(
+          `Measure ${name}'s balance is at "start", "end" or an exact time, such as "1704067200".`,
+        );
+      }
+      let value: Q;
+      try {
+        value = parseMeasureValue(b.value);
+      } catch (error) {
+        throw new Error(`Measure ${name}'s balance: ${(error as Error).message}`);
+      }
+      if (d.type === 'mpz' && value.denominator !== 1n)
+        throw new Error(`Measure ${name}'s balance is a whole number.`);
+      balance = { at, value: measureText(value) };
+    }
     measures[name] = {
       type: d.type,
       ...(d.label === undefined ? {} : { label: (d.label as string).trim() }),
       ...(presentation && !plainDefault ? { presentation } : {}),
+      ...(d.durations === 'end' ? { durations: 'end' as const } : {}),
+      ...(balance ? { balance } : {}),
     };
   }
   return measures;
