@@ -1715,7 +1715,7 @@ pub(crate) fn edge_window(
 /// duration, #325), and arrays of at most 1024 characters as JSON (such as
 /// relationship arrows, #326), so a band never carries large metadata to the webview.
 /// `band_json` turns a row into JSON.
-pub(crate) const BAND_COLUMNS: &str = "d.id,d.start_json,d.end_json,d.first,d.last,(SELECT json_group_object(key,CASE WHEN type='true' THEN json('true') WHEN type='array' THEN json(value) WHEN key='title' THEN substr(value,1,512) WHEN key='description' THEN substr(value,1,2000) ELSE value END) FROM json_each(d.metadata) WHERE type='true' OR (type='text' AND (key IN ('title','description') OR length(value)<=256 OR (length(value)<=1024 AND (value LIKE 'http://%' OR value LIKE 'https://%')))) OR (type='array' AND key NOT IN ('tags','content_labels') AND length(value)<=1024)),d.start_time,d.end_time";
+pub(crate) const BAND_COLUMNS: &str = "d.id,d.start_json,d.end_json,d.first,d.last,(SELECT json_group_object(key,CASE WHEN type='true' THEN json('true') WHEN type IN ('array','object') THEN json(value) WHEN key='title' THEN substr(value,1,512) WHEN key='description' THEN substr(value,1,2000) ELSE value END) FROM json_each(d.metadata) WHERE type='true' OR (type='text' AND (key IN ('title','description') OR length(value)<=256 OR (length(value)<=1024 AND (value LIKE 'http://%' OR value LIKE 'https://%')))) OR (type='array' AND key NOT IN ('tags','content_labels') AND length(value)<=1024) OR (type='object' AND key='measures')),d.start_time,d.end_time";
 /// One duration band as JSON from a row of `BAND_COLUMNS`, in the shape the editor draws:
 /// `{id, start, end, first, last, metadata, startTime, endTime}`.
 fn band_json(row: &[Option<String>]) -> Result<Value, String> {
@@ -2029,6 +2029,7 @@ fn join_summary(
                 last,
                 count,
                 band: if count == 1 { band } else { None },
+                totals: None,
             });
         }
     }
@@ -2058,6 +2059,8 @@ pub(crate) struct DurationSummary {
     pub count: u64,
     /// The duration's band when the group holds exactly one, so the editor can still open it.
     pub band: Option<Value>,
+    /// Its durations' measure totals (#576), each counted where it starts: by name.
+    pub totals: Option<Value>,
 }
 /// Anchored-span summaries of durations shorter than the threshold that intersect
 /// [lower, upper], keyed by start: a group starts at the first collapsed start and takes every
@@ -2087,15 +2090,19 @@ pub(crate) fn duration_summaries(
     // starting in [anchor, anchor + threshold), counted, with their latest end and the
     // smallest ord (the duration itself when the group holds one). The final join attaches
     // that single duration's band columns; larger groups get NULLs there.
+    // Each group's measure totals (#576): its durations' values added per declared measure,
+    // each duration's counted in the group holding its start.
+    let names = file_measure_names(db)?;
+    let sums = sums_sql(&names);
     let rows = db.query(
         &format!("WITH RECURSIVE anchors(a) AS (\
            SELECT (SELECT d.first FROM duration_intervals d WHERE d.first>=q_sub(q(?1),q(?3)) AND {collapsed} ORDER BY d.first LIMIT 1) \
            UNION ALL SELECT (SELECT d.first FROM duration_intervals d WHERE d.first>=q_add(a,q(?3)) AND {collapsed} ORDER BY d.first LIMIT 1) \
            FROM anchors WHERE a IS NOT NULL), \
-         groups AS (SELECT a,count(*) AS cnt,max(d.last) AS last,min(d.ord) AS one FROM anchors \
+         groups AS (SELECT a,count(*) AS cnt,max(d.last) AS last,min(d.ord) AS one,{sums} AS sums FROM anchors \
            JOIN duration_intervals d ON d.first>=a AND d.first<q_add(a,q(?3)) AND {collapsed} \
            WHERE a IS NOT NULL GROUP BY a) \
-         SELECT q(g.a),q(g.last),g.cnt,{BAND_COLUMNS} FROM groups g \
+         SELECT q(g.a),q(g.last),g.cnt,{BAND_COLUMNS},g.sums FROM groups g \
          LEFT JOIN duration_intervals d ON g.cnt=1 AND d.ord=g.one ORDER BY g.a COLLATE RATIONAL_V1"),
         &[lower, upper, threshold],
     )?;
@@ -2115,6 +2122,7 @@ pub(crate) fn duration_summaries(
                 } else {
                     None
                 },
+                totals: named_totals(&names, r[11].as_deref()),
             })
         })
         .collect()
@@ -2209,6 +2217,7 @@ pub(crate) fn duration_summaries_walk(
             last,
             count,
             band: if count == 1 { band } else { None },
+            totals: None,
         });
     }
     Ok(out)

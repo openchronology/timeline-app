@@ -59,11 +59,38 @@ const moment = (id) => ({
   time: `${Math.floor(rand() * 400)}/${1 + Math.floor(rand() * 2)}`,
   metadata: { title: id, ...(rand() < 0.3 ? { tags: ['red'] } : {}), measures: values() },
 });
-/** Every overview group's totals against the document's values summed by hand. */
+const duration = (id) => {
+  const start = Math.floor(rand() * 400);
+  // Mostly short, collapsing into summaries; some long, drawn as bands (#576).
+  const length = rand() < 0.75 ? Math.floor(rand() * 3) : 50 + Math.floor(rand() * 200);
+  return {
+    id,
+    start: `${start}/1`,
+    end: `${start + length}/1`,
+    metadata: { title: id, ...(rand() < 0.3 ? { tags: ['red'] } : {}), measures: values() },
+  };
+};
+const add = (into, values) => {
+  for (const [name, v] of Object.entries(values ?? {}))
+    into[name] = (into[name] ?? Q.zero).add(q(v));
+};
+const named = (sums) =>
+  Object.fromEntries(
+    Object.entries(sums)
+      .filter(([, v]) => v.numerator !== 0n)
+      .map(([n, v]) => [n, text(v)]),
+  );
+/**
+ * Every overview group's totals against the document's values summed by hand: a group of
+ * moments alone exactly; and across all groups, every moment and every collapsed duration
+ * reaching the window once, each duration's where it starts (#576).
+ */
 async function check(id, label, filter) {
   const { document } = await request(`timelines/${id}/document`);
   const { revision } = await request(`timelines/${id}`);
-  const events = document.events.filter((e) => !filter || (e.metadata.tags ?? []).includes('red'));
+  const keep = (e) => !filter || (e.metadata.tags ?? []).includes('red');
+  const events = document.events.filter(keep),
+    durations = (document.durations ?? []).filter(keep);
   let groups = 0;
   for (const threshold of ['0/1', '3/1', '40/1', '1000/1']) {
     const frame = await request(`timelines/${id}/query`, 'POST', {
@@ -74,8 +101,26 @@ async function check(id, label, filter) {
       revision,
       ...(filter ? { filter } : {}),
     });
+    const all = {};
+    for (const e of events) add(all, e.metadata.measures);
+    const limit = q(frame.threshold);
+    for (const d of durations) {
+      const first = q(d.start),
+        last = q(d.end);
+      if (
+        last.sub(first).compare(limit) < 0 &&
+        last.compare(q('-1')) >= 0 &&
+        first.compare(q('401')) <= 0
+      )
+        add(all, d.metadata.measures);
+    }
+    const summed = {};
+    for (const group of frame.groups)
+      for (const [name, v] of Object.entries(group.totals ?? {}))
+        summed[name] = (summed[name] ?? Q.zero).add(q(v));
+    assert.deepEqual(named(summed), named(all), `${label} at ${threshold}: every value once`);
     for (const group of frame.groups) {
-      if (BigInt(group.count) === 0n) continue;
+      if (BigInt(group.count) === 0n || group.durationCount) continue;
       groups++;
       const expected = {};
       for (const e of events) {
@@ -84,14 +129,9 @@ async function check(id, label, filter) {
         for (const [name, v] of Object.entries(e.metadata.measures ?? {}))
           expected[name] = (expected[name] ?? Q.zero).add(q(v));
       }
-      const named = Object.fromEntries(
-        Object.entries(expected)
-          .filter(([, v]) => v.numerator !== 0n)
-          .map(([n, v]) => [n, text(v)]),
-      );
       assert.deepEqual(
         group.totals ?? {},
-        named,
+        named(expected),
         `${label} at ${threshold}: ${group.first}..${group.last}`,
       );
     }
@@ -118,7 +158,11 @@ try {
   const created = await request(
     'timelines',
     'POST',
-    { ...SETTINGS, events: Array.from({ length: 120 }, () => moment('m' + next++)) },
+    {
+      ...SETTINGS,
+      events: Array.from({ length: 120 }, () => moment('m' + next++)),
+      durations: Array.from({ length: 60 }, () => duration('d' + next++)),
+    },
     201,
   );
   /** Random sparse saves to timeline `id`: adds, moves, value changes and deletions. */
@@ -147,11 +191,29 @@ try {
           });
         else changes.push({ id: e.id, event: { ...moment(e.id), metadata: { ...e.metadata } } });
       }
+      // Durations: added, revalued in place, moved and deleted.
+      const durationChanges = [];
+      for (let k = 0; k < Math.floor(rand() * 5); k++) {
+        const r = rand(),
+          d = document.durations?.length ? pick(document.durations) : null;
+        if (r < 0.3 || !d) {
+          const added = duration('d' + next++);
+          durationChanges.push({ id: added.id, duration: added });
+        } else if (durationChanges.some((c) => c.id === d.id)) continue;
+        else if (r < 0.45) durationChanges.push({ id: d.id, duration: null });
+        else if (r < 0.75)
+          durationChanges.push({
+            id: d.id,
+            duration: { ...d, metadata: { ...d.metadata, measures: values() } },
+          });
+        else
+          durationChanges.push({ id: d.id, duration: { ...duration(d.id), metadata: d.metadata } });
+      }
       await request(`timelines/${id}/changes`, 'PUT', {
         revision,
         settings: SETTINGS,
         changes,
-        durationChanges: [],
+        durationChanges,
         relationshipChanges: [],
       });
     }
@@ -179,7 +241,10 @@ try {
       const { measures: _m, ...metadata } = e.metadata;
       return { id: e.id, event: { ...e, metadata } };
     }),
-    durationChanges: [],
+    durationChanges: (document.durations ?? []).map((d) => {
+      const { measures: _m, ...metadata } = d.metadata;
+      return { id: d.id, duration: { ...d, metadata } };
+    }),
     relationshipChanges: [],
   });
   await check(created.id, 'without values');

@@ -13,6 +13,8 @@ import {
 } from './plugins.js';
 import { renderMarkdown } from './rich-text.js';
 import type { InstalledPlugin } from './plugins.js';
+import { measureRows } from './measure-ui.js';
+import type { Measures } from './measures.js';
 
 /** The host an image URL names, or nothing for one that is not a URL. */
 function hostOf(url: string) {
@@ -37,6 +39,8 @@ export function createHoverPreview(
   stage: HTMLElement,
   scale: () => number,
   select: (button: HTMLButtonElement) => void,
+  /** The timeline's measures (#575), whose values the card lists. */
+  measures: () => Measures | undefined = () => undefined,
 ) {
   const card = document.createElement('div');
   card.className = 'focus-card';
@@ -59,7 +63,10 @@ export function createHoverPreview(
   // Where the image is hosted, credited (#109).
   const credit = document.createElement('small');
   credit.className = 'focus-credit';
-  card.append(img, credit, title, notes, sources);
+  // The moment's measure values (#575), as each measure shows them.
+  const values = document.createElement('div');
+  values.className = 'focus-measures';
+  card.append(img, credit, title, values, notes, sources);
   stage.append(card);
   // Per-marker preview data, and the markers already given listeners. Weak, so markers the
   // editor discards are collected without any cleanup here.
@@ -160,6 +167,9 @@ export function createHoverPreview(
       notes.append(p);
     }
     notes.hidden = !description;
+    const measured = measureRows(measures(), entry.metadata);
+    values.replaceChildren(...(measured ? [measured] : []));
+    values.hidden = !measured;
     sources.replaceChildren();
     // Only safe https URLs become links (imageURL applies the same rule as for images).
     const urls = Array.isArray(entry.metadata.sources)

@@ -2486,7 +2486,7 @@ export class PostgresStore {
         // Durations shorter than the threshold, grouped like moments (oc_duration_overview,
         // from the duration tree's subtree summaries), to merge into the moment groups.
         const collapsed = await c.query(
-          `SELECT first_time,last_time,duration_count,band FROM ${names.durationOverview}($1,$2::mpq,$3::mpq,$4::mpq)`,
+          `SELECT first_time,last_time,duration_count,band,totals FROM ${names.durationOverview}($1,$2::mpq,$3::mpq,$4::mpq)`,
           [tree, query.lower, query.upper, threshold],
         );
         const momentGroups = rows.map((r) => ({
@@ -2512,6 +2512,8 @@ export class PostgresStore {
             last: r.last_time,
             count: r.duration_count,
             ...(r.band ? { band: r.band } : {}),
+            // Their measure totals, each counted where it starts (#576).
+            ...(r.totals ? { totals: r.totals } : {}),
           })),
         );
         const bands = {
@@ -2987,6 +2989,8 @@ async function writeIntervalNodes(client, table, id, root) {
       count: node.count,
       minExtent: node.minExtent.toString(),
       maxExtent: node.maxExtent.toString(),
+      // Measure totals (#576), as the browser's tree computed them.
+      totals: node.totals,
       source: node.band,
     };
     rows.push(row);

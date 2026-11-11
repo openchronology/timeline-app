@@ -606,6 +606,14 @@ export function compilePluginScript(source: string) {
     outline: [1],
     merge: [2],
     none: [0],
+    // A moment's measure value (#575) and exact arithmetic to compare it.
+    measure: [1],
+    rational: [1],
+    compare: [2],
+    add: [2],
+    sub: [2],
+    mul: [2],
+    div: [2],
     trim: [1],
     upper: [1],
     lower: [1],
@@ -618,7 +626,23 @@ export function compilePluginScript(source: string) {
   return (invoke: (name: string, args: ScriptValue[]) => ScriptValue): string =>
     string(
       run(body, '', undefined, (name, args) => {
-        if (['trim', 'upper', 'lower', 'startsWith', 'endsWith', 'slice', 'replace'].includes(name))
+        if (
+          [
+            'trim',
+            'upper',
+            'lower',
+            'startsWith',
+            'endsWith',
+            'slice',
+            'replace',
+            'rational',
+            'compare',
+            'add',
+            'sub',
+            'mul',
+            'div',
+          ].includes(name)
+        )
           return call(name, args);
         return invoke(name, args);
       }),

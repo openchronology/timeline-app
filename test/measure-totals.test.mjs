@@ -160,3 +160,63 @@ test('coalesced groups add their totals', () => {
   assert.equal(addTotals({ a: '1' }, { a: '-1' }), undefined);
   assert.deepEqual(addTotals(undefined, { a: '2' }), { a: '2' });
 });
+
+test("collapsed durations' values count where they start, once, beside moments' (#576)", () => {
+  const rand = random(576);
+  const MEASURES = { cost: { type: 'mpz' } };
+  const cost = () => String(Math.floor(rand() * 900) - 200);
+  const events = Array.from({ length: 80 }, (_, i) => ({
+    id: 'm' + i,
+    time: `${Math.floor(rand() * 1000)}/1`,
+    metadata: { measures: { cost: cost() } },
+  }));
+  const durations = Array.from({ length: 120 }, (_, i) => {
+    const start = Math.floor(rand() * 1000);
+    // Mostly short (collapsing at most views), some long (drawn as bands).
+    const length = rand() < 0.8 ? Math.floor(rand() * 8) : 100 + Math.floor(rand() * 400);
+    return {
+      id: 'd' + i,
+      start: `${start}/1`,
+      end: `${start + length}/1`,
+      metadata: { measures: { cost: cost() } },
+    };
+  });
+  const index = new TimelineIndex(
+    validateDocument({
+      format: 'openchronology',
+      version: 1,
+      title: 'Durations',
+      description: '',
+      measures: MEASURES,
+      events,
+      durations,
+    }),
+  );
+  const viewport = new Viewport(q('-50'), q('1600'));
+  for (const width of [60, 300, 1500]) {
+    const frame = index.frame(viewport, width);
+    const threshold = viewport.threshold(width, 24);
+    // Every moment in view and every collapsed duration reaching it, each once.
+    let expected = Q.zero;
+    for (const e of events) expected = expected.add(q(e.metadata.measures.cost));
+    let collapsed = 0;
+    for (const d of durations) {
+      const first = q(d.start),
+        last = q(d.end);
+      if (last.sub(first).compare(threshold) >= 0) continue;
+      if (last.compare(viewport.left) < 0 || first.compare(viewport.right) > 0) continue;
+      expected = expected.add(q(d.metadata.measures.cost));
+      collapsed++;
+    }
+    const counted = frame.groups.reduce((n, g) => n + Number(g.durationCount ?? 0), 0);
+    assert.equal(counted, collapsed, `${width}: durations summarized`);
+    const all = frame.groups.reduce((sum, g) => addTotals(sum, g.totals), undefined) ?? {};
+    assert.equal(all.cost ?? '0', text(expected), `${width}: every value once`);
+    // A band drawn on its own carries its values for the reader and the chart.
+    for (const band of frame.durations ?? [])
+      assert.deepEqual(
+        band.metadata.measures,
+        durations.find((d) => d.id === band.id).metadata.measures,
+      );
+  }
+});

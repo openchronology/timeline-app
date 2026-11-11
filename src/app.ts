@@ -74,6 +74,7 @@ import {
   pluginOutline,
   pluginHeading,
   pluginSize,
+  pluginSizeMeasure,
   PLUGIN_EXAMPLE,
   validateTags,
   validateEntityTags,
@@ -82,6 +83,7 @@ import {
   validateMeasures,
   normalizeMeasureMetadata,
   measureLabel,
+  measurePresenter,
   measuresCompatible,
   remeasuredEntities,
   validateTimelineView,
@@ -194,6 +196,7 @@ import type {
   TimelineView,
   SavedViewEntry,
   Measures,
+  MomentSize,
   ViewSeparation,
   TimePresentation,
   PresentationContext,
@@ -714,6 +717,7 @@ const hoverPreview = createHoverPreview(
   stage,
   () => uiScale,
   (button) => button.click(),
+  () => timelineMeasures(),
 );
 /** Changes whenever what the timeline shows may have: another document, an edit, a revision. */
 const contentGeneration = () =>
@@ -1244,9 +1248,13 @@ async function timelineQuery<T>(query: Record<string, unknown>, signal?: AbortSi
             ...(p.manifest.marker ? [p.manifest.marker.metadataKey] : []),
             ...(p.manifest.hover || p.manifest.source ? ['title', 'description'] : []),
             ...(p.manifest.hover ? ['sources'] : []),
-            ...(p.manifest.chart?.series?.length ? ['tags'] : []),
+            ...(p.manifest.chart?.kind === 'moments' && p.manifest.chart.series?.length
+              ? ['tags']
+              : []),
             ...derivationKeys(p.manifest),
           ]),
+        // Measure values (#575), for hover cards, scripts and sizes.
+        ...(plugins.some((p) => p.enabled) && timelineMeasures() ? ['measures'] : []),
       ]),
     ];
     // The desktop store has no clock of its own: ongoing durations (#537) end at this one.
@@ -1756,6 +1764,8 @@ function drawFrame() {
     ? [...frame.groups].sort((a, b) => Q.parse(a.first).compare(Q.parse(b.first)))
     : [...groups].map(([, group]) => group);
   const trackLanes = new Map<string, number>();
+  // Sizes by a measure's total (#575), relative to the largest in view.
+  const sizedBy = measureSizes(orderedGroups, activePlugins());
   const rowPlan = comparisonRows();
   if (comparison && !comparison.combined) bottomExtent = Math.max(bottomExtent, rowPlan.total);
   for (const group of orderedGroups) {
@@ -1850,7 +1860,12 @@ function drawFrame() {
       markSensitive(button, metadata);
       const color = count === 1n ? pluginColor(plugins, metadata) : null;
       button.style.backgroundColor = color ?? '';
-      button.dataset.size = count === 1n && !span ? pluginSize(plugins, metadata) : 'medium';
+      button.dataset.size =
+        sizedBy && !span
+          ? sizedBy(group)
+          : count === 1n && !span
+            ? pluginSize(plugins, metadata)
+            : 'medium';
       renderPluginShape(button, count === 1n && !span ? pluginShape(plugins, metadata) : 'circle');
       // Dashed for a presumptive moment or collapsed duration (#325); summaries stay solid.
       renderPluginOutline(button, count === 1n ? pluginOutline(plugins, metadata) : 'solid');
@@ -1858,9 +1873,10 @@ function drawFrame() {
     button.style.borderColor = '';
     button.setAttribute(
       'aria-label',
-      count > 1n ? `${summaryName(group)} near ${presented(first)}` : name,
+      count > 1n ? `${summaryName(group)}${totalsText(group, 32)} near ${presented(first)}` : name,
     );
-    button.title = count > 1n ? `${summaryName(group)}; select to explore` : name;
+    button.title =
+      count > 1n ? `${summaryName(group)}${totalsText(group, 32)}; select to explore` : name;
     const sourceLane = trackLanes.get(sourceKey ?? '') ?? 0;
     trackLanes.set(sourceKey ?? '', sourceLane + 1);
     // Labels below the axis go beneath the duration bands, whose titles they would cover; a
@@ -1882,8 +1898,13 @@ function drawFrame() {
     // Rows of larger labels can reach past the stage: they can be panned into view.
     topExtent = Math.min(topExtent, labelTop);
     bottomExtent = Math.max(bottomExtent, labelTop + labelHeight);
+    // A summary's label names what it holds, then its measures' totals (#575).
     label.title.textContent =
-      count > 1n ? summaryName(group) : span ? (span.metadata.title ?? '') : (group.title ?? '');
+      count > 1n
+        ? summaryName(group) + totalsText(group)
+        : span
+          ? (span.metadata.title ?? '')
+          : (group.title ?? '');
     caption.hidden =
       !!heading || (count === 1n && !(span ? span.metadata.title : group.title)?.trim());
     stem.hidden = caption.hidden;
@@ -9130,6 +9151,45 @@ function parseTagInput(value: string): string[] {
   );
 }
 /** "3 moments", "2 durations" or "3 moments · 2 durations". */
+/**
+ * A summary's measure totals as its label shows them (#575): each nonzero total, labelled, as
+ * its measure shows totals, at most `limit` of them, after " · ". Empty without measures.
+ */
+function totalsText(group: FrameGroup, limit = 2): string {
+  const measures = timelineMeasures();
+  if (!measures || !group.totals) return '';
+  const parts = Object.keys(measures)
+    .filter((name) => group.totals![name] !== undefined)
+    .map(
+      (name) =>
+        `${measureLabel(measures, name)} ${measurePresenter(measures, name).print(Q.parse(group.totals![name].includes('/') ? group.totals![name] : group.totals![name] + '/1'), 'total')}`,
+    );
+  return parts.length ? ' · ' + parts.slice(0, limit).join(' · ') : '';
+}
+/**
+ * Marker sizes by a measure's total (#575): for each group in view, small, medium or large by
+ * its total of the measure the plugins size by, relative to the largest in view; null when no
+ * plugin sizes by a measure or nothing in view has a positive total.
+ */
+function measureSizes(groups: readonly FrameGroup[], plugins: readonly InstalledPlugin[]) {
+  const measure = pluginSizeMeasure(plugins);
+  if (!measure) return null;
+  const value = (group: FrameGroup) => {
+    const text = group.totals?.[measure];
+    return text ? Q.parse(text.includes('/') ? text : text + '/1') : Q.zero;
+  };
+  let largest = Q.zero;
+  for (const group of groups) if (value(group).compare(largest) > 0) largest = value(group);
+  if (largest.compare(Q.zero) <= 0) return null;
+  return (group: FrameGroup): MomentSize => {
+    const share = value(group).div(largest);
+    return share.compare(Q.from(2n, 3n)) >= 0
+      ? 'large'
+      : share.compare(Q.from(1n, 3n)) >= 0
+        ? 'medium'
+        : 'small';
+  };
+}
 function summaryName(group: FrameGroup) {
   const moments = BigInt(group.count),
     spans = BigInt(group.durationCount ?? '0');
@@ -13308,7 +13368,26 @@ function renderBackgroundChart(host: HTMLElement) {
   const chart = pluginChart(installedPlugins());
   const x = (time: string) => viewport.x(parsedTime(time), width()),
     spread = Math.max(24, 2 * pixels());
-  const density = chart && momentDensity(frame.groups, x, width(), spread);
+  // A measure chart (#575) weighs each group by its total of the measure (none below zero),
+  // and each duration drawn as a band by its own value, at its start (#576).
+  const weight = (text: string | undefined) => {
+    const total = text ? Q.parse(text.includes('/') ? text : text + '/1') : Q.zero;
+    return String(total.compare(Q.zero) > 0 ? total.toApproximateNumber() : 0);
+  };
+  const charted = chart?.measure
+    ? [
+        ...frame.groups.map((g) => ({
+          first: g.first,
+          last: g.last,
+          count: weight(g.totals?.[chart.measure!]),
+        })),
+        ...(frame.durations ?? []).map((band) => {
+          const values = band.metadata.measures as Record<string, string> | undefined;
+          return { first: band.first, last: band.first, count: weight(values?.[chart.measure!]) };
+        }),
+      ]
+    : frame.groups;
+  const density = chart && momentDensity(charted, x, width(), spread);
   const most = density ? Math.max(...density) : 0;
   if (!chart || !(most > 0)) {
     timelineChart?.svg.remove();
