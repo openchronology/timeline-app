@@ -15,6 +15,10 @@ concurrency:
   cancel-in-progress: false
 jobs:
   desktop:
+    # packages: read for the Linux desktop build image (#605).
+    permissions:
+      contents: read
+      packages: read
     uses: ./.github/workflows/desktop.yml
     with:
       tag: ${{ github.event.release.tag_name || github.ref_name }}

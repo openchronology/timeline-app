@@ -84,3 +84,27 @@ test('each Dockerfile builds its tools stages unless given images of them', asyn
     }
   }
 });
+
+test('the desktop build image is tagged with a hash of its Dockerfile', async () => {
+  const { IMAGES, wholeImage } = await import('../scripts/build-images.mjs');
+  const { createHash } = await import('node:crypto');
+  const { dockerfile } = IMAGES['desktop-build'];
+  const hash = createHash('sha256')
+    .update(await readFile(dockerfile, 'utf8'))
+    .digest('hex')
+    .slice(0, 16);
+  assert.equal(await wholeImage('desktop-build'), `ghcr.io/openchronology/desktop-build:${hash}`);
+});
+
+test('the Linux desktop jobs run in the image only when it is found', async () => {
+  const desktop = await readFile('.github/workflows/desktop.yml', 'utf8');
+  assert.match(desktop, /--find desktop-build >> "\$GITHUB_OUTPUT"/);
+  assert.match(
+    desktop,
+    /image: \$\{\{ startsWith\(matrix\.target, 'linux-'\) && needs\.image\.outputs\.image \|\| '' \}\}/,
+  );
+  assert.match(desktop, /if: runner\.os == 'Linux' && !needs\.image\.outputs\.image/);
+  const ci = await readFile('.github/workflows/ci.yml', 'utf8');
+  assert.match(ci, /image: \$\{\{ needs\.desktop-image\.outputs\.image \}\}/);
+  assert.match(ci, /if: \$\{\{ !needs\.desktop-image\.outputs\.image \}\}/);
+});

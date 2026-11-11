@@ -6,8 +6,11 @@
 // from), the target's base image and PostgreSQL version, so a changed stage never uses an old
 // image: scripts/server-package.mjs builds the stage itself until one is published.
 //
-//   node scripts/build-images.mjs [--push] [--stage native-tools|package-tools] [target ...]
+//   node scripts/build-images.mjs [--push] [--stage native-tools|package-tools] [target|image ...]
+//   node scripts/build-images.mjs --find desktop-build
 //
+// It also builds images from a whole Dockerfile (IMAGES): the Linux desktop build image, which
+// the desktop jobs run in when --find finds it published.
 // Without --push the images are loaded into the local Docker. With --push (build-images.yml)
 // they are pushed, and with one target and stage the image's name and digest are written to
 // $GITHUB_OUTPUT for its attestation. OCH_TOOL_IMAGES names another repository.
@@ -15,7 +18,7 @@ import { spawn, execFile } from 'node:child_process';
 import { createHash } from 'node:crypto';
 import { readFile, appendFile, mkdtemp, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
-import { join } from 'node:path';
+import { dirname, join } from 'node:path';
 import { pathToFileURL } from 'node:url';
 import { serverTargets } from './server-targets.mjs';
 
@@ -70,6 +73,30 @@ export async function toolImage(name, stage, repo = TOOL_IMAGES) {
   const dockerfile = await readFile(dockerfileOf(target), 'utf8');
   return `${repo}:${name}-${stage}-${toolStageKey(dockerfile, stage, target)}`;
 }
+
+/**
+ * Images built from a whole Dockerfile, its folder the build context, tagged with a hash of the
+ * Dockerfile: the Linux desktop build image (deploy/desktop-build). OCH_DESKTOP_IMAGES names
+ * another repository for it.
+ */
+export const IMAGES = {
+  'desktop-build': {
+    dockerfile: 'deploy/desktop-build/Dockerfile',
+    repo: () => process.env.OCH_DESKTOP_IMAGES || 'ghcr.io/openchronology/desktop-build',
+    description: "OpenChronology's Linux desktop build image (scripts/build-images.mjs)",
+  },
+};
+/** A whole-Dockerfile image's reference, tagged with the Dockerfile's hash. */
+export async function wholeImage(name) {
+  const { dockerfile, repo } = IMAGES[name];
+  const text = await readFile(dockerfile, 'utf8');
+  return `${repo()}:${createHash('sha256').update(text).digest('hex').slice(0, 16)}`;
+}
+// OCH_UBUNTU_MIRROR: an Ubuntu archive mirror closer than archive.ubuntu.com.
+const imageArgs = () =>
+  process.env.OCH_UBUNTU_MIRROR
+    ? ['--build-arg', `UBUNTU_MIRROR=${process.env.OCH_UBUNTU_MIRROR}`]
+    : [];
 
 /** The build arguments every build of a target's Dockerfile takes. */
 export function targetArgs(target) {
@@ -133,49 +160,71 @@ const run = (command, args) =>
     );
   });
 
+/** Builds one image, loaded into the local Docker or pushed; returns its digest when pushed. */
+async function buildImage(ref, args, description, push) {
+  console.log(`Building ${ref}`);
+  const dir = await mkdtemp(join(tmpdir(), 'och-image-'));
+  const metadata = join(dir, 'metadata.json');
+  try {
+    await run('docker', [
+      'buildx',
+      'build',
+      '--progress=plain',
+      ...args.slice(0, -1),
+      '--label',
+      'org.opencontainers.image.source=https://github.com/openchronology/timeline-app',
+      '--label',
+      `org.opencontainers.image.description=${description}`,
+      '--tag',
+      ref,
+      '--metadata-file',
+      metadata,
+      push ? '--push' : '--load',
+      args.at(-1),
+    ]);
+    const digest = JSON.parse(await readFile(metadata, 'utf8'))['containerimage.digest'];
+    console.log(`Built ${ref}${digest ? `@${digest}` : ''}`);
+    return { ref, digest };
+  } finally {
+    await rm(dir, { recursive: true, force: true });
+  }
+}
+
 async function main(argv) {
   const push = argv.includes('--push');
+  // --find <image>: the published image's pinned reference as `image=<ref>@<digest>`, or an
+  // empty `image=` when there is none, for $GITHUB_OUTPUT (desktop.yml, ci.yml).
+  const find = argv.indexOf('--find');
+  if (find >= 0) {
+    const name = argv[find + 1];
+    if (!IMAGES[name]) throw new Error(`Unknown image ${name}`);
+    const ref = await wholeImage(name);
+    const digest = await publishedDigest(ref);
+    console.error(digest ? `Using the published ${ref}@${digest}` : `No published ${ref}`);
+    console.log(`image=${digest ? `${ref}@${digest}` : ''}`);
+    return;
+  }
   const at = argv.indexOf('--stage');
   const stages = at >= 0 ? [argv[at + 1]] : Object.keys(TOOL_STAGES);
   const names = argv.filter((a, i) => !a.startsWith('--') && (at < 0 || i !== at + 1));
   for (const stage of stages) if (!TOOL_STAGES[stage]) throw new Error(`Unknown stage ${stage}`);
   for (const name of names)
-    if (!toolTargets().includes(name)) throw new Error(`${name} has no tools images`);
+    if (!toolTargets().includes(name) && !IMAGES[name])
+      throw new Error(`${name} is neither a server target with tools images nor an image`);
   const built = [];
-  for (const name of names.length ? names : toolTargets()) {
+  for (const name of names.length ? names : [...toolTargets(), ...Object.keys(IMAGES)]) {
+    if (IMAGES[name]) {
+      const { dockerfile, description } = IMAGES[name];
+      const args = ['--file', dockerfile, ...imageArgs(), dirname(dockerfile)];
+      built.push(await buildImage(await wholeImage(name), args, description, push));
+      continue;
+    }
     const target = serverTargets[name];
     for (const stage of stages) {
       const ref = await toolImage(name, stage, process.env.OCH_TOOL_IMAGES || TOOL_IMAGES);
-      console.log(`Building ${ref}`);
-      const dir = await mkdtemp(join(tmpdir(), 'och-image-'));
-      const metadata = join(dir, 'metadata.json');
-      try {
-        await run('docker', [
-          'buildx',
-          'build',
-          '--progress=plain',
-          '--file',
-          dockerfileOf(target),
-          '--target',
-          stage,
-          ...targetArgs(target),
-          '--label',
-          'org.opencontainers.image.source=https://github.com/openchronology/timeline-app',
-          '--label',
-          `org.opencontainers.image.description=OpenChronology's ${name} server package ${stage} (scripts/build-images.mjs)`,
-          '--tag',
-          ref,
-          '--metadata-file',
-          metadata,
-          push ? '--push' : '--load',
-          '.',
-        ]);
-        const digest = JSON.parse(await readFile(metadata, 'utf8'))['containerimage.digest'];
-        console.log(`Built ${ref}${digest ? `@${digest}` : ''}`);
-        built.push({ ref, digest });
-      } finally {
-        await rm(dir, { recursive: true, force: true });
-      }
+      const args = ['--file', dockerfileOf(target), '--target', stage, ...targetArgs(target), '.'];
+      const description = `OpenChronology's ${name} server package ${stage} (scripts/build-images.mjs)`;
+      built.push(await buildImage(ref, args, description, push));
     }
   }
   if (push && built.length === 1 && process.env.GITHUB_OUTPUT) {
