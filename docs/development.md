@@ -119,6 +119,7 @@ This directory is self-contained and can be the root of its own GitHub repositor
 The browser jobs (Chromium, Firefox and WebKit) run on the project's own machine, a self-hosted runner labelled `och-heavy`, rather than on GitHub's. Pull requests from forks still run them on GitHub's runners, so code from outside the project never runs there.
 
 - **Isolation:** the runner runs as its own user, `gh-runner`, which has no sudo, SSH keys or tokens. Jobs run in containers on that user's rootless Docker (`DOCKER_HOST` in each runner's `.env`), so a job is root only inside its container.
+- **Downloads:** its Docker downloads one layer at a time (`"max-concurrent-downloads": 1` in `~gh-runner/.config/docker/daemon.json`). Jobs pulling a new image together otherwise deadlocked on the same layer.
 - **Instances:** three runner services, `actions-runner`, `actions-runner-2` and `actions-runner-3` in `/home/gh-runner`, so a matrix runs in parallel. Each is a systemd unit named `actions.runner.openchronology-timeline-app.<name>.service`.
 - **Other jobs:** a job that needs `sudo` on its host, such as the PostgreSQL job, which installs packages and follows the system journal, stays on GitHub's runners. So do benchmarks whose budgets are calibrated there.
 - **Adding one:** register it with `config.sh --labels och-heavy`, using a token from `POST /repos/openchronology/timeline-app/actions/runners/registration-token`, then install it with `svc.sh install gh-runner`.
