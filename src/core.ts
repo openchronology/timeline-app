@@ -276,6 +276,11 @@ export interface FrameGroup {
    * text by name, zeros left out; absent when all are zero or the timeline has none.
    */
   totals?: Record<string, string>;
+  /**
+   * In a combined comparison, the totals by compared timeline (its track's key) (#586): each
+   * timeline's measures are its own, so totals are never added across timelines.
+   */
+  sourceTotals?: Record<string, Record<string, string>>;
   /** The duration, when the group is exactly one collapsed duration and no moments. */
   duration?: DurationBand;
 }
