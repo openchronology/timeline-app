@@ -920,9 +920,10 @@ export class PostgresStore {
     // The row's description of the index, in one update: settings, the three trees' roots,
     // the moment count, catalogue text (fresh, so event_text_stale is cleared), comparison,
     // storage size (the same as set above, so its charge is unchanged), event_generation when
-    // moments were added, updated_at when `touch`, and index_version 2 (current).
+    // moments were added, updated_at when `touch`, and index_version 3 (current: trees with
+    // measures' totals, #574).
     await client.query(
-      'UPDATE oc_timelines SET title=$2,description=$3,root=$4,event_count=$5,presentation=$6::jsonb,plugins=$7::jsonb,tags=$8,assets=$9::jsonb,event_text=$10,comparison=$11::jsonb,storage_bytes=$12,event_generation=event_generation+CASE WHEN $13 THEN 1 ELSE 0 END,updated_at=CASE WHEN $14 THEN now() ELSE updated_at END,duration_root=$15,edge_root=$16,index_version=2,event_text_stale=false,image=$17::jsonb,view=$18::jsonb,measures=$19::jsonb WHERE id=$1',
+      'UPDATE oc_timelines SET title=$2,description=$3,root=$4,event_count=$5,presentation=$6::jsonb,plugins=$7::jsonb,tags=$8,assets=$9::jsonb,event_text=$10,comparison=$11::jsonb,storage_bytes=$12,event_generation=event_generation+CASE WHEN $13 THEN 1 ELSE 0 END,updated_at=CASE WHEN $14 THEN now() ELSE updated_at END,duration_root=$15,edge_root=$16,index_version=3,event_text_stale=false,image=$17::jsonb,view=$18::jsonb,measures=$19::jsonb WHERE id=$1',
       [
         id,
         document.title,
@@ -2502,6 +2503,8 @@ export class PostgresStore {
                   : {}),
               }
             : {}),
+          // The group's measure totals (#574), from the tree's subtree totals.
+          ...(r.totals ? { totals: r.totals } : {}),
         }));
         const durationClusters = durationGroups(
           collapsed.rows.map((r) => ({
@@ -3159,15 +3162,16 @@ export async function releaseIndexes(client) {
   return rows.length;
 }
 /**
- * Rebuilds indexes stored before persistent AVL trees (index_version 2), each from its
- * document read whole, without touching `updated_at`; comparisons, rebuilt from their
- * sources, are only marked current. Run by migrate.mjs in its transaction `client`.
+ * Rebuilds indexes stored before persistent AVL trees (index_version 2), and those of
+ * timelines with measures stored before trees kept their totals (index_version 3, #574),
+ * each from its document read whole, without touching `updated_at`; comparisons, rebuilt from
+ * their sources, are only marked current. Run by migrate.mjs in its transaction `client`.
  * Returns how many timelines it rebuilt.
  */
 export async function rebuildIndexes(client) {
   const store = new PostgresStore(null);
   const { rows } = await client.query(
-    'SELECT t.* FROM oc_timelines t WHERE t.index_version<2 AND t.comparison IS NULL',
+    'SELECT t.* FROM oc_timelines t WHERE (t.index_version<2 OR (t.index_version<3 AND t.measures IS NOT NULL)) AND t.comparison IS NULL',
   );
   for (const timeline of rows)
     await store.replace(client, timeline.id, await store.branchDocument(client, timeline), {

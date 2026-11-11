@@ -199,6 +199,11 @@ CREATE TABLE IF NOT EXISTS oc_moments (
 -- height (NULL in trees built before index version 2, which migrate.mjs rebuilds).
 ALTER TABLE oc_nodes ADD COLUMN IF NOT EXISTS moment_ids text[];
 ALTER TABLE oc_nodes ADD COLUMN IF NOT EXISTS height integer;
+-- Measures' totals (#574): own_totals, the values of the node's moments added up; totals, its
+-- subtree's. Each is {name: exact value as text}, zeros left out; NULL is all zero, as in
+-- trees built before measures. avl.mjs and tree.mjs compute them as they do event_count.
+ALTER TABLE oc_nodes ADD COLUMN IF NOT EXISTS own_totals jsonb;
+ALTER TABLE oc_nodes ADD COLUMN IF NOT EXISTS totals jsonb;
 ALTER TABLE oc_nodes ALTER COLUMN events DROP NOT NULL;
 -- Older installations kept whole moments inside nodes; move them out once: copy each node's
 -- events into oc_moments, then keep their IDs in stored order and clear events. Both
@@ -240,13 +245,34 @@ AS $$ SELECT num(q)::text || '/' || den(q)::text $$;
 -- one revision. Raises on missing or negative bounds and on a node the tree names but lacks.
 -- Forks are handed to oc_overview_lineage and views use oc_view_overview (both generated
 -- below from this definition, which the rewrites there match by text).
+-- Two maps of measure totals added (#574): {name: exact value as text}, zeros left out, NULL
+-- for none. Values are canonical mpq text ("1250", "3/2").
+CREATE OR REPLACE FUNCTION oc_add_totals(a jsonb, b jsonb) RETURNS jsonb
+LANGUAGE sql IMMUTABLE PARALLEL SAFE AS $$
+  SELECT CASE WHEN a IS NULL OR a='{}'::jsonb THEN NULLIF(b,'{}'::jsonb)
+    WHEN b IS NULL OR b='{}'::jsonb THEN a
+    ELSE (SELECT jsonb_object_agg(k,v::text) FROM (
+      SELECT k,sum(x::mpq) AS v FROM (
+        SELECT key AS k,value#>>'{}' AS x FROM jsonb_each(a)
+        UNION ALL SELECT key,value#>>'{}' FROM jsonb_each(b)) s GROUP BY k) t
+      WHERE v<>'0'::mpq) END
+$$;
+-- The overview's result gained totals (#574): a function's result type can't be replaced, so
+-- older versions (and their generated view and fork variants) go first.
+DO $$ BEGIN
+  IF EXISTS(SELECT 1 FROM pg_proc WHERE proname='oc_overview_v2' AND NOT ('totals'=ANY(proargnames))) THEN
+    DROP FUNCTION oc_overview_v2(uuid,mpq,mpq,mpq);
+    DROP FUNCTION IF EXISTS oc_view_overview(uuid,mpq,mpq,mpq);
+    DROP FUNCTION IF EXISTS oc_overview_lineage(uuid,mpq,mpq,mpq);
+  END IF;
+END $$;
 CREATE OR REPLACE FUNCTION oc_overview_v2(tid uuid, lo mpq, hi mpq, threshold mpq)
-RETURNS TABLE(first_time text,last_time text,event_count text,distinct_count integer,title text,event_id text,visited_nodes integer,metadata jsonb)
+RETURNS TABLE(first_time text,last_time text,event_count text,distinct_count integer,title text,event_id text,visited_nodes integer,metadata jsonb,totals jsonb)
 LANGUAGE plpgsql AS $$
 DECLARE ids bigint[]; points boolean[] := ARRAY[false]; idx integer; nid bigint; point boolean;
-  n record; a mpq; b mpq; weight bigint; distinct_n integer; whole boolean;
+  n record; a mpq; b mpq; weight bigint; distinct_n integer; whole boolean; sums jsonb;
   current_a mpq; current_b mpq; current_weight bigint; current_distinct integer; current_id bigint; visits integer:=0;
-  sample jsonb;
+  current_sums jsonb; sample jsonb;
 BEGIN
   -- Overviews need exact, finite bounds (event pages accept open ones).
   IF lo IS NULL OR hi IS NULL OR threshold IS NULL OR threshold<'0'::mpq THEN
@@ -258,7 +284,7 @@ BEGIN
   WHILE cardinality(ids)>0 LOOP
     -- Pop the top entry: a node, standing for its own time only (point) or its subtree.
     idx:=cardinality(ids); nid:=ids[idx]; point:=points[idx]; ids:=ids[1:idx-1]; points:=points[1:idx-1];
-    SELECT node.time,node.left_id,node.right_id,node.first_id,node.first_time,node.last_time,node.bucket_count,node.event_count,node.distinct_count INTO n FROM oc_nodes node WHERE node.timeline_id=tid AND node.id=nid;
+    SELECT node.time,node.left_id,node.right_id,node.first_id,node.first_time,node.last_time,node.bucket_count,node.event_count,node.distinct_count,node.own_totals,node.totals INTO n FROM oc_nodes node WHERE node.timeline_id=tid AND node.id=nid;
     IF NOT FOUND THEN RAISE EXCEPTION 'Broken timeline index'; END IF;
     -- visited_nodes counts subtrees entered, not points.
     IF NOT point THEN visits:=visits+1; END IF;
@@ -269,17 +295,17 @@ BEGIN
     -- time is in the window).
     IF point THEN
       IF n.time<lo OR n.time>hi THEN CONTINUE; END IF;
-      a:=n.time; b:=n.time; weight:=n.bucket_count; distinct_n:=1; whole:=true;
+      a:=n.time; b:=n.time; weight:=n.bucket_count; distinct_n:=1; whole:=true; sums:=n.own_totals;
     ELSE
       a:=n.first_time; b:=n.last_time; weight:=n.event_count; distinct_n:=n.distinct_count;
-      whole:=a>=lo AND b<=hi;
+      whole:=a>=lo AND b<=hi; sums:=n.totals;
     END IF;
     -- The candidate starts threshold or more after the open group's first time, so that group
     -- is complete: emit it. A group of exactly one moment also carries the moment's title, ID
     -- and metadata, found through its node (current_id) and the node's first moment ID.
     IF current_a IS NOT NULL AND a-current_a>=threshold THEN
       first_time:=oc_qtext(current_a); last_time:=oc_qtext(current_b); event_count:=current_weight::text;
-      distinct_count:=current_distinct; visited_nodes:=visits; title:=NULL; event_id:=NULL; metadata:=NULL;
+      distinct_count:=current_distinct; visited_nodes:=visits; title:=NULL; event_id:=NULL; metadata:=NULL; totals:=current_sums;
       IF current_weight=1 THEN
         SELECT m.event INTO sample FROM oc_moments m WHERE m.timeline_id=tid AND m.id=(SELECT node.moment_ids[1] FROM oc_nodes node WHERE node.timeline_id=tid AND node.id=current_id);
         title:=sample->'metadata'->>'title'; event_id:=sample->>'id'; metadata:=sample->'metadata';
@@ -291,8 +317,10 @@ BEGIN
     -- threshold after the group's first time (or its own first, when it opens a group). A new
     -- group remembers its first node (a subtree's leftmost, first_id) for the lookup above.
     IF whole AND (point OR distinct_n=1 OR b-coalesce(current_a,a)<threshold) THEN
-      IF current_a IS NULL THEN current_a:=a; current_id:=CASE WHEN point THEN nid ELSE n.first_id END; current_weight:=0; current_distinct:=0; END IF;
+      IF current_a IS NULL THEN current_a:=a; current_id:=CASE WHEN point THEN nid ELSE n.first_id END; current_weight:=0; current_distinct:=0; current_sums:=NULL; END IF;
       current_b:=b; current_weight:=current_weight+weight; current_distinct:=current_distinct+distinct_n;
+      -- Its measures' totals (#574), added only where it has any.
+      IF sums IS NOT NULL THEN current_sums:=oc_add_totals(current_sums,sums); END IF;
     ELSE
       -- Otherwise descend: push the right subtree, the node's own time, then the left
       -- subtree, so that they pop in time order.
@@ -304,7 +332,7 @@ BEGIN
   -- Emit the last open group, as above.
   IF current_a IS NOT NULL THEN
     first_time:=oc_qtext(current_a); last_time:=oc_qtext(current_b); event_count:=current_weight::text;
-    distinct_count:=current_distinct; visited_nodes:=visits; title:=NULL; event_id:=NULL; metadata:=NULL;
+    distinct_count:=current_distinct; visited_nodes:=visits; title:=NULL; event_id:=NULL; metadata:=NULL; totals:=current_sums;
     IF current_weight=1 THEN
       SELECT m.event INTO sample FROM oc_moments m WHERE m.timeline_id=tid AND m.id=(SELECT node.moment_ids[1] FROM oc_nodes node WHERE node.timeline_id=tid AND node.id=current_id);
       title:=sample->'metadata'->>'title'; event_id:=sample->>'id'; metadata:=sample->'metadata';
@@ -1284,6 +1312,8 @@ CREATE TABLE IF NOT EXISTS oc_view_nodes (
 -- The same upgrades as oc_nodes, for views older releases built; and the view's duration root.
 ALTER TABLE oc_view_nodes ADD COLUMN IF NOT EXISTS moment_ids text[];
 ALTER TABLE oc_view_nodes ADD COLUMN IF NOT EXISTS height integer;
+ALTER TABLE oc_view_nodes ADD COLUMN IF NOT EXISTS own_totals jsonb;
+ALTER TABLE oc_view_nodes ADD COLUMN IF NOT EXISTS totals jsonb;
 ALTER TABLE oc_view_nodes ALTER COLUMN events DROP NOT NULL;
 ALTER TABLE oc_views ADD COLUMN IF NOT EXISTS duration_root integer;
 -- Mirrors oc_moments.
@@ -1881,8 +1911,8 @@ BEGIN
     'SELECT ARRAY[root+(1::bigint<<56)],' || lineage || ' INTO ids,tids,clocks FROM oc_timelines WHERE id=tid AND root IS NOT NULL;');
   src:=oc_rewrite(src,'nid:=ids[idx]; point:=points[idx];',
     'nid:=ids[idx]&36028797018963967; hint:=ids[idx]>>56; hint_retired:=(ids[idx]>>55)&1=1; point:=points[idx];');
-  src:=oc_rewrite(src,'SELECT node.time,node.left_id,node.right_id,node.first_id,node.first_time,node.last_time,node.bucket_count,node.event_count,node.distinct_count INTO n FROM oc_nodes node WHERE node.timeline_id=tid AND node.id=nid;',
-    oc_lineage_lookup('node.time,node.left_id,node.right_id,node.first_id,node.first_time,node.last_time,node.bucket_count,node.event_count,node.distinct_count',
+  src:=oc_rewrite(src,'SELECT node.time,node.left_id,node.right_id,node.first_id,node.first_time,node.last_time,node.bucket_count,node.event_count,node.distinct_count,node.own_totals,node.totals INTO n FROM oc_nodes node WHERE node.timeline_id=tid AND node.id=nid;',
+    oc_lineage_lookup('node.time,node.left_id,node.right_id,node.first_id,node.first_time,node.last_time,node.bucket_count,node.event_count,node.distinct_count,node.own_totals,node.totals',
       'n','oc_nodes','node','nid','hint','lv','found_retired','hint_retired'));
   src:=oc_rewrite(src,'current_id:=CASE WHEN point THEN nid ELSE n.first_id END;',
     'current_id:=CASE WHEN point THEN nid ELSE n.first_id END; current_lv:=lv;');

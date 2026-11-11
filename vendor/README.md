@@ -4,6 +4,8 @@ Copyright (c) 2026 Athan Clark. SPDX-License-Identifier: GPL-3.0-only
 
 The two independent rational-number libraries the app is built on, pinned here so that no build depends on a neighbouring checkout. They are MIT-licensed and maintained upstream: change them there and update the copies here; [`versions.json`](versions.json) records the upstream commits. `package.json` installs the browser library from the archive, and `native-store` (the desktop app and `och-convert`) compiles the SQLite extension. Their notices are in [`THIRD_PARTY.md`](../THIRD_PARTY.md).
 
+The copy of sqlite-rational here carries changes for measures' totals (#574) that upstream doesn't have yet: the `q_sum` aggregate, and the `sums` vectors its index totals per subtree (its README and tests describe both). Send them upstream before updating the copy from there.
+
 ## Contents
 
 | File                                                               | What it is for                                                                                                                             |

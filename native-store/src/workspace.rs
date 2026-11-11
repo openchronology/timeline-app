@@ -306,6 +306,7 @@ impl Snapshot {
         if !current_layout(&saved)? {
             super::rebuild_duration_index(&saved)?;
             super::rebuild_edge_index(&saved)?;
+            super::rebuild_point_index(&saved)?;
             intervals::set_layout(&saved, &format!("rebuilt-{}", intervals::token()))?;
         }
         super::create_start_index(&saved)?;
@@ -889,7 +890,10 @@ impl Snapshot {
                 // characters, toggles that are on and small arrays), or {} if even that exceeds
                 // 2048 bytes. More
                 // than 1025 groups fails the row budget rather than truncating the frame.
-                let rows=db.query_limited("SELECT p.time,p.last_time,p.weight,p.distinct_count,p.visited_nodes,e.id,CASE WHEN json_valid(e.metadata) THEN substr(json_extract(e.metadata,'$.title'),1,512) END,CASE WHEN length(CAST(e.metadata AS BLOB))<=2048 THEN e.metadata ELSE (SELECT CASE WHEN length(projected)<=2048 THEN projected ELSE '{}' END FROM (SELECT json_group_object(j.key,CASE WHEN j.type='text' THEN substr(j.value,1,CASE WHEN j.key='description' THEN 512 ELSE 10000 END) WHEN j.type='true' THEN json('true') ELSE json(j.value) END) AS projected FROM json_each(e.metadata) j WHERE j.key IN (SELECT value FROM json_each(?)) AND (j.type IN ('text','true') OR (j.type='array' AND length(j.value)<=2048)))) END FROM points p LEFT JOIN events e ON p.weight=1 AND e.time=p.time COLLATE RATIONAL_V1 WHERE p.lower=q(?) AND p.upper=q(?) AND p.include_upper=1 AND p.threshold=q(?) AND p.mode='span' ORDER BY p.time COLLATE RATIONAL_V1 LIMIT 1026",&[&metadata_keys,&q.lower,&q.upper,&threshold],1025,BUDGET)?;
+                let rows=db.query_limited("SELECT p.time,p.last_time,p.weight,p.distinct_count,p.visited_nodes,e.id,CASE WHEN json_valid(e.metadata) THEN substr(json_extract(e.metadata,'$.title'),1,512) END,CASE WHEN length(CAST(e.metadata AS BLOB))<=2048 THEN e.metadata ELSE (SELECT CASE WHEN length(projected)<=2048 THEN projected ELSE '{}' END FROM (SELECT json_group_object(j.key,CASE WHEN j.type='text' THEN substr(j.value,1,CASE WHEN j.key='description' THEN 512 ELSE 10000 END) WHEN j.type='true' THEN json('true') ELSE json(j.value) END) AS projected FROM json_each(e.metadata) j WHERE j.key IN (SELECT value FROM json_each(?)) AND (j.type IN ('text','true') OR (j.type='array' AND length(j.value)<=2048)))) END,p.sums FROM points p LEFT JOIN events e ON p.weight=1 AND e.time=p.time COLLATE RATIONAL_V1 WHERE p.lower=q(?) AND p.upper=q(?) AND p.include_upper=1 AND p.threshold=q(?) AND p.mode='span' ORDER BY p.time COLLATE RATIONAL_V1 LIMIT 1026",&[&metadata_keys,&q.lower,&q.upper,&threshold],1025,BUDGET)?;
+                // Each group's measure totals (#574), from the index's sums in the order of the
+                // file's measure names.
+                let names = super::file_measure_names(&db)?;
                 let mut groups = Vec::new();
                 let mut visited = 0u64;
                 for row in rows {
@@ -906,6 +910,9 @@ impl Snapshot {
                         group["title"] = json!(row[6].as_deref().unwrap_or(""));
                         group["metadata"] = serde_json::from_str(row[7].as_deref().unwrap_or("{}"))
                             .map_err(|e| e.to_string())?;
+                    }
+                    if let Some(totals) = super::named_totals(&names, row[8].as_deref()) {
+                        group["totals"] = totals;
                     }
                     groups.push(group);
                 }
@@ -1166,6 +1173,7 @@ fn apply_changes(
     progress: &dyn Fn(usize, usize),
 ) -> Result<(), String> {
     let total = patch.changes.len() + patch.duration_changes.len();
+    let mut renamed_measures = false;
     let mut done = 0;
     let mut step = || {
         done += 1;
@@ -1437,10 +1445,18 @@ fn apply_changes(
     }
     edges.flush()?;
     // Recount each affected bucket: delete it, then insert it again weighted by the moments
-    // now at that time (events_time index), or not at all when none are left.
-    for time in affected {
-        db.execute("DELETE FROM points WHERE time=q(?)", &[&time])?;
-        db.execute("INSERT INTO points(time,value,weight) SELECT time,time,count(*) FROM events WHERE time=q(?) COLLATE RATIONAL_V1 GROUP BY time COLLATE RATIONAL_V1",&[&time])?;
+    // now at that time (events_time index), or not at all when none are left, with its
+    // measures' sums (#574). Measures named differently change every bucket's sums: the index
+    // is rebuilt instead.
+    let names = super::measure_names(patch.settings.measures.as_ref());
+    if names != super::file_measure_names(db)? {
+        renamed_measures = true;
+    } else {
+        let sums = super::sums_sql(&names);
+        for time in affected {
+            db.execute("DELETE FROM points WHERE time=q(?)", &[&time])?;
+            db.execute(&format!("INSERT INTO points(time,value,weight,sums) SELECT time,time,count(*),{sums} FROM events WHERE time=q(?) COLLATE RATIONAL_V1 GROUP BY time COLLATE RATIONAL_V1"),&[&time])?;
+        }
     }
     // The settings tables are replaced whole, as in `save` (which also sheds legacy CHECKs).
     for table in ["timeline_settings", "timeline_plugins", "timeline_extras"] {
@@ -1472,6 +1488,9 @@ fn apply_changes(
         "INSERT INTO timeline_extras VALUES(1,?)",
         &[&json!({"tags":patch.settings.tags,"assets":patch.settings.assets,"view":patch.settings.view,"views":patch.settings.views,"measures":patch.settings.measures}).to_string()],
     )?;
+    if renamed_measures {
+        super::rebuild_point_index(db)?;
+    }
     intervals::set_layout(db, token)
 }
 /// Windowed queries stay bounded, and sparse and staged saves change only what they should.
@@ -3702,5 +3721,164 @@ mod toggle_tests {
         );
         let band = &frame["durations"][0]["metadata"];
         assert_eq!(band, &json!({"title":"D","presumptive":true}));
+    }
+}
+/// Measures' totals (#574): overview groups total their moments' values as summing them by
+/// hand does, after a whole save, after sparse changes, and after measures are renamed.
+#[cfg(test)]
+mod measure_total_tests {
+    use super::*;
+    /// A small deterministic generator, so a failure can be replayed.
+    struct Random(u64);
+    impl Random {
+        fn next(&mut self, n: u64) -> u64 {
+            self.0 = self
+                .0
+                .wrapping_mul(6364136223846793005)
+                .wrapping_add(1442695040888963407);
+            (self.0 >> 33) % n
+        }
+    }
+    fn gcd(a: i128, b: i128) -> i128 {
+        if b == 0 {
+            a.abs()
+        } else {
+            gcd(b, a % b)
+        }
+    }
+    /// A sum of halves written as the index writes totals: integers without "/1".
+    fn halves(sum: i128) -> String {
+        let g = gcd(sum, 2);
+        if 2 / g == 1 {
+            (sum / g).to_string()
+        } else {
+            format!("{}/{}", sum / g, 2 / g)
+        }
+    }
+    /// Every group's totals at several thresholds against the document's values, where `cost`
+    /// holds integers and `hours` halves ("k/2").
+    fn check(snapshot: &Snapshot, cost: &str) {
+        let document = snapshot.document().unwrap();
+        let time = |t: &str| t.trim_end_matches("/1").parse::<i64>().unwrap();
+        for threshold in ["0/1", "3/1", "40/1", "1000/1"] {
+            let frame = snapshot
+                .query(&serde_json::from_value(json!({"kind":"overview","lower":"-1/1","upper":"401/1","threshold":threshold})).unwrap())
+                .unwrap();
+            for group in frame["groups"].as_array().unwrap() {
+                let (first, last) = (
+                    time(group["first"].as_str().unwrap()),
+                    time(group["last"].as_str().unwrap()),
+                );
+                let (mut c, mut h) = (0i128, 0i128);
+                for e in &document.events {
+                    let t = time(&e.time);
+                    if t < first || t > last {
+                        continue;
+                    }
+                    let values = &e.metadata.get("measures");
+                    if let Some(v) = values.and_then(|m| m.get(cost)).and_then(|v| v.as_str()) {
+                        c += v.parse::<i128>().unwrap();
+                    }
+                    if let Some(v) = values.and_then(|m| m.get("hours")).and_then(|v| v.as_str()) {
+                        h += v.trim_end_matches("/2").parse::<i128>().unwrap();
+                    }
+                }
+                let mut expected = serde_json::Map::new();
+                if c != 0 {
+                    expected.insert(cost.into(), json!(c.to_string()));
+                }
+                if h != 0 {
+                    expected.insert("hours".into(), json!(halves(h)));
+                }
+                let got = group.get("totals").cloned().unwrap_or(json!({}));
+                assert_eq!(got, Value::Object(expected), "{threshold}: {first}..{last}");
+            }
+        }
+    }
+    fn values(r: &mut Random, cost: &str) -> Value {
+        let mut v = serde_json::Map::new();
+        if r.next(10) < 7 {
+            v.insert(cost.into(), json!((r.next(2000) as i64 - 500).to_string()));
+        }
+        if r.next(10) < 5 {
+            v.insert(
+                "hours".into(),
+                json!(format!("{}/2", r.next(9) as i64 * 2 + 1)),
+            );
+        }
+        Value::Object(v)
+    }
+    #[test]
+    fn overview_groups_total_their_moments_values() {
+        let mut r = Random(574);
+        let measures = json!({"cost":{"type":"mpz"},"hours":{"type":"mpq"}});
+        let events: Vec<Value> = (0..150)
+            .map(|i| json!({"id":format!("m{i}"),"time":format!("{}/1",r.next(400)),"metadata":{"title":"M","measures":values(&mut r,"cost")}}))
+            .collect();
+        let doc: Document = serde_json::from_value(json!({"format":"openchronology","version":1,"title":"Totals","description":"","measures":measures,"events":events})).unwrap();
+        let snapshot = Snapshot::from_document(&doc).unwrap();
+        check(&snapshot, "cost");
+
+        // Sparse changes: values changed in place, moments moved, removed and added.
+        let mut settings = snapshot.header().unwrap().document;
+        settings.events.clear();
+        let mut changes = Vec::new();
+        for i in 0..40 {
+            let id = format!("m{}", r.next(150));
+            if changes.iter().any(|c: &Value| c["id"] == id.as_str()) {
+                continue;
+            }
+            let event = match r.next(4) {
+                0 => Value::Null,
+                1 => {
+                    json!({"id":id,"time":format!("{}/1",r.next(400)),"metadata":{"measures":values(&mut r,"cost")}})
+                }
+                _ => {
+                    let at = doc.events.iter().find(|e| e.id == id).unwrap().time.clone();
+                    json!({"id":id,"time":at,"metadata":{"measures":values(&mut r,"cost")}})
+                }
+            };
+            changes.push(json!({"id":id,"event":event}));
+            changes.push(json!({"id":format!("n{i}"),"event":{"id":format!("n{i}"),"time":format!("{}/1",r.next(400)),"metadata":{"measures":values(&mut r,"cost")}}}));
+        }
+        let patch: Patch =
+            serde_json::from_value(json!({"settings":settings,"changes":changes})).unwrap();
+        let target = snapshot.directory().join("totals.och");
+        let saved = snapshot.save_patch(&target, &patch).unwrap();
+        check(&saved, "cost");
+
+        // Renamed: the editor moves every value (#572); the index takes the new names.
+        let mut renamed = saved.header().unwrap().document;
+        renamed.events.clear();
+        renamed.measures = Some(json!({"price":{"type":"mpz"},"hours":{"type":"mpq"}}));
+        let moved: Vec<Value> = saved
+            .document()
+            .unwrap()
+            .events
+            .iter()
+            .filter_map(|e| {
+                let cost = e.metadata.get("measures")?.get("cost")?.clone();
+                let mut values = e.metadata.get("measures")?.as_object()?.clone();
+                values.remove("cost");
+                values.insert("price".into(), cost);
+                Some(json!({"id":e.id,"event":{"id":e.id,"time":e.time,"metadata":{"measures":values}}}))
+            })
+            .collect();
+        let patch: Patch =
+            serde_json::from_value(json!({"settings":renamed,"changes":moved})).unwrap();
+        let again = saved
+            .save_patch(&snapshot.directory().join("renamed.och"), &patch)
+            .unwrap();
+        check(&again, "price");
+        // An older file's index, without sums, is rebuilt when opened.
+        let path = snapshot.directory().join("renamed.och");
+        drop(again);
+        {
+            let db = Connection::open(&path, true).unwrap();
+            db.execute("UPDATE index_layout SET version=2", &[])
+                .unwrap();
+        }
+        let reopened = Snapshot::open(&path).unwrap();
+        check(&reopened, "price");
     }
 }

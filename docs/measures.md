@@ -104,6 +104,14 @@ On a server, make these changes with `POST /api/timelines/{id}/measures`, giving
 { "revision": "12", "measures": { "price": { "type": "mpz" } }, "renames": { "cost": "price" } }
 ```
 
+## Totals
+
+Every summary of a timeline keeps the total of each measure over what it summarizes ([#574](https://github.com/openchronology/timeline-app/issues/574)), beside the count it keeps. The total is exact, and computed the same way wherever the timeline is kept: in the browser, on a server and in a desktop file.
+
+- **How:** the trees that index a timeline's moments keep, at every node, the totals of the moments beneath it. A summary of any stretch of time reads a few nodes rather than every moment. A change to an event's values updates the nodes on one path.
+- **Where:** the browser's index, the server's PostgreSQL trees and a desktop file's SQLite index all keep them. A desktop file saved before this is re-indexed when it is opened.
+- **In overviews:** each group in an overview (`/api/timelines/{id}/query` with `kind: "overview"`) has `totals`, the exact totals of its moments by measure name, with zeros left out.
+
 ## Where measures go
 
 The declarations are a timeline setting, like its title and time display. They're kept by:

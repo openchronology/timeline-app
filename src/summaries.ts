@@ -46,6 +46,18 @@ export function addTotals(
   return Object.keys(sum).length ? sum : undefined;
 }
 const asFraction = (text: string) => (text.includes('/') ? text : text + '/1');
+/** Totals with every value negated, to take an entity's values away (#574). */
+export function negateTotals(
+  a: Record<string, string> | undefined,
+): Record<string, string> | undefined {
+  if (!a) return a;
+  return Object.fromEntries(
+    Object.entries(a).map(([name, text]) => [
+      name,
+      text.startsWith('-') ? text.slice(1) : '-' + text,
+    ]),
+  );
+}
 export function coalesceGroups(groups: readonly FrameGroup[], threshold: Q): FrameGroup[] {
   const out: FrameGroup[] = [];
   const ordered = [...groups].sort(

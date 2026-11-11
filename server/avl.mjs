@@ -9,7 +9,7 @@
 // keys: the order of the tree is held in left_id/right_id, never in the IDs. In a fork, the
 // tree's rows are read through to its source's (indexReader in index-versions.mjs), and the
 // nodes a save changes are written as the fork's own rows.
-import { Q, durationOverview } from '../dist/core.mjs';
+import { Q, durationOverview, addTotals, negateTotals } from '../dist/core.mjs';
 import { removeRows } from './index-versions.mjs';
 
 /**
@@ -117,10 +117,19 @@ export const MOMENT_TREE = {
     'distinct_count',
     'height',
     'moment_ids',
+    'own_totals',
+    'totals',
   ],
-  casts: { time: '::mpq', first_time: '::mpq', last_time: '::mpq', moment_ids: '::text[]' },
+  casts: {
+    time: '::mpq',
+    first_time: '::mpq',
+    last_time: '::mpq',
+    moment_ids: '::text[]',
+    own_totals: '::jsonb',
+    totals: '::jsonb',
+  },
   select:
-    'id,oc_qtext(time) AS time,oc_qtext(first_time) AS first,oc_qtext(last_time) AS last,left_id,right_id,first_id,bucket_count,event_count,distinct_count,height,moment_ids',
+    'id,oc_qtext(time) AS time,oc_qtext(first_time) AS first,oc_qtext(last_time) AS last,left_id,right_id,first_id,bucket_count,event_count,distinct_count,height,moment_ids,own_totals,totals',
   decode: (r) => ({
     id: Number(r.id),
     time: r.time,
@@ -134,6 +143,8 @@ export const MOMENT_TREE = {
     distinct: Number(r.distinct_count),
     height: r.height,
     ids: r.moment_ids,
+    own: r.own_totals ?? undefined,
+    totals: r.totals ?? undefined,
   }),
   encode: (owner, n) => [
     owner,
@@ -149,16 +160,28 @@ export const MOMENT_TREE = {
     n.distinct,
     n.height,
     n.ids,
+    n.own ? JSON.stringify(n.own) : null,
+    n.totals ? JSON.stringify(n.totals) : null,
   ],
   compare: (key, n) => parsed(key, 'time').compare(parsed(n, 'time')),
-  create: (nodeId, { time, id: momentId }) => ({ id: nodeId, time, ids: [momentId] }),
-  /** A moment at a time that already has a node joins its bucket, kept sorted ("C" order). */
-  merge(n, { id: momentId }) {
+  create: (nodeId, { time, id: momentId, values }) => ({
+    id: nodeId,
+    time,
+    ids: [momentId],
+    own: values,
+  }),
+  /**
+   * A moment at a time that already has a node joins its bucket, kept sorted ("C" order), and
+   * its measure values (#574) join the bucket's.
+   */
+  merge(n, { id: momentId, values }) {
     if (!n.ids.includes(momentId)) n.ids = [...n.ids, momentId].sort(order);
+    n.own = addTotals(n.own, values);
   },
   copy(to, from) {
     to.time = from.time;
     to.ids = from.ids;
+    to.own = from.own;
   },
   /**
    * Recomputes `n`'s summaries from its children `l` and `r` (null when absent), which are
@@ -172,6 +195,8 @@ export const MOMENT_TREE = {
     n.bucketCount = n.ids.length;
     n.count = (l?.count ?? 0) + n.ids.length + (r?.count ?? 0);
     n.distinct = (l?.distinct ?? 0) + 1 + (r?.distinct ?? 0);
+    // The subtree's measure totals (#574): its own bucket's values and its children's totals.
+    n.totals = addTotals(addTotals(l?.totals, n.own), r?.totals);
   },
   // Paths from the root towards each key, plus the children of every node on them. The keys
   // descend together: a node is read once, with the keys that reach it, which it splits
@@ -477,6 +502,26 @@ export class PersistentTree {
       if (c === 0) {
         update(n);
         for (const p of this.rows.depth ? path : [n]) this.#touch(p);
+        return;
+      }
+      nodeId = c < 0 ? n.left : n.right;
+    }
+    throw new Error('Broken timeline index');
+  }
+  /**
+   * Changes the node with `key` in place with `update`, then recomputes the summaries of the
+   * path to it (a moment's measure values changed without its time, #574), writing the path.
+   */
+  async adjust(key, update) {
+    const path = [];
+    let nodeId = this.root;
+    while (nodeId !== null) {
+      const n = await this.get(nodeId),
+        c = this.spec.compare(key, n);
+      path.push(n);
+      if (c === 0) {
+        update(n);
+        for (const p of path.reverse()) await this.#update(p);
         return;
       }
       nodeId = c < 0 ? n.left : n.right;

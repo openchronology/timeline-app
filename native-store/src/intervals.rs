@@ -15,8 +15,9 @@
 use super::Connection;
 use std::collections::{HashMap, HashSet};
 
-/// Index layout written by this version: AVL interval trees with heights and stored roots.
-pub(crate) const LAYOUT: &str = "2";
+/// Index layout written by this version: AVL interval trees with heights and stored roots
+/// (2), and a points index keeping measures' sums (3, #574).
+pub(crate) const LAYOUT: &str = "3";
 
 /// One tree node in memory: its links and height, its own interval's key fields (from the
 /// intervals table), and its subtree summaries (the nodes table's columns).
