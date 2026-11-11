@@ -156,6 +156,9 @@ try {
     throw error;
   };
   async function signOut() {
+    // Signed out, the account page becomes the sign-in form, whose autofill the authenticator
+    // would answer at once, signing straight back in: it is held back until the caller says.
+    await presence(false);
     await tab.goto(origin + '/account');
     await tab
       .getByRole('navigation', { name: 'Account' })
@@ -169,6 +172,9 @@ try {
     // The account page refreshes itself after signing out; a blank page ends that, so it
     // can't take over the next page the test opens.
     await tab.goto('about:blank');
+    // Still signed out (the browser's cookies, from about:blank).
+    const after = await (await context.request.get(origin + '/api/session')).json();
+    assert.equal(after.user, null, 'signed out');
   }
 
   // Adding a passkey: the password confirms it, the browser makes it, recovery codes show.
@@ -299,14 +305,18 @@ try {
   await tab.goto('about:blank');
   await tab.setExtraHTTPHeaders({ 'X-Forwarded-For': '203.0.113.7' });
   await presence(true);
-  const firstRefusal = tab.waitForResponse(
-    (r) => r.url().endsWith('/api/auth/passkeys/sign-in') && r.status() === 401,
-  );
+  // The page asks for a new challenge as soon as the refusal comes, often before this test
+  // has seen it: the challenges asked for are counted when the refusal arrives.
+  let refused = -1;
+  const firstRefusal = tab.waitForResponse((r) => {
+    const refusal = r.url().endsWith('/api/auth/passkeys/sign-in') && r.status() === 401;
+    if (refusal) refused = asked;
+    return refusal;
+  });
   await tab.goto(origin + '/login');
   // Once never sent (#465): if so, what the page showed and what the session said.
   await firstRefusal.catch(failedOn('the autofill never asked for a passkey'));
   await presence(false);
-  const refused = asked;
   await tab.getByText('That passkey was not recognized.', { exact: false }).waitFor();
   await askedMore(refused);
   await presence(true);
