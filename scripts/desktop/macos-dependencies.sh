@@ -3,7 +3,12 @@
 # CI: builds GMP and SQLite as static libraries with a pinned vcpkg for the macOS desktop build,
 # and passes their location to later steps (GITHUB_ENV).
 set -euo pipefail
-brew install autoconf autoconf-archive automake libtool pkg-config cmake ninja
+# Only the tools missing, so the project's own Mac, whose Homebrew its runner can't write to,
+# uses the ones installed there.
+tools=(autoconf autoconf-archive automake libtool pkg-config cmake ninja)
+missing=()
+for tool in "${tools[@]}"; do brew list --versions "$tool" >/dev/null 2>&1 || missing+=("$tool"); done
+if ((${#missing[@]})); then brew install "${missing[@]}"; fi
 vcpkg_root="$RUNNER_TEMP/och-vcpkg"
 # Source archives and built packages live outside the clone so CI can cache them: builds then
 # survive GNU mirror outages, and the archives are still there to ship as native sources.
