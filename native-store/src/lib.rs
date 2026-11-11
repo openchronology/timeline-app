@@ -41,7 +41,11 @@ mod workspace;
 use serde::{Deserialize, Serialize};
 use serde_json::{Map, Value};
 use sqlite::Connection;
-use std::{borrow::Cow, collections::HashSet, path::Path};
+use std::{
+    borrow::Cow,
+    collections::{HashMap, HashSet},
+    path::Path,
+};
 pub use workspace::{Header, Patch, Query, Snapshot};
 /// `PRAGMA application_id` of a timeline file, as SQLite prints it: the ASCII bytes "OCTL"
 /// read as a big-endian 32-bit integer.
@@ -252,9 +256,16 @@ fn validate(doc: &Document) -> Result<(), String> {
         return Err(TOO_LARGE.into());
     }
     validate_settings(doc)?;
+    let types = measure_types(doc.measures.as_ref())?;
     let mut ids = HashSet::new();
     for e in &doc.events {
         event_problem(e, |id| ids.insert(id))?;
+        measure_values_problem(&e.metadata, &types)
+            .map_err(|problem| format!("Moment {}: {problem}", e.id))?;
+    }
+    for d in &doc.durations {
+        measure_values_problem(&d.metadata, &types)
+            .map_err(|problem| format!("Duration {}: {problem}", d.id))?;
     }
     ongoing_needs_calendar(doc, &doc.durations)?;
     validate_entities(&doc.durations, &doc.relationships, |id| ids.contains(id))
@@ -272,6 +283,118 @@ fn ongoing_needs_calendar(doc: &Document, durations: &[Duration]) -> Result<(), 
         return Err(
             "Only timelines with the Gregorian time display can have ongoing durations".into(),
         );
+    }
+    Ok(())
+}
+/// The most measures a timeline declares, and values an entity gives (#572).
+const MEASURE_LIMIT: usize = 32;
+/// The longest measure value, as text (src/measures.ts MEASURE_TEXT_LIMIT).
+const MEASURE_TEXT_LIMIT: usize = 2200;
+/// Whether `name` is a measure name: lowercase letters, digits and underscores, starting with a
+/// letter, at most 40 (src/measures.ts MEASURE_NAME).
+fn measure_name(name: &str) -> bool {
+    (1..=40).contains(&name.len())
+        && name.starts_with(|c: char| c.is_ascii_lowercase())
+        && name
+            .bytes()
+            .all(|c| c.is_ascii_lowercase() || c.is_ascii_digit() || c == b'_')
+}
+/// A timeline's measures (#588), checked as src/measures.ts validateMeasures checks them, as
+/// each name's type ("mpz" or "mpq"). Their presentations are the editor's to check; here only
+/// their size is bounded.
+fn measure_types(measures: Option<&Value>) -> Result<HashMap<String, String>, String> {
+    let mut types = HashMap::new();
+    let Some(measures) = measures else {
+        return Ok(types);
+    };
+    let invalid = || "Invalid measures".to_string();
+    let object = measures.as_object().ok_or_else(invalid)?;
+    if object.len() > MEASURE_LIMIT {
+        return Err(format!(
+            "A timeline declares at most {MEASURE_LIMIT} measures"
+        ));
+    }
+    for (name, declaration) in object {
+        let d = declaration.as_object().ok_or_else(invalid)?;
+        let kind = d.get("type").and_then(Value::as_str);
+        let label = d.get("label");
+        if !measure_name(name)
+            || !matches!(kind, Some("mpz" | "mpq"))
+            || d.keys()
+                .any(|k| !["type", "label", "presentation"].contains(&k.as_str()))
+            || label.is_some_and(|l| {
+                l.as_str()
+                    .is_none_or(|l| l.trim().is_empty() || l.encode_utf16().count() > 80)
+            })
+            || d.get("presentation")
+                .is_some_and(|p| !p.is_object() || p.to_string().len() > 4096)
+        {
+            return Err(format!("Invalid measure {name}"));
+        }
+        types.insert(name.clone(), kind.unwrap().to_string());
+    }
+    Ok(types)
+}
+/// What is wrong with an entity's measure values (#588), as src/measures.ts would refuse them:
+/// an object of at most MEASURE_LIMIT values of declared measures, each a canonical integer
+/// (`1250`) or fraction (`3/2`, never `n/1`), whole for `mpz`, never zero. Whether a fraction
+/// is in lowest terms needs exact arithmetic: `reduced_measures` checks it where it is written.
+fn measure_values_problem(
+    metadata: &Map<String, Value>,
+    types: &HashMap<String, String>,
+) -> Result<(), String> {
+    let Some(values) = metadata.get("measures") else {
+        return Ok(());
+    };
+    let values = values
+        .as_object()
+        .ok_or("Measures must be an object of values by name")?;
+    if values.len() > MEASURE_LIMIT {
+        return Err(format!(
+            "An entity has at most {MEASURE_LIMIT} measure values"
+        ));
+    }
+    let digits = |s: &str| !s.is_empty() && s.bytes().all(|c| c.is_ascii_digit());
+    let positive = |s: &str| digits(s) && !s.starts_with('0');
+    for (name, value) in values {
+        let kind = types
+            .get(name)
+            .ok_or_else(|| format!("The timeline declares no measure named {name}"))?;
+        let text = value
+            .as_str()
+            .filter(|t| t.len() <= MEASURE_TEXT_LIMIT)
+            .ok_or_else(|| format!("{name} must be exact text"))?;
+        let unsigned = text.strip_prefix('-').unwrap_or(text);
+        let canonical = match unsigned.split_once('/') {
+            None => positive(unsigned),
+            Some((n, d)) => positive(n) && positive(d) && d != "1",
+        };
+        if !canonical {
+            return Err(format!("{name}: {text} is not a canonical nonzero value"));
+        }
+        if kind == "mpz" && unsigned.contains('/') {
+            return Err(format!("{name} is a whole number; {text} isn't one"));
+        }
+    }
+    Ok(())
+}
+/// Whether an entity's fractions are in lowest terms (#588), through the rational extension:
+/// a canonical fraction is its own canonical form.
+pub(crate) fn reduced_measures(
+    db: &Connection,
+    metadata: &Map<String, Value>,
+) -> Result<(), String> {
+    for (name, value) in metadata
+        .get("measures")
+        .and_then(Value::as_object)
+        .into_iter()
+        .flatten()
+    {
+        if let Some(text) = value.as_str().filter(|t| t.contains('/')) {
+            if db.scalar("SELECT q(?1)", &[text])? != text {
+                return Err(format!("{name}: {text} is not in lowest terms"));
+            }
+        }
     }
     Ok(())
 }
@@ -524,6 +647,7 @@ fn write<'a>(
         // q(?) parses and canonicalizes each time (2/4 becomes 1/2) and fails on malformed
         // input or a zero denominator, which aborts the save.
         let (mut ids, mut legacy, mut count) = (HashSet::new(), Vec::new(), 0);
+        let types = measure_types(doc.measures.as_ref())?;
         for event in events.by_ref() {
             let mut event = event?;
             if event.metadata.contains_key("durations") {
@@ -534,6 +658,9 @@ fn write<'a>(
                 return Err(TOO_LARGE.into());
             }
             event_problem(&event, |id| ids.insert(id.to_string()))?;
+            measure_values_problem(&event.metadata, &types)
+                .map_err(|problem| format!("Moment {}: {problem}", event.id))?;
+            reduced_measures(&db, &event.metadata)?;
             let metadata = serde_json::to_string(&event.metadata).map_err(|e| e.to_string())?;
             db.execute(
                 "INSERT INTO events(id,time,metadata) VALUES(?,q(?),?)",
@@ -574,6 +701,10 @@ fn write<'a>(
         };
         ongoing_needs_calendar(doc, &durations)?;
         validate_entities(&durations, &doc.relationships, |id| ids.contains(id))?;
+        for d in durations.iter() {
+            measure_values_problem(&d.metadata, &types)
+                .map_err(|problem| format!("Duration {}: {problem}", d.id))?;
+        }
         create_duration_table(&db)?;
         for duration in durations.iter() {
             insert_duration(&db, duration)?;
@@ -818,6 +949,7 @@ pub(crate) fn insert_duration(db: &Connection, d: &Duration) -> Result<(), Strin
     if end_time.is_none() && end_moment.is_none() {
         allow_ongoing(db)?;
     }
+    reduced_measures(db, &d.metadata)?;
     let metadata = serde_json::to_string(&d.metadata).map_err(|e| e.to_string())?;
     // Empty strings stand in for NULL; the wrapper binds text parameters only.
     db.execute(
@@ -1175,6 +1307,65 @@ pub fn overview(
 #[cfg(test)]
 mod tests {
     use super::*;
+    /// Measures (#588): declarations and values are checked as the editor checks them, on
+    /// whole saves; a file with valid ones keeps them.
+    #[test]
+    fn measure_declarations_and_values_are_validated() {
+        let with = |measures: Value, values: Value| -> Document {
+            serde_json::from_value(serde_json::json!({
+                "format":"openchronology","version":1,"title":"Measured","description":"",
+                "measures":measures,
+                "events":[{"id":"a","time":"1/1","metadata":{"measures":values}}],
+                "durations":[{"id":"d","start":"1/1","end":"2/1","metadata":{"measures":{"hours":"1/2"}}}]
+            }))
+            .unwrap()
+        };
+        let measures =
+            serde_json::json!({"cost":{"type":"mpz","label":"Cost"},"hours":{"type":"mpq"}});
+        let path = file("measures");
+        let good = with(
+            measures.clone(),
+            serde_json::json!({"cost":"-1250","hours":"7/2"}),
+        );
+        save(&path, &good).unwrap();
+        assert_eq!(
+            open(&path).unwrap().events[0].metadata["measures"]["hours"],
+            "7/2"
+        );
+        for (values, problem) in [
+            (
+                serde_json::json!({"price":"1"}),
+                "declares no measure named price",
+            ),
+            (serde_json::json!({"cost":"1/2"}), "whole number"),
+            (serde_json::json!({"cost":1250}), "exact text"),
+            (serde_json::json!({"cost":"0"}), "canonical"),
+            (serde_json::json!({"cost":"012"}), "canonical"),
+            (serde_json::json!({"hours":"6/4"}), "lowest terms"),
+            (serde_json::json!({"hours":"3/1"}), "canonical"),
+            (serde_json::json!({"hours":"1.5"}), "canonical"),
+        ] {
+            let error = save(&path, &with(measures.clone(), values.clone())).unwrap_err();
+            assert!(error.contains(problem), "{values}: {error}");
+        }
+        for bad in [
+            serde_json::json!({"Cost":{"type":"mpz"}}),
+            serde_json::json!({"cost":{"type":"f64"}}),
+            serde_json::json!({"cost":{"type":"mpz","unit":"$"}}),
+            serde_json::json!(["cost"]),
+        ] {
+            assert!(
+                save(&path, &with(bad.clone(), serde_json::json!({}))).is_err(),
+                "{bad}"
+            );
+        }
+        // An undeclared value on a duration is refused too.
+        let mut duration = good.clone();
+        duration.measures = Some(serde_json::json!({"cost":{"type":"mpz"}}));
+        duration.events[0].metadata.remove("measures");
+        assert!(save(&path, &duration).unwrap_err().contains("Duration d"));
+        fs::remove_file(path).unwrap();
+    }
     use std::{
         fs,
         time::{SystemTime, UNIX_EPOCH},

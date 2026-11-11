@@ -1265,6 +1265,7 @@ fn apply_changes(
             let mut doc = patch.settings.clone();
             doc.events = vec![event.clone()];
             validate(&doc)?;
+            super::reduced_measures(db, &event.metadata)?;
             // Canonical form, so it compares equal to the stored time when unchanged.
             let time = db.scalar("SELECT q(?)", &[&event.time])?;
             affected.insert(time.clone());
@@ -3742,6 +3743,14 @@ mod measure_total_tests {
             (self.0 >> 33) % n
         }
     }
+    /// Values are never zero: no entry is zero (#572).
+    fn nonzero(v: i64) -> i64 {
+        if v == 0 {
+            1
+        } else {
+            v
+        }
+    }
     fn gcd(a: i128, b: i128) -> i128 {
         if b == 0 {
             a.abs()
@@ -3801,7 +3810,10 @@ mod measure_total_tests {
     fn values(r: &mut Random, cost: &str) -> Value {
         let mut v = serde_json::Map::new();
         if r.next(10) < 7 {
-            v.insert(cost.into(), json!((r.next(2000) as i64 - 500).to_string()));
+            v.insert(
+                cost.into(),
+                json!(nonzero(r.next(2000) as i64 - 500).to_string()),
+            );
         }
         if r.next(10) < 5 {
             v.insert(
@@ -3818,7 +3830,7 @@ mod measure_total_tests {
         let mut r = Random(576);
         let measures = json!({"cost":{"type":"mpz"}});
         let events: Vec<Value> = (0..60)
-            .map(|i| json!({"id":format!("m{i}"),"time":format!("{}/1",r.next(400)),"metadata":{"measures":{"cost":(r.next(900) as i64 - 200).to_string()}}}))
+            .map(|i| json!({"id":format!("m{i}"),"time":format!("{}/1",r.next(400)),"metadata":{"measures":{"cost":nonzero(r.next(900) as i64 - 200).to_string()}}}))
             .collect();
         let durations: Vec<(i64, i64, i64)> = (0..80)
             .map(|_| {
@@ -3828,7 +3840,7 @@ mod measure_total_tests {
                 } else {
                     60 + r.next(200) as i64
                 };
-                (start, start + length, r.next(900) as i64 - 200)
+                (start, start + length, nonzero(r.next(900) as i64 - 200))
             })
             .collect();
         let spans: Vec<Value> = durations
