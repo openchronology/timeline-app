@@ -47,12 +47,17 @@ export async function checkZoomHelp(page) {
   // time pass and redrew the old view. Frame timestamps are shifted 50 ms back here to make that
   // happen every time; the result is read after the frame paints (a message posted from
   // requestAnimationFrame runs after it).
+  // So does it on a stalled page, whose first frame comes after the whole animation's time
+  // (the last two rounds: frames shifted 300 ms ahead), as under load or on a slow phone.
   const view = () => page.evaluate(() => document.getElementById('markers').dataset.view);
   await page.evaluate(() => {
     window.__raf = window.requestAnimationFrame;
-    window.requestAnimationFrame = (callback) => window.__raf((now) => callback(now - 50));
+    window.__shift = -50;
+    window.requestAnimationFrame = (callback) =>
+      window.__raf((now) => callback(now + window.__shift));
   });
-  for (let i = 0; i < 5; i++) {
+  for (let i = 0; i < 7; i++) {
+    if (i === 5) await page.evaluate(() => (window.__shift = 300));
     await page.evaluate(() => {
       const before = document.getElementById('markers').dataset.view;
       window.__firstZoomFrame = null;
