@@ -75,6 +75,7 @@ import {
   pluginHeading,
   pluginSize,
   pluginSizeMeasure,
+  pluginSummaryEffects,
   PLUGIN_EXAMPLE,
   validateTags,
   validateEntityTags,
@@ -1858,17 +1859,26 @@ function drawFrame() {
       renderPluginHeading(button, null, '');
       renderPluginMarker(button, imageSource(pluginMarker(plugins, metadata)), count);
       markSensitive(button, metadata);
-      const color = count === 1n ? pluginColor(plugins, metadata) : null;
+      // A summary takes what scripts that render summaries return from its totals (#587).
+      const summary = count > 1n && !span ? summaryEffects(plugins, group) : {};
+      const color = count === 1n ? pluginColor(plugins, metadata) : (summary.color ?? null);
       button.style.backgroundColor = color ?? '';
       button.dataset.size =
         sizedBy && !span
           ? sizedBy(group)
           : count === 1n && !span
             ? pluginSize(plugins, metadata)
-            : 'medium';
-      renderPluginShape(button, count === 1n && !span ? pluginShape(plugins, metadata) : 'circle');
-      // Dashed for a presumptive moment or collapsed duration (#325); summaries stay solid.
-      renderPluginOutline(button, count === 1n ? pluginOutline(plugins, metadata) : 'solid');
+            : (summary.size ?? 'medium');
+      renderPluginShape(
+        button,
+        count === 1n && !span ? pluginShape(plugins, metadata) : (summary.shape ?? 'circle'),
+      );
+      // Dashed for a presumptive moment or collapsed duration (#325); summaries stay solid
+      // unless a script that renders them says otherwise.
+      renderPluginOutline(
+        button,
+        count === 1n ? pluginOutline(plugins, metadata) : (summary.outline ?? 'solid'),
+      );
     }
     button.style.borderColor = '';
     button.setAttribute(
@@ -9202,6 +9212,29 @@ function measureSizes(groups: readonly FrameGroup[], plugins: readonly Installed
         ? 'medium'
         : 'small';
   };
+}
+/**
+ * What plugins' scripts set on a summary from its totals (#587). In a comparison,
+ * `api.total(name, n)` reads its nth timeline's totals: a track's own, or a combined summary's
+ * by timeline, never added across them (#586).
+ */
+function summaryEffects(plugins: readonly InstalledPlugin[], group: FrameGroup) {
+  const keys = comparison && !separation ? comparison.tracks.map((t) => t.source.key) : [];
+  const own = (group as ComparisonGroup).sourceKey;
+  return pluginSummaryEffects(
+    plugins,
+    keys.length ? undefined : group.totals,
+    keys.length
+      ? (n) => {
+          const key = keys[n - 1];
+          return key === undefined
+            ? undefined
+            : key === own
+              ? group.totals
+              : group.sourceTotals?.[key];
+        }
+      : undefined,
+  );
 }
 function summaryName(group: FrameGroup) {
   const moments = BigInt(group.count),

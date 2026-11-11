@@ -96,3 +96,51 @@ test("a measure chart weighs each group by its total's value", () => {
   const values = momentDensity(groups, x, 100, 1);
   assert(values[values.length - 1] > values[0]);
 });
+
+test("scripts that render summaries read their totals, and each compared timeline's (#587)", async () => {
+  const { pluginSummaryEffects } = await import('../dist/core.mjs');
+  const source = `function render(m, api) {
+    return api.compare(api.total("cost"), api.rational("1000")) > 0
+      ? api.merge(api.color("#cc0000"), api.size("large"))
+      : api.compare(api.total("cost", 2), api.rational("0")) > 0
+        ? api.shape("diamond")
+        : api.none();
+  }`;
+  const summaries = installed({ source, renderSummaries: true });
+  assert.deepEqual(pluginSummaryEffects(summaries, { cost: '2500' }), {
+    color: '#cc0000',
+    size: 'large',
+  });
+  assert.deepEqual(pluginSummaryEffects(summaries, { cost: '10' }), {});
+  // In a comparison, the second timeline's own totals; the first's never add to them.
+  const timelines = (n) => [{ cost: '9999' }, { cost: '5' }][n - 1];
+  assert.deepEqual(pluginSummaryEffects(summaries, undefined, timelines), { shape: 'diamond' });
+  // A moment's total is its value.
+  assert.equal(pluginColor(summaries, { measures: { cost: '1001' } }), '#cc0000');
+  // Plugins that don't render summaries leave them as they were.
+  assert.deepEqual(pluginSummaryEffects(installed({ source }), { cost: '2500' }), {});
+  assert.throws(() => validatePluginManifest(manifest({ renderSummaries: true })), /with a script/);
+  assert.throws(
+    () => validatePluginManifest(manifest({ source, renderSummaries: 'yes' })),
+    /with a script/,
+  );
+});
+
+test('derivations read a measure: a value, or a summary’s total (#587)', async () => {
+  const { derivedMetadata, pluginSummaryEffects } = await import('../dist/core.mjs');
+  const plugins = installed({
+    fields: [{ kind: 'color', metadataKey: 'color', label: 'Color' }],
+    derive: [
+      { metadataKey: 'color', from: [{ measure: 'tier' }], map: { 1: '#111111', 2: '#222222' } },
+    ],
+    marker: { kind: 'color', metadataKey: 'color' },
+    source: 'function render(m, api) { return api.color(api.get("color")); }',
+    renderSummaries: true,
+  });
+  assert.equal(derivedMetadata(plugins, { measures: { tier: '2' } }).color, '#222222');
+  assert.equal(pluginColor(plugins, { measures: { tier: '1' } }), '#111111');
+  assert.deepEqual(pluginSummaryEffects(plugins, { tier: '2' }), { color: '#222222' });
+  assert.throws(() =>
+    validatePluginManifest(manifest({ derive: [{ metadataKey: 'x', from: [{ measure: 'No' }] }] })),
+  );
+});
