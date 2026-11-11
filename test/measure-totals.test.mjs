@@ -161,7 +161,7 @@ test('coalesced groups add their totals', () => {
   assert.deepEqual(addTotals(undefined, { a: '2' }), { a: '2' });
 });
 
-test("collapsed durations' values count where they start, once, beside moments' (#576)", () => {
+test("durations' values count where they start, once, beside moments' (#576, #595)", () => {
   const rand = random(576);
   const MEASURES = { cost: { type: 'mpz' } };
   const cost = () => String(Math.floor(rand() * 900) - 200);
@@ -196,16 +196,18 @@ test("collapsed durations' values count where they start, once, beside moments' 
   for (const width of [60, 300, 1500]) {
     const frame = index.frame(viewport, width);
     const threshold = viewport.threshold(width, 24);
-    // Every moment in view and every collapsed duration reaching it, each once.
+    // Every change in the window once (#595): each moment's, and each duration's at its start,
+    // whether it is summarized or drawn as a band.
     let expected = Q.zero;
     for (const e of events) expected = expected.add(q(e.metadata.measures.cost));
     let collapsed = 0;
     for (const d of durations) {
       const first = q(d.start),
         last = q(d.end);
+      if (first.compare(viewport.left) >= 0 && first.compare(viewport.right) <= 0)
+        expected = expected.add(q(d.metadata.measures.cost));
       if (last.sub(first).compare(threshold) >= 0) continue;
       if (last.compare(viewport.left) < 0 || first.compare(viewport.right) > 0) continue;
-      expected = expected.add(q(d.metadata.measures.cost));
       collapsed++;
     }
     const counted = frame.groups.reduce((n, g) => n + Number(g.durationCount ?? 0), 0);

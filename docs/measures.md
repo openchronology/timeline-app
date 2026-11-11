@@ -123,6 +123,23 @@ A duration's values count entirely **where it starts**, as if it were a moment a
 - **Ongoing durations:** each counts where it starts, like the rest.
 - **Trees:** the duration trees keep subtree totals by start in every edition, so a summary of many durations reads cached totals, as one of many moments does.
 
+## Balances
+
+A measure's values can be **changes**, such as payments in and out, with a running **balance** ([#595](https://github.com/openchronology/timeline-app/issues/595)). Give the measure an anchor, and the balance anywhere is the anchor plus the changes on one side of it:
+
+```json
+"cost": { "type": "mpz", "durations": "end", "balance": { "at": "end", "value": "125000" } }
+```
+
+- **`balance.at`:** `start` (an opening balance, before everything), `end` (a closing balance, after everything), or an exact time (the balance just after that time's changes, like a statement's closing balance). `value` is exact, in the measure's type.
+- **`durations`:** where a duration's change applies, at its `start` (the default) or its `end`. It governs the measure's totals and balance alike. An ongoing duration counted at its end applies nothing until it ends.
+- **Simultaneous changes:** changes at the same time apply together. The balance at a time includes its changes, and the balance just before it doesn't.
+- **Overviews:** they report each anchored measure's balance before the window's changes (excluding those exactly at its left edge) and after them (including those at its right edge), as `balances`. Each summary reports its balance after its changes, as `balanceAfter`.
+- **Summaries' totals split the window:** each summary covers from its first time up to the next one's, the first from the window's start and the last to its end. So every change in the window counts once, a long duration's too. A summary's total is the difference between its balance after and the balance before it.
+- **Comparisons:** each timeline keeps its own balance.
+
+A balance is read from the timeline's change index in O(log n): the browser keeps one now. Servers and desktop files follow (#595).
+
 ## Showing totals
 
 - **Summaries:** a summary's label says what it holds, then up to two of its totals, each labelled and shown as its measure shows totals: `3 moments · Cost $21.50`. Its tooltip and the name screen readers hear list them all.
