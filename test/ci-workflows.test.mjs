@@ -179,7 +179,12 @@ test('the Node.js version comes from the Dockerfiles, which agree', async () => 
   assert.match(runtime.version, /^\d+\.\d+\.\d+$/);
   assert.match(runtime.sha256, /^[0-9a-f]{64}$/);
   assert.equal(runtime.tarball, `node-v${runtime.version}-linux-x64.tar.xz`);
-  for (const file of ['deploy/debian-server/Dockerfile', 'deploy/rpm-server/Dockerfile'])
+  // The desktop build image's (#605) serves local runs, and is the same release.
+  for (const file of [
+    'deploy/debian-server/Dockerfile',
+    'deploy/rpm-server/Dockerfile',
+    'deploy/desktop-build/Dockerfile',
+  ])
     assert.deepEqual(nodeRuntime(await readFile(file, 'utf8')), runtime, file);
   // The Windows installer bundles the same release (its zip has its own checksum).
   assert.match(

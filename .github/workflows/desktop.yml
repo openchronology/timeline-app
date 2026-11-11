@@ -12,8 +12,33 @@ on:
 permissions:
   contents: read
 jobs:
+  # The published Linux desktop build image (deploy/desktop-build, #605), pinned by digest, or
+  # nothing, in which case the Linux jobs install their packages on the runner as before.
+  image:
+    name: Desktop / build image
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    permissions:
+      contents: read
+      packages: read
+    outputs:
+      image: ${{ steps.find.outputs.image }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ inputs.tag || github.sha }}
+          persist-credentials: false
+      - name: Sign in to GitHub's container registry
+        continue-on-error: true
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: echo "$GITHUB_TOKEN" | docker login ghcr.io -u "$GITHUB_ACTOR" --password-stdin
+      - name: Find the published image
+        id: find
+        run: node scripts/build-images.mjs --find desktop-build >> "$GITHUB_OUTPUT"
   native:
     name: Desktop / ${{ matrix.target }}
+    needs: image
     strategy:
       fail-fast: false
       matrix:
@@ -28,6 +53,16 @@ jobs:
           - { os: macos-15-intel, target: macos-amd64 }
           - { os: windows-2025, target: windows-amd64 }
     runs-on: ${{ matrix.os }}
+    # The Linux targets build in the desktop build image when it is published; the others, and
+    # the Linux ones without it, on the runner itself (an empty image runs no container).
+    container:
+      image: ${{ startsWith(matrix.target, 'linux-') && needs.image.outputs.image || '' }}
+      credentials:
+        username: ${{ github.actor }}
+        password: ${{ secrets.GITHUB_TOKEN }}
+    permissions:
+      contents: read
+      packages: read
     timeout-minutes: 90
     env:
       RELEASE_TAG: ${{ inputs.tag }}
@@ -42,7 +77,7 @@ jobs:
           node-version: 24
           cache: npm
       - name: Linux dependencies
-        if: runner.os == 'Linux'
+        if: runner.os == 'Linux' && !needs.image.outputs.image
         run: |
           sh scripts/ubuntu-archive.sh
           sudo apt-get update

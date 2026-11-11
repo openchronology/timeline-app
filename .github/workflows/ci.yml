@@ -429,6 +429,10 @@ jobs:
           path: ${{ runner.temp }}/openchronology-postgres.log
   desktop:
     name: Desktop packages
+    # packages: read for the Linux desktop build image (#605).
+    permissions:
+      contents: read
+      packages: read
     uses: ./.github/workflows/desktop.yml
   # The server .deb for each distribution: on every push (so main always has them as
   # artifacts) and pull request.
@@ -443,9 +447,44 @@ jobs:
   nix:
     name: Nix
     uses: ./.github/workflows/nix.yml
+  # The published Linux desktop build image (deploy/desktop-build, #605) for desktop-ui, as
+  # desktop.yml finds it.
+  desktop-image:
+    name: Desktop app / build image
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    permissions:
+      contents: read
+      packages: read
+    outputs:
+      image: ${{ steps.find.outputs.image }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Sign in to GitHub's container registry
+        continue-on-error: true
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: echo "$GITHUB_TOKEN" | docker login ghcr.io -u "$GITHUB_ACTOR" --password-stdin
+      - name: Find the published image
+        id: find
+        run: node scripts/build-images.mjs --find desktop-build >> "$GITHUB_OUTPUT"
   desktop-ui:
     name: Desktop app / UI interactions within budget
+    needs: desktop-image
     runs-on: ubuntu-24.04
+    # In the desktop build image when it is published, with tauri-driver and Xvfb; otherwise on
+    # the runner, installing them (an empty image runs no container).
+    container:
+      image: ${{ needs.desktop-image.outputs.image }}
+      credentials:
+        username: ${{ github.actor }}
+        password: ${{ secrets.GITHUB_TOKEN }}
+      options: --shm-size=1g
+    permissions:
+      contents: read
+      packages: read
     timeout-minutes: 60
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -456,6 +495,7 @@ jobs:
           node-version: 24
           cache: npm
       - name: Desktop build dependencies, WebKitWebDriver and a virtual display
+        if: ${{ !needs.desktop-image.outputs.image }}
         run: |
           sh scripts/ubuntu-archive.sh
           sudo apt-get update
@@ -464,7 +504,7 @@ jobs:
         run: |
           rustup toolchain install 1.99.0 --profile minimal --no-self-update
           rustup default 1.99.0
-          cargo install tauri-driver --locked
+          command -v tauri-driver || cargo install tauri-driver --locked
       - run: node scripts/npm-ci.mjs
       - run: npm run build:editor
       # A debug app with the editor embedded (no installer packages).

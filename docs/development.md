@@ -78,7 +78,7 @@ npm run desktop:dev
 npm run desktop:build
 ```
 
-`src-tauri/target/release/bundle/deb/` contains the package. The desktop embeds sqlite-rational and registers it on each SQLite connection. It opens and saves `.och` files through native dialogs, works without a server, and uses rational-map for the active editable document. SQLite and GMP remain system shared libraries.
+`src-tauri/target/release/bundle/deb/` contains the package. Without these packages, the Linux desktop build image ([`deploy/desktop-build`](../deploy/README.md), which CI's Linux desktop jobs run in) builds and tests the desktop app in Docker. The desktop embeds sqlite-rational and registers it on each SQLite connection. It opens and saves `.och` files through native dialogs, works without a server, and uses rational-map for the active editable document. SQLite and GMP remain system shared libraries.
 
 Local `.och` timelines use SQLite viewport queries and persisted proximity summaries, with a bounded nearby cache in the interface. Opening and ordinary local saving do not transfer all moments into JavaScript; only inspected moments and unsaved changes are retained. Desktop JSON imports are parsed natively and staged on disk, while full exports remain explicit operations.
 
