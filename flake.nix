@@ -7,6 +7,14 @@
 
   inputs.nixpkgs.url = "github:NixOS/nixpkgs/nixos-26.05";
 
+  # The project's binary cache (docs/nix.md#binary-cache): Nix offers to use it for this flake.
+  nixConfig = {
+    extra-substituters = [ "https://openchronology.cachix.org" ];
+    extra-trusted-public-keys = [
+      "openchronology.cachix.org-1:6w2e4xOQ6CcjLNSILS23JpQ2CPjDtkRP2NX7NsQ8TVc="
+    ];
+  };
+
   outputs =
     { self, nixpkgs }:
     let

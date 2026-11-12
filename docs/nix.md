@@ -151,9 +151,23 @@ The database is PostgreSQL's, in its usual place: back it up with `pg_dump openc
 
 ## Binary cache
 
-Releases can push what they build to a [Cachix](https://www.cachix.org) cache, once the project has one: the release workflow does so when the `CACHIX_CACHE` variable and `CACHIX_AUTH_TOKEN` secret are set, and otherwise says it skipped. This page will then give the cache's address and public key, for `nix.settings.substituters` and `trusted-public-keys`.
+Releases push what they build to the project's [Cachix](https://www.cachix.org) cache, `openchronology`, and CI reads from it.
 
-Without a cache, Nix builds from source: a few minutes for the server, longer for the desktop app.
+- **Address:** `https://openchronology.cachix.org`.
+- **Public key:** `openchronology.cachix.org-1:6w2e4xOQ6CcjLNSILS23JpQ2CPjDtkRP2NX7NsQ8TVc=`.
+- **The flake offers it:** its `nixConfig` names the cache. Nix asks whether to trust that the first time you build from the flake, unless your user is trusted or you pass `--accept-flake-config`.
+- **On NixOS:** add it for the whole machine:
+
+  ```nix
+  nix.settings = {
+    substituters = [ "https://openchronology.cachix.org" ];
+    trusted-public-keys = [ "openchronology.cachix.org-1:6w2e4xOQ6CcjLNSILS23JpQ2CPjDtkRP2NX7NsQ8TVc=" ];
+  };
+  ```
+
+- **In the workflows:** the release workflow pushes when the `CACHIX_CACHE` variable and `CACHIX_AUTH_TOKEN` secret are set, and otherwise says it skipped.
+
+Without the cache, or for a commit no release has built, Nix builds from source: a few minutes for the server, longer for the desktop app.
 
 ## Checking it
 
