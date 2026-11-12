@@ -1552,7 +1552,8 @@ function drawnTrack(key: string, at?: Q): string {
   return key;
 }
 function comparisonRows() {
-  const rows = new Map<string, { offset: number; title: number }>();
+  // Each track's axis and title, and the extent of its row (#612), in the layers' pixels.
+  const rows = new Map<string, { offset: number; title: number; start: number; end: number }>();
   let total = 0;
   if (!comparison || comparison.combined) return { rows, total };
   const fields = pluginFields(comparison.plugins).filter((field) => field.kind === 'stack');
@@ -1578,7 +1579,12 @@ function comparisonRows() {
         if (lane++ % 4 < 2) up = Math.max(up, extent);
         else down = Math.max(down, extent);
       }
-    rows.set(track.source.key, { offset: total + up, title: total + 22 });
+    rows.set(track.source.key, {
+      offset: total + up,
+      title: total + 22,
+      start: total,
+      end: total + up + 340 + down,
+    });
     total += up + 340 + down;
   }
   return { rows, total };
@@ -13606,6 +13612,79 @@ function chartSeriesGroups(series: readonly (readonly string[])[]): ChartGroups[
  * rate across the view, and balance chart (#595), its running balance as steps, each on its
  * own scale, with a value axis on the right (renderChartAxes).
  */
+/**
+ * Where measures are charted (#612), in the stage's pixels: across the stage below `top`,
+ * from the view's moments and balances; or, while the timeline is separated, in each track's
+ * row, from that track's moments and its own balances, so measures move with what is
+ * separated. None in other comparisons, whose timelines' measures are their own.
+ */
+function chartBands(height: number, top: number) {
+  type Band = {
+    key: string | null;
+    top: number;
+    base: number;
+    groups: FrameGroup[];
+    durations: DurationBand[];
+    balances: Record<string, WindowBalance> | undefined;
+  };
+  if (!comparison)
+    return [
+      {
+        key: null,
+        top,
+        base: height,
+        groups: frame.groups,
+        durations: frame.durations ?? [],
+        balances: shownBalances(),
+      },
+    ] as Band[];
+  if (!separation || comparison.combined) return [] as Band[];
+  const { rows } = comparisonRows();
+  const measures = timelineMeasures() ?? {};
+  // A known balance stays with everything else, the last track; each separation counts from
+  // zero at it, so the tracks' balances add up to the whole timeline's at every time.
+  const rest = comparison.tracks.at(-1)?.source.key;
+  const offset = (text: string, name: string) => {
+    const anchor = measures[name]?.balance?.value;
+    if (!anchor || anchor === '0') return text;
+    const q = (t: string) => Q.parse(t.includes('/') ? t : t + '/1');
+    return measureText(q(text).sub(q(anchor)));
+  };
+  const shifted = (values: Record<string, string> | undefined) =>
+    values && Object.fromEntries(Object.entries(values).map(([n, v]) => [n, offset(v, n)]));
+  const bands: Band[] = [];
+  for (const [key, row] of rows) {
+    const y = (v: number) => verticalOffset + v * uiScale;
+    const bandTop = y(row.start + 40),
+      bandBase = y(row.end - 8);
+    // Off the stage: nothing to draw.
+    if (bandBase <= 0 || bandTop >= height || bandBase - bandTop < 24) continue;
+    let groups = frame.groups.filter((g) => (g as ComparisonGroup).sourceKey === key);
+    let windowBalances = frame.trackBalances?.[key];
+    if (key !== rest) {
+      groups = groups.map((g) =>
+        g.balanceAfter ? { ...g, balanceAfter: shifted(g.balanceAfter) } : g,
+      );
+      windowBalances =
+        windowBalances &&
+        Object.fromEntries(
+          Object.entries(windowBalances).map(([n, b]) => [
+            n,
+            { before: offset(b.before, n), after: offset(b.after, n) },
+          ]),
+        );
+    }
+    bands.push({
+      key,
+      top: bandTop,
+      base: bandBase,
+      groups,
+      durations: (frame.durations ?? []).filter((d) => d.sourceKey === key),
+      balances: viewBalances(groups, windowBalances, viewport.left, viewport.right),
+    });
+  }
+  return bands;
+}
 function renderBackgroundChart(host: HTMLElement) {
   const charts = pluginCharts(installedPlugins());
   const measures = timelineMeasures();
@@ -13634,24 +13713,29 @@ function renderBackgroundChart(host: HTMLElement) {
     top = height * 0.2;
   const density = charts.moments ? momentDensity(frame.groups, x, width(), spread) : null;
   const most = density ? Math.max(...density) : 0;
-  // Each measure chart's paths, and its axis: its range in stored units, from `low` at the
-  // stage's foot to `high` at `top`, and what one unit of its height is.
+  // Where the measures are charted (#612): across the stage, or, while the timeline is
+  // separated, each track in its own row, from its own moments and balances.
+  const bands = chartBands(height, top);
+  // Each measure chart's paths, and its axis: its range in stored units, from `low` at its
+  // band's foot to `high` at its top, and what one unit of its height is.
   const layers: {
     kind: 'measure' | 'balance';
     color: string | null;
     paths: { line: string; area: string };
     axis: { measure: string; low: number; high: number; per?: { interval: Q; name: string } };
+    band: number;
   }[] = [];
   let rate: { interval: Q; name: string } | null | undefined;
-  const hovered: NonNullable<typeof chartHover>['balances'] = [];
-  for (const chart of measureCharts) {
-    if (chart.kind === 'balance') {
-      // A balance chart draws the measure's running balance across the view, as steps.
-      const balance = shownBalances()?.[chart.measure];
-      const steps =
-        balance && !comparison
+  const hovers: NonNullable<typeof chartHover>['bands'] = [];
+  bands.forEach((band, b) => {
+    const hovered: NonNullable<typeof chartHover>['bands'][number]['balances'] = [];
+    for (const chart of measureCharts) {
+      if (chart.kind === 'balance') {
+        // A balance chart draws the measure's running balance across the view, as steps.
+        const balance = band.balances?.[chart.measure];
+        const steps = balance
           ? balanceSteps(
-              frame.groups,
+              band.groups,
               chart.measure,
               rationalNumber(balance.before),
               rationalNumber(balance.after),
@@ -13659,7 +13743,7 @@ function renderBackgroundChart(host: HTMLElement) {
               width(),
             )
           : null;
-      if (steps)
+        if (!steps) continue;
         hovered.push({
           measure: chart.measure,
           color: chart.color,
@@ -13667,74 +13751,86 @@ function renderBackgroundChart(host: HTMLElement) {
           low: steps.low,
           high: steps.high,
         });
-      if (steps)
         layers.push({
           kind: 'balance',
           color: chart.color,
-          paths: stepPaths(steps.steps, steps.zero, inset(), width(), top, height),
+          paths: stepPaths(steps.steps, steps.zero, inset(), width(), band.top, band.base),
           axis: { measure: chart.measure, low: steps.low, high: steps.high },
+          band: b,
         });
-      continue;
-    }
-    // A measure chart weighs each group by its total of the measure (none below zero), and
-    // each duration drawn as a band by its own value, at its start (#576). Its height is the
-    // measure per CHART_STEP pixels, so per the ruler's labelled step on its axis.
-    const weight = (text: string | undefined) => {
-      const total = text ? Q.parse(text.includes('/') ? text : text + '/1') : Q.zero;
-      return String(total.compare(Q.zero) > 0 ? total.toApproximateNumber() : 0);
-    };
-    const values = momentDensity(
-      [
-        ...frame.groups.map((g) => ({
-          first: g.first,
-          last: g.last,
-          count: weight(g.totals?.[chart.measure]),
-        })),
-        ...(frame.durations ?? []).map((band) => {
-          const values = band.metadata.measures as Record<string, string> | undefined;
-          return { first: band.first, last: band.first, count: weight(values?.[chart.measure]) };
-        }),
-      ],
-      x,
-      width(),
-      spread,
-    );
-    const peak = values ? Math.max(...values) : 0;
-    if (!values || !(peak > 0)) continue;
-    rate ??= rulerStep();
-    // Stored units per CHART_STEP pixels, as stored units per the ruler's step.
-    const perStep = rate
-      ? rate.interval.div(viewport.span).toApproximateNumber() * (width() / CHART_STEP)
-      : 1;
-    layers.push({
-      kind: 'measure',
-      color: chart.color,
-      paths: chartPaths(
-        values.map((v) => v / peak),
-        inset(),
+        continue;
+      }
+      // A measure chart weighs each group by its total of the measure (none below zero), and
+      // each duration drawn as a band by its own value, at its start (#576). Its height is
+      // the measure per CHART_STEP pixels, so per the ruler's labelled step on its axis.
+      const weight = (text: string | undefined) => {
+        const total = text ? Q.parse(text.includes('/') ? text : text + '/1') : Q.zero;
+        return String(total.compare(Q.zero) > 0 ? total.toApproximateNumber() : 0);
+      };
+      const values = momentDensity(
+        [
+          ...band.groups.map((g) => ({
+            first: g.first,
+            last: g.last,
+            count: weight(g.totals?.[chart.measure]),
+          })),
+          ...band.durations.map((duration) => {
+            const values = duration.metadata.measures as Record<string, string> | undefined;
+            return {
+              first: duration.first,
+              last: duration.first,
+              count: weight(values?.[chart.measure]),
+            };
+          }),
+        ],
+        x,
         width(),
-        top,
-        height,
-      ),
-      axis: {
-        measure: chart.measure,
-        low: 0,
-        high: peak * perStep,
-        ...(rate ? { per: rate } : {}),
-      },
-    });
-  }
-  chartHover = measures && hovered.length ? { top, base: height, balances: hovered } : null;
+        spread,
+      );
+      const peak = values ? Math.max(...values) : 0;
+      if (!values || !(peak > 0)) continue;
+      rate ??= rulerStep();
+      // Stored units per CHART_STEP pixels, as stored units per the ruler's step.
+      const perStep = rate
+        ? rate.interval.div(viewport.span).toApproximateNumber() * (width() / CHART_STEP)
+        : 1;
+      layers.push({
+        kind: 'measure',
+        color: chart.color,
+        paths: chartPaths(
+          values.map((v) => v / peak),
+          inset(),
+          width(),
+          band.top,
+          band.base,
+        ),
+        axis: {
+          measure: chart.measure,
+          low: 0,
+          high: peak * perStep,
+          ...(rate ? { per: rate } : {}),
+        },
+        band: b,
+      });
+    }
+    if (hovered.length)
+      hovers.push({ top: band.top, base: band.base, groups: band.groups, balances: hovered });
+  });
+  chartHover = measures && hovers.length ? { bands: hovers } : null;
   if (!chartHover) hideChartTooltip();
   renderChartAxes(
     stage,
     measures
-      ? layers
-          .filter((layer) => measures[layer.axis.measure])
-          .map((layer) => ({ ...layer.axis, color: layer.color }))
+      ? bands.map((band, b) => ({
+          top: band.top,
+          base: band.base,
+          // Clear of the balance readout, which only the whole timeline's stage has.
+          clear: band.key === null ? 28 : 0,
+          axes: layers
+            .filter((layer) => layer.band === b && measures[layer.axis.measure])
+            .map((layer) => ({ ...layer.axis, color: layer.color })),
+        }))
       : [],
-    top,
-    height,
   );
   if (!(charts.moments && most > 0) && !layers.length) {
     timelineChart?.svg.remove();
@@ -13852,14 +13948,18 @@ const AXIS_SPACING = 36;
  * view and range.
  */
 let chartHover: {
-  top: number;
-  base: number;
-  balances: {
-    measure: string;
-    color: string | null;
-    before: string;
-    low: number;
-    high: number;
+  /** Each band's extent, its groups, and its balance charts (#612). */
+  bands: {
+    top: number;
+    base: number;
+    groups: FrameGroup[];
+    balances: {
+      measure: string;
+      color: string | null;
+      before: string;
+      low: number;
+      high: number;
+    }[];
   }[];
 } | null = null;
 let chartTooltip: HTMLElement | null = null;
@@ -13877,22 +13977,21 @@ function showChartTooltip(event: PointerEvent) {
   const box = stage.getBoundingClientRect();
   const x = localX(event.clientX),
     y = event.clientY - box.top;
+  const band = chartHover?.bands.find((b) => y >= b.top && y <= b.base);
   if (
-    !chartHover ||
+    !band ||
     !measures ||
-    comparison ||
+    (comparison && !separation) ||
     pointers.size ||
     event.pointerType !== 'mouse' ||
     (event.target as HTMLElement).closest(
       'button, .duration-band, .chart-axes, .balance-readout',
     ) ||
     x < 0 ||
-    x > width() ||
-    y < chartHover.top ||
-    y > chartHover.base
+    x > width()
   )
     return hideChartTooltip();
-  const { top, base, balances } = chartHover;
+  const { top, base, balances, groups } = band;
   const position = (time: string) => viewport.x(parsedTime(time), width());
   if (!chartTooltip) {
     chartTooltip = document.createElement('div');
@@ -13909,7 +14008,7 @@ function showChartTooltip(event: PointerEvent) {
   card.append(time);
   const parts: HTMLElement[] = [card];
   for (const chart of balances) {
-    const value = balanceAt(frame.groups, chart.measure, chart.before, position, width(), x);
+    const value = balanceAt(groups, chart.measure, chart.before, position, width(), x);
     const line = document.createElement('span');
     line.className = 'chart-tooltip-value';
     line.dataset.measure = chart.measure;
@@ -13943,18 +14042,22 @@ stage.addEventListener('wheel', hideChartTooltip, { passive: true });
  */
 function renderChartAxes(
   host: HTMLElement,
-  axes: {
-    measure: string;
-    color: string | null;
-    low: number;
-    high: number;
-    per?: { interval: Q; name: string };
+  bands: {
+    top: number;
+    base: number;
+    /** How far above its foot values stop, clear of the balance readout. */
+    clear: number;
+    axes: {
+      measure: string;
+      color: string | null;
+      low: number;
+      high: number;
+      per?: { interval: Q; name: string };
+    }[];
   }[],
-  top: number,
-  base: number,
 ) {
   const measures = timelineMeasures();
-  if (!axes.length || !measures) {
+  if (!bands.some((band) => band.axes.length) || !measures) {
     chartAxes?.remove();
     chartAxes = null;
     return;
@@ -13966,44 +14069,50 @@ function renderChartAxes(
   if (chartAxes.parentNode !== host) host.append(chartAxes);
   // On the stage itself, above the moments, which aren't scaled with them (Ctrl and the wheel).
   chartAxes.style.right = `${stageWidth() - inset() - width()}px`;
-  const columns = axes.map((axis) => {
-    const presenter = measurePresenter(measures, axis.measure);
-    const label = measureLabel(measures, axis.measure);
-    const column = document.createElement('div');
-    column.className = 'chart-axis';
-    column.dataset.measure = axis.measure;
-    if (axis.color) column.style.color = axis.color;
-    // Its title runs up beside its values, as long as the chart is tall, so many axes fit
-    // side by side however long their measures' names.
-    const title = document.createElement('span');
-    title.className = 'chart-axis-title';
-    title.textContent = axis.per ? `${label} per ${axis.per.name}` : label;
-    title.style.top = `${top}px`;
-    // Clear of the balance readout in the lower corner, as the values are.
-    title.style.height = `${base - top - 28}px`;
-    column.append(title);
-    let widest = 0;
-    // A value about every AXIS_SPACING pixels of the chart's height.
-    for (const tick of axisTicks(
-      axis.low,
-      axis.high,
-      Math.max(4, Math.round((base - top) / AXIS_SPACING)),
-    )) {
-      const y = base - tick.at * (base - top);
-      // Clear of the balance readout in the lower corner.
-      if (y > base - 28) continue;
-      const value = document.createElement('span');
-      value.className = 'chart-axis-value';
-      value.textContent = presenter.print(tick.value, 'axis');
-      value.style.top = `${y}px`;
-      widest = Math.max(widest, value.textContent.length);
-      column.append(value);
-    }
-    // As wide as its longest value (in digits' width) and its title beside them.
-    column.style.setProperty('--axis-chars', String(widest));
-    return column;
+  // Each band's axes side by side at the right, the bands one above another (#612).
+  const sets = bands.map(({ top, base, clear, axes }) => {
+    const set = document.createElement('div');
+    set.className = 'chart-axes-band';
+    set.append(
+      ...axes.map((axis) => {
+        const presenter = measurePresenter(measures, axis.measure);
+        const label = measureLabel(measures, axis.measure);
+        const column = document.createElement('div');
+        column.className = 'chart-axis';
+        column.dataset.measure = axis.measure;
+        if (axis.color) column.style.color = axis.color;
+        // Its title runs up beside its values, as long as the chart is tall, so many axes fit
+        // side by side however long their measures' names.
+        const title = document.createElement('span');
+        title.className = 'chart-axis-title';
+        title.textContent = axis.per ? `${label} per ${axis.per.name}` : label;
+        title.style.top = `${top}px`;
+        title.style.height = `${Math.max(0, base - top - clear)}px`;
+        column.append(title);
+        let widest = 0;
+        // A value about every AXIS_SPACING pixels of the chart's height.
+        for (const tick of axisTicks(
+          axis.low,
+          axis.high,
+          Math.max(2, Math.round((base - top) / AXIS_SPACING)),
+        )) {
+          const y = base - tick.at * (base - top);
+          if (y > base - clear) continue;
+          const value = document.createElement('span');
+          value.className = 'chart-axis-value';
+          value.textContent = presenter.print(tick.value, 'axis');
+          value.style.top = `${y}px`;
+          widest = Math.max(widest, value.textContent.length);
+          column.append(value);
+        }
+        // As wide as its longest value (in digits' width) and its title beside them.
+        column.style.setProperty('--axis-chars', String(widest));
+        return column;
+      }),
+    );
+    return set;
   });
-  chartAxes.replaceChildren(...columns);
+  chartAxes.replaceChildren(...sets);
 }
 /**
  * The balances at the view's edges (#595): the frame's are at the edges of the window it was

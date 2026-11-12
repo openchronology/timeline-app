@@ -303,6 +303,11 @@ export interface FrameGroup {
 export interface Frame {
   /** The balances before and after the window's changes (#595), of measures with an anchor. */
   balances?: Record<string, { before: string; after: string }>;
+  /**
+   * In a comparison's joined frame (#612), each track's own `balances`, by its source key, so
+   * each separated side charts its own.
+   */
+  trackBalances?: Record<string, Record<string, { before: string; after: string }>>;
   durations?: DurationBand[];
   durationsTruncated?: boolean;
   /**
