@@ -116,12 +116,13 @@ This directory is self-contained and can be the root of its own GitHub repositor
 
 ### The project's own runner
 
-The browser jobs (Chromium, Firefox and WebKit) run on the project's own machine, a self-hosted runner labelled `och-heavy`, rather than on GitHub's. Pull requests from forks still run them on GitHub's runners, so code from outside the project never runs there.
+The browser jobs (Chromium, Firefox and WebKit) and the PostgreSQL job run on the project's own machine, a self-hosted runner labelled `och-heavy`, rather than on GitHub's. Pull requests from forks still run them on GitHub's runners, so code from outside the project never runs there.
 
 - **Isolation:** the runner runs as its own user, `gh-runner`, which has no sudo, SSH keys or tokens. Jobs run in containers on that user's rootless Docker (`DOCKER_HOST` in each runner's `.env`), so a job is root only inside its container.
 - **Downloads:** its Docker downloads one layer at a time (`"max-concurrent-downloads": 1` in `~gh-runner/.config/docker/daemon.json`). Jobs pulling a new image together otherwise deadlocked on the same layer.
 - **Instances:** three runner services, `actions-runner`, `actions-runner-2` and `actions-runner-3` in `/home/gh-runner`, so a matrix runs in parallel. Each is a systemd unit named `actions.runner.openchronology-timeline-app.<name>.service`.
-- **Other jobs:** a job that needs `sudo` on its host, such as the PostgreSQL job, which installs packages and follows the system journal, stays on GitHub's runners. So do benchmarks whose budgets are calibrated there.
+- **The PostgreSQL job:** it runs there too, in the PostgreSQL CI image ([`deploy/postgres-ci`](../deploy/postgres-ci/README.md), #605), which has PostgreSQL 16 with pgmp, the build tools, Rust and the browsers, so it installs nothing and needs no `sudo`. OpenLDAP, for the directory tests, is a service container beside it, so the job doesn't use the runner's Docker itself.
+- **Other jobs:** a job that needs `sudo` on its host stays on GitHub's runners, such as following the systemd journal, which reads the host's own journal. So do benchmarks whose budgets are calibrated there.
 - **The Mac:** the Apple silicon desktop build (`macos-arm64`) runs on a MacBook, a runner labelled `och-mac`, under the same rule for forks. Its user, `gh-runner`, is a hidden standard user with its own primary group, so it can't read other users' home folders, and it can't log in over SSH. It uses the machine's Homebrew, which it can read but not change, so `scripts/desktop/macos-dependencies.sh` installs only missing tools, and its own `rustup`. The runner in `/Users/gh-runner/actions-runner` runs as the launchd daemon `com.openchronology.actions-runner` (`/Library/LaunchDaemons`), so it starts at boot without anyone signed in. The Intel build and the Homebrew server test, which installs services system-wide, stay on GitHub's runners.
 - **Adding one:** register it with `config.sh --labels och-heavy`, using a token from `POST /repos/openchronology/timeline-app/actions/runners/registration-token`, then install it with `svc.sh install gh-runner`.
 

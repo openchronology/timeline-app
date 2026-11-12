@@ -4,7 +4,9 @@ name: Build images
 # ghcr.io/openchronology/server-build under a tag that hashes the stage, which
 # server-packages.yml's builds start from; and the Linux desktop build image
 # (deploy/desktop-build) in ghcr.io/openchronology/desktop-build under a hash of its Dockerfile,
-# which the Linux desktop jobs run in. So these builds don't depend on distribution mirrors.
+# which the Linux desktop jobs run in; and the PostgreSQL CI image (deploy/postgres-ci) in
+# ghcr.io/openchronology/postgres-ci under a hash of its files, which ci.yml's PostgreSQL job
+# runs in. So these builds and tests don't depend on distribution mirrors.
 # Built when the Dockerfiles or the targets change on main, weekly for security updates, and
 # by hand.
 on:
@@ -14,6 +16,8 @@ on:
       - deploy/debian-server/Dockerfile
       - deploy/rpm-server/Dockerfile
       - deploy/desktop-build/Dockerfile
+      - deploy/postgres-ci/Dockerfile
+      - deploy/postgres-ci/och-ci-postgres
       - scripts/build-images.mjs
       - scripts/server-targets.mjs
       - .github/workflows/build-images.yml
@@ -64,9 +68,14 @@ jobs:
           subject-digest: ${{ steps.image.outputs.digest }}
           push-to-registry: true
   # The Linux desktop build image (deploy/desktop-build), which desktop.yml's Linux targets and
-  # ci.yml's desktop-ui run in.
-  desktop:
-    name: desktop-build
+  # ci.yml's desktop-ui run in, and the PostgreSQL CI image (deploy/postgres-ci), which ci.yml's
+  # postgres job runs in.
+  whole:
+    name: ${{ matrix.image }}
+    strategy:
+      fail-fast: false
+      matrix:
+        image: [desktop-build, postgres-ci]
     runs-on: ubuntu-24.04
     timeout-minutes: 30
     permissions:
@@ -90,7 +99,7 @@ jobs:
         timeout-minutes: 25
         env:
           OCH_UBUNTU_MIRROR: http://azure.archive.ubuntu.com/ubuntu
-        run: node scripts/build-images.mjs --push desktop-build
+        run: node scripts/build-images.mjs --push "${{ matrix.image }}"
       - uses: actions/attest-build-provenance@4d101475d8b20a2381f78447822ac1eab6504dd8 # v4.2.2
         with:
           subject-name: ${{ steps.image.outputs.image }}

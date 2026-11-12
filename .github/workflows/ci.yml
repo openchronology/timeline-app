@@ -233,59 +233,94 @@ jobs:
           UI_THROTTLES: '4'
           UI_SIZES: '2000'
           UI_SAMPLES: '3'
-  postgres:
-    name: PostgreSQL 16 / native pgmp / accounts and sharing
+  # The PostgreSQL CI image (deploy/postgres-ci, #605) the PostgreSQL job runs in: the
+  # published one whose tag matches, or, when a branch of this repository changes it, built and
+  # pushed here first. A pull request from a fork can't push, so it needs a published one.
+  postgres-image:
+    name: PostgreSQL / CI image
     runs-on: ubuntu-24.04
-    # Usually about twelve minutes; a hung test fails here rather than after GitHub's six hours.
-    timeout-minutes: 40
-    env:
-      PG_CONFIG: /usr/lib/postgresql/16/bin/pg_config
-      PGHOST: 127.0.0.1
-      PGPORT: 5433
-      PGUSER: rational_test
-      PGDATABASE: rational_app
-      DATABASE_URL: postgresql://rational_test@127.0.0.1:5433/rational_app
+    timeout-minutes: 30
+    permissions:
+      contents: read
+      packages: write
+    outputs:
+      image: ${{ steps.find.outputs.image }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: 24
+      - name: Sign in to GitHub's container registry
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: echo "$GITHUB_TOKEN" | docker login ghcr.io -u "$GITHUB_ACTOR" --password-stdin
+      - name: Find the published image, or build and push it
+        id: find
+        timeout-minutes: 25
+        env:
+          OCH_UBUNTU_MIRROR: http://azure.archive.ubuntu.com/ubuntu
+          PUSH: ${{ !github.event.pull_request.head.repo.fork && '--push' || '' }}
+        run: |
+          node scripts/build-images.mjs --find postgres-ci $PUSH >> "$GITHUB_OUTPUT"
+          grep -q '^image=.' "$GITHUB_OUTPUT" || { echo '::error::No published PostgreSQL CI image matches deploy/postgres-ci'; exit 1; }
+  postgres:
+    name: PostgreSQL 16 / native pgmp / accounts and sharing
+    needs: postgres-image
+    # The project's own runner (och-heavy), except for pull requests from forks, whose code never
+    # runs there (docs/development.md). It runs in the PostgreSQL CI image, so it needs neither
+    # sudo nor Ubuntu's mirrors; following the journal, which does, is the journald job's.
+    runs-on: ${{ github.event.pull_request.head.repo.fork && 'ubuntu-24.04' || 'och-heavy' }}
+    # Usually about twelve minutes; a hung test fails here rather than after GitHub's six hours.
+    timeout-minutes: 40
+    permissions:
+      contents: read
+      packages: read
+    container:
+      image: ${{ needs.postgres-image.outputs.image }}
+      credentials:
+        username: ${{ github.actor }}
+        password: ${{ secrets.GITHUB_TOKEN }}
+      options: --ipc=host
+    # The directory the LDAP sign-in and directory check tests use, which each fills with its
+    # own people.
+    services:
+      ldap:
+        image: osixia/openldap:1.5.0
+        env:
+          LDAP_ORGANISATION: School
+          LDAP_DOMAIN: school.example
+          LDAP_ADMIN_PASSWORD: admin-secret
+          LDAP_TLS: 'false'
+    env:
+      # Firefox and Chromium will not start as root with another user's home.
+      HOME: /root
+      PGHOST: 127.0.0.1
+      PGPORT: 5433
+      PGUSER: rational_test
+      PGDATABASE: rational_app
+      PGDATA: /tmp/openchronology-postgres
+      OCH_POSTGRES_LOG: /tmp/openchronology-postgres.log
+      DATABASE_URL: postgresql://rational_test@127.0.0.1:5433/rational_app
+      LDAP_TEST_URL: ldap://ldap:389
+    steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
-          repository: dvarrazzo/pgmp
-          ref: 1849585416f2bc3d070bf8cef6a659907687ec7f
-          path: upstream/pgmp
           persist-credentials: false
       - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
         with:
           node-version: 24
           cache: npm
-      - name: Install PostgreSQL and native build dependencies
-        run: |
-          sh scripts/ubuntu-archive.sh
-          sudo apt-get update
-          sudo apt-get install -y postgresql-16 postgresql-server-dev-16 libgmp-dev libsqlite3-dev build-essential cmake python3
-          "$PG_CONFIG" --bindir >> "$GITHUB_PATH"
-          echo "PGDATA=$RUNNER_TEMP/openchronology-postgres" >> "$GITHUB_ENV"
-      - name: Build and install real pgmp
-        working-directory: upstream/pgmp
-        run: |
-          python3 tools/unmix.py < sql/pgmp.pysql > sql/pgmp--1.1.sql
-          python3 tools/sql2extension.py --extname pgmp sql/pgmp--1.1.sql > sql/pgmp--unpackaged--1.1.sql
-          make PG_CONFIG="$PG_CONFIG" with_llvm=no -j2
-          sudo make PG_CONFIG="$PG_CONFIG" with_llvm=no install
+      # PostgreSQL 16 with pgmp, as postgres, from the image (deploy/postgres-ci/och-ci-postgres).
       - name: Start an isolated PostgreSQL instance
-        run: |
-          initdb -D "$PGDATA" -U "$PGUSER" --auth=trust
-          pg_ctl -D "$PGDATA" -l "$RUNNER_TEMP/openchronology-postgres.log" -o "-p $PGPORT -h 127.0.0.1 -k $RUNNER_TEMP" -w start
-          createdb "$PGDATABASE"
-          psql -X -v ON_ERROR_STOP=1 -c 'CREATE EXTENSION pgmp;'
+        run: och-ci-postgres
       - run: node scripts/npm-ci.mjs
       - run: npm run build
       - run: node test/sql-oracle.mjs
+      # Rust 1.99.0 is the image's.
       - name: Build the isolated SQLite file converter
         run: |
-          rustup toolchain install 1.99.0 --profile minimal --no-self-update
-          rustup default 1.99.0
           cargo build --manifest-path native-store/Cargo.toml --locked --release --bin och-convert
       # The vendored extension's own tests, which carry local changes (vendor/README.md).
       - name: The SQLite rational extension's tests
@@ -328,11 +363,11 @@ jobs:
       - run: node test/admin-reset-postgres.mjs
       - run: node test/account-security-postgres.mjs
       - run: node test/passkeys-postgres.mjs
-      # Directory sign-in against an OpenLDAP container the test starts (Docker is on the runner).
+      # Directory sign-in against the ldap service.
       - run: node test/ldap-postgres.mjs
         env:
           LDAP_TEST_REQUIRED: '1'
-      # Ending access when someone leaves the directory (#408), against another such container.
+      # Ending access when someone leaves the directory (#408), against the same service.
       - run: node test/directory-check-postgres.mjs
         env:
           LDAP_TEST_REQUIRED: '1'
@@ -353,17 +388,14 @@ jobs:
       - run: node test/measure-totals-postgres.mjs
       - run: node test/measure-balance-postgres.mjs
       - run: node test/openapi-postgres.mjs
-      # As root, so the system journal is readable whatever the runner's groups.
-      - name: Following the systemd journal
-        run: sudo -E env "PATH=$PATH" node test/journald-live-postgres.mjs
       - run: npm run test:postgres
       - run: npm run test:platform:postgres
       - run: node test/next-client-address-postgres.mjs
-      # Chromium's system packages come from Ubuntu's archive; when it is slow, this fails on
-      # its own rather than taking the job's whole budget (#351).
-      - name: Chromium and its system packages
-        timeout-minutes: 10
-        run: npx playwright install --with-deps chromium
+      # Nothing to do while the image's Playwright matches the package; downloads only the
+      # browser if not.
+      - name: Chromium
+        timeout-minutes: 5
+        run: npx playwright install chromium
       - name: Realtime syslog timelines in a live browser
         run: node test/syslog-live-postgres.mjs
       - name: Sharing, link previews and embeds in a live browser
@@ -418,15 +450,49 @@ jobs:
       - run: node test/seed-postgres.mjs
       - run: node test/browser-fork-postgres.mjs
       - run: node test/comparison-live-postgres.mjs
-      - name: Stop PostgreSQL
-        if: always()
-        run: |
-          if test -f "$PGDATA/postmaster.pid"; then pg_ctl -D "$PGDATA" -m fast -w stop; fi
       - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         if: failure()
         with:
           name: postgres-log
-          path: ${{ runner.temp }}/openchronology-postgres.log
+          path: /tmp/openchronology-postgres.log
+  # Following the systemd journal (#151), which needs the runner's own journal and sudo, so on
+  # GitHub's runner, with the PostgreSQL CI image's database beside it.
+  journald:
+    name: PostgreSQL / following the systemd journal
+    needs: postgres-image
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    permissions:
+      contents: read
+      packages: read
+    env:
+      DATABASE_URL: postgresql://rational_test@127.0.0.1:5433/rational_app
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: 24
+          cache: npm
+      - name: Start the CI image's PostgreSQL
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          IMAGE: ${{ needs.postgres-image.outputs.image }}
+        run: |
+          echo "$GITHUB_TOKEN" | docker login ghcr.io -u "$GITHUB_ACTOR" --password-stdin
+          docker run -d --name postgres --network host "$IMAGE" och-ci-postgres --foreground
+          for i in $(seq 60); do
+            docker exec postgres psql -X -h 127.0.0.1 -p 5433 -U rational_test -d rational_app -tAc "SELECT 1 FROM pg_extension WHERE extname = 'pgmp'" 2>/dev/null | grep -q 1 && exit 0
+            sleep 2
+          done
+          docker logs postgres
+          exit 1
+      - run: node scripts/npm-ci.mjs
+      - run: npm run build
+      # As root, so the system journal is readable whatever the runner's groups.
+      - name: Following the systemd journal
+        run: sudo -E env "PATH=$PATH" node test/journald-live-postgres.mjs
   desktop:
     name: Desktop packages
     # packages: read for the Linux desktop build image (#605).
