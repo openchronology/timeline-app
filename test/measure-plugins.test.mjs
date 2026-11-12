@@ -161,7 +161,9 @@ test('a balance chart draws a measure’s running balance as steps (#595)', asyn
     { first: '20/1', last: '20/1', balanceAfter: { cost: '-50' } },
     { first: '50/1', last: '70/1', balanceAfter: { cost: '0' } },
   ];
-  const { steps, zero } = balanceSteps(groups, 'cost', 100, 0, x, 100);
+  const { steps, zero, low, high } = balanceSteps(groups, 'cost', 100, 0, x, 100);
+  // Its axis runs from the lowest balance in view to the highest.
+  assert.deepEqual([low, high], [-50, 100]);
   assert.deepEqual(steps, [
     [0, 1],
     [20, 0],
@@ -174,6 +176,55 @@ test('a balance chart draws a measure’s running balance as steps (#595)', asyn
   // Changes with no summary to place them step at the view's end; a flat zero draws nothing.
   assert.deepEqual(balanceSteps([], 'cost', 5, 7, x, 100).steps.at(-1), [100, 1]);
   assert.equal(balanceSteps([], 'cost', 0, 0, x, 100), null);
+});
+
+test('every measure and balance chart is drawn, each with its own axis', async () => {
+  const { pluginCharts } = await import('../dist/core.mjs');
+  const plugin = (id, chart, enabled = true) => ({
+    manifest: validatePluginManifest(manifest({ id, chart })),
+    enabled,
+  });
+  const charts = pluginCharts([
+    plugin('first-moments', { kind: 'moments' }),
+    plugin('debt', { kind: 'balance', measure: 'debt' }),
+    plugin('spending', { kind: 'measure', measure: 'spend' }),
+    plugin('off', { kind: 'measure', measure: 'off' }, false),
+    plugin('last-moments', {
+      kind: 'moments',
+      series: [{ label: 'Errors', tags: ['error'], color: '#cc0000' }],
+    }),
+  ]);
+  // One moments chart, the last enabled; every enabled measure chart, in plugin order.
+  assert.deepEqual(charts.moments, {
+    color: null,
+    series: [{ label: 'Errors', tags: ['error'], color: '#cc0000' }],
+  });
+  assert.deepEqual(charts.measures, [
+    { kind: 'balance', measure: 'debt', color: null, plugin: 'debt' },
+    { kind: 'measure', measure: 'spend', color: null, plugin: 'spending' },
+  ]);
+  assert.deepEqual(pluginCharts([]), { moments: null, measures: [] });
+});
+
+test('a chart axis has round values, exact, at their heights', async () => {
+  const { axisTicks } = await import('../dist/core.mjs');
+  const text = (ticks) => ticks.map((t) => t.value.toString().replace(/\/1$/, ''));
+  assert.deepEqual(text(axisTicks(0, 3909956292398)), [
+    '0',
+    '1000000000000',
+    '2000000000000',
+    '3000000000000',
+  ]);
+  const ticks = axisTicks(-50, 100);
+  assert.deepEqual(text(ticks), ['-50', '0', '50', '100']);
+  assert.deepEqual(
+    ticks.map((t) => t.at),
+    [0, 1 / 3, 2 / 3, 1],
+  );
+  // Small and fractional: exact decimals, never binary floating point.
+  assert.deepEqual(text(axisTicks(0, 0.03)), ['0', '1/100', '1/50', '3/100']);
+  assert.deepEqual(axisTicks(5, 5), []);
+  assert.deepEqual(axisTicks(0, Infinity), []);
 });
 
 test('scripts read a moment’s or summary’s balance after it (#595)', async () => {
