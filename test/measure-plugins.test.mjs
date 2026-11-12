@@ -198,6 +198,7 @@ test('every measure and balance chart is drawn, each with its own axis', async (
   assert.deepEqual(charts.moments, {
     color: null,
     series: [{ label: 'Errors', tags: ['error'], color: '#cc0000' }],
+    plugin: 'last-moments',
   });
   assert.deepEqual(charts.measures, [
     { kind: 'balance', measure: 'debt', color: null, plugin: 'debt' },

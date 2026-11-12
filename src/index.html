@@ -394,6 +394,9 @@ Every point has a place. Explore the spaces between them.</textarea>
                 title="Follow new server moments after 15 seconds without navigation"
                 ><input id="follow-latest" type="checkbox" /> Follow latest moments</label
               >
+              <button id="layers-button" data-phone-menu title="Show or hide parts of the timeline">
+                Show<span id="layers-count" class="button-count" hidden></span>
+              </button>
               <button id="separate-button" data-phone-menu>
                 Separate<span id="separate-count" class="button-count" hidden></span>
               </button>
@@ -1410,6 +1413,33 @@ Every point has a place. Explore the spaces between them.</textarea>
         <label>Time display<select id="compare-format"></select></label>
         <button value="cancel">Cancel</button
         ><button value="apply" class="button-primary">Use this display</button>
+      </form>
+    </dialog>
+    <dialog id="layers-dialog" aria-labelledby="layers-heading">
+      <form method="dialog" class="layers-form">
+        <div class="dialog-heading">
+          <h2 id="layers-heading">Show</h2>
+          <button type="button" data-close="layers-dialog" aria-label="Close">×</button>
+        </div>
+        <p class="field-hint">
+          Hide parts of the timeline while you read it. Only this tab is changed, not the timeline.
+        </p>
+        <!-- Sections rather than fieldsets: WebKit lays a fieldset out taller until it's pressed. -->
+        <section class="layers-group" aria-labelledby="layers-timeline-heading">
+          <h3 id="layers-timeline-heading">Timeline</h3>
+          <div id="layers-timeline" class="layers-list"></div>
+        </section>
+        <section class="layers-group" aria-labelledby="layers-charts-heading">
+          <h3 id="layers-charts-heading">Charts</h3>
+          <div id="layers-charts" class="layers-list"></div>
+          <p id="layers-no-charts" class="muted" hidden>
+            This timeline draws no charts. Measures and chart plugins add them.
+          </p>
+        </section>
+        <div class="dialog-commit">
+          <button type="button" id="layers-show-all">Show all</button
+          ><button type="button" data-close="layers-dialog" class="button-primary">Done</button>
+        </div>
       </form>
     </dialog>
     <dialog id="measures-dialog" aria-labelledby="measures-heading">

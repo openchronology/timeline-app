@@ -253,6 +253,13 @@ import {
 } from './draft-store.js';
 import type { DraftEntry } from './draft-store.js';
 import { readViewState, viewStorageKey, VIEW_PREFIX } from './view-state.js';
+import {
+  layerSwitches,
+  measureChartLayer,
+  MOMENTS_CHART,
+  readHiddenLayers,
+  TIMELINE_LAYERS,
+} from './layers.js';
 import { showRelated } from './related-timelines.js';
 import type { RelatedTimeline } from './related-timelines.js';
 import type { ViewState } from './view-state.js';
@@ -1841,6 +1848,7 @@ function drawFrame() {
       caption.append(title, coordinate);
       const stem = document.createElement('div');
       stem.className = 'event-stem';
+      stem.dataset.key = key;
       label = { button, stem, caption, title, coordinate, current };
       momentLabels.set(key, label);
       button.addEventListener('click', () => {
@@ -3047,6 +3055,7 @@ function updateRelated() {
       .catch(() => {});
 }
 function heading() {
+  applyHiddenLayers(false);
   updateSensitive();
   updateRelated();
   updateLinkedFrom();
@@ -5899,6 +5908,7 @@ const viewTools = toolbarMenu({
   items: [
     ...[
       'clear-selection',
+      'layers-button',
       'separate-button',
       'presentation-button',
       'measures-button',
@@ -7076,6 +7086,112 @@ el('measures-button').onclick = () => {
   el('measures-working').hidden = true;
   describeMeasures();
   el<HTMLDialogElement>('measures-dialog').showModal();
+};
+/**
+ * The parts of the timeline the reader has hidden (#618), by their switches' keys: kept in the
+ * tab, for every timeline it opens, and never in the timeline itself.
+ */
+const HIDDEN_LAYERS_KEY = 'och:hidden-layers';
+let hiddenLayers = (() => {
+  try {
+    return readHiddenLayers(sessionStorage.getItem(HIDDEN_LAYERS_KEY));
+  } catch {
+    return new Set<string>();
+  }
+})();
+/** The switches for what this timeline shows: its own parts and each chart it draws. */
+function currentLayerSwitches() {
+  const charts = timelineCharts();
+  const measures = timelineMeasures();
+  const plugins = installedPlugins();
+  const pluginName = (id: string | undefined) =>
+    id ? plugins.find((p) => p.manifest.id === id)?.manifest.name : undefined;
+  return layerSwitches({
+    moments: charts.moments && {
+      color: charts.moments.color,
+      plugin: pluginName(charts.moments.plugin),
+    },
+    measures: charts.measures.map((chart) => ({
+      measure: chart.measure,
+      label: measures?.[chart.measure] ? measureLabel(measures, chart.measure) : chart.measure,
+      color: chart.color,
+      plugin: pluginName(chart.plugin),
+    })),
+  });
+}
+/**
+ * Shows what isn't hidden: the stage's own layers by its classes, and the charts and the
+ * balance readout as they're drawn. The Show button counts the hidden parts this timeline has.
+ */
+function applyHiddenLayers(redraw = true) {
+  for (const { key } of TIMELINE_LAYERS)
+    stage.classList.toggle(`hide-${key}`, hiddenLayers.has(key));
+  const hidden = currentLayerSwitches().filter(({ key }) => hiddenLayers.has(key)).length;
+  el('layers-count').hidden = !hidden;
+  text('layers-count', hidden ? String(hidden) : '');
+  el('layers-count').setAttribute('aria-label', hidden ? `${hidden} hidden` : '');
+  if (redraw) render(false);
+}
+function setLayerHidden(key: string, hidden: boolean) {
+  if (hidden) hiddenLayers.add(key);
+  else hiddenLayers.delete(key);
+  try {
+    sessionStorage.setItem(HIDDEN_LAYERS_KEY, JSON.stringify([...hiddenLayers]));
+  } catch {
+    // Without storage, hidden only until the page reloads.
+  }
+  applyHiddenLayers();
+}
+/** The Show dialog (#618): a switch for each part of the timeline and each chart. */
+function renderLayersDialog() {
+  const switches = currentLayerSwitches();
+  const row = (layer: (typeof switches)[number]) => {
+    const label = document.createElement('label');
+    label.className = 'layer-switch';
+    const box = document.createElement('input');
+    box.type = 'checkbox';
+    box.setAttribute('role', 'switch');
+    box.dataset.layer = layer.key;
+    box.checked = !hiddenLayers.has(layer.key);
+    box.onchange = () => setLayerHidden(layer.key, !box.checked);
+    const name = document.createElement('span');
+    name.className = 'layer-name';
+    name.textContent = layer.label;
+    label.append(box);
+    if (layer.group === 'charts') {
+      const swatch = document.createElement('span');
+      swatch.className = 'layer-swatch';
+      swatch.setAttribute('aria-hidden', 'true');
+      if (layer.color) swatch.style.color = layer.color;
+      label.append(swatch);
+    }
+    label.append(name);
+    if (layer.source) {
+      const source = document.createElement('span');
+      source.className = 'muted layer-source';
+      source.textContent = `${layer.source} plugin`;
+      label.append(source);
+    }
+    return label;
+  };
+  el('layers-timeline').replaceChildren(...switches.filter((s) => s.group === 'timeline').map(row));
+  const charts = switches.filter((s) => s.group === 'charts');
+  el('layers-charts').replaceChildren(...charts.map(row));
+  el('layers-no-charts').hidden = !!charts.length;
+}
+el('layers-button').onclick = () => {
+  renderLayersDialog();
+  el<HTMLDialogElement>('layers-dialog').showModal();
+};
+el('layers-show-all').onclick = () => {
+  hiddenLayers.clear();
+  try {
+    sessionStorage.removeItem(HIDDEN_LAYERS_KEY);
+  } catch {
+    // Nothing kept.
+  }
+  applyHiddenLayers();
+  renderLayersDialog();
 };
 el('measures-add').onclick = () => {
   const row = addMeasureRow(
@@ -13685,13 +13801,21 @@ function chartBands(height: number, top: number) {
   }
   return bands;
 }
-function renderBackgroundChart(host: HTMLElement) {
+/**
+ * The charts the timeline draws, shown or hidden (#618): the moments chart a plugin draws, and
+ * every measure's (#612), as its declaration says and in its color, unless a chart plugin
+ * charts it, whose chart is drawn instead (in the measure's color if it has none).
+ */
+function timelineCharts() {
   const charts = pluginCharts(installedPlugins());
   const measures = timelineMeasures();
-  // Every measure is charted (#612) as its declaration says, in its color, unless a chart
-  // plugin charts it, whose chart is drawn instead (in the measure's color if it has none).
   const charted = new Set(charts.measures.map((chart) => chart.measure));
-  const measureCharts = [
+  const measureCharts: {
+    kind: 'measure' | 'balance';
+    measure: string;
+    color: string | null;
+    plugin?: string;
+  }[] = [
     ...charts.measures.map((chart) => ({
       ...chart,
       color:
@@ -13706,6 +13830,16 @@ function renderBackgroundChart(host: HTMLElement) {
         color: measureColor(measures!, name),
       })),
   ];
+  return { moments: charts.moments, measures: measureCharts };
+}
+function renderBackgroundChart(host: HTMLElement) {
+  const all = timelineCharts();
+  const measures = timelineMeasures();
+  // Those the reader hasn't hidden (#618).
+  const charts = { moments: hiddenLayers.has(MOMENTS_CHART) ? null : all.moments };
+  const measureCharts = all.measures.filter(
+    (chart) => !hiddenLayers.has(measureChartLayer(chart.measure)),
+  );
   const x = (time: string) => viewport.x(parsedTime(time), width()),
     spread = Math.max(24, 2 * pixels());
   const full = stageWidth(),
@@ -14198,7 +14332,7 @@ let balanceReadout: { box: HTMLElement; start: HTMLElement; end: HTMLElement } |
 function renderBalanceReadout(host: HTMLElement) {
   const measures = timelineMeasures();
   const shown =
-    !comparison && measures
+    !comparison && measures && !hiddenLayers.has('balances')
       ? Object.entries(shownBalances() ?? {}).filter(([name]) => measures[name])
       : [];
   if (!shown.length) {
