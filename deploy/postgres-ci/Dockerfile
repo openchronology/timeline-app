@@ -22,7 +22,7 @@ RUN mkdir -p /etc/postgresql-common/createcluster.d \
     && echo 'create_main_cluster = false' > /etc/postgresql-common/createcluster.d/no-main.conf \
     && apt-get update && apt-get install -y --no-install-recommends \
         postgresql-16 postgresql-server-dev-16 libgmp-dev libsqlite3-dev \
-        build-essential cmake python3 curl ca-certificates git \
+        build-essential cmake pkg-config python3 curl ca-certificates git \
     && rm -rf /var/lib/apt/lists/*
 ENV PG_CONFIG=/usr/lib/postgresql/16/bin/pg_config PATH=/usr/lib/postgresql/16/bin:$PATH
 # pgmp, the commit compose's database image builds (deploy/Dockerfile.postgres). PGXS

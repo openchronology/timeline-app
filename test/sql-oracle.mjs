@@ -1,6 +1,6 @@
 // Copyright (c) 2026 Athan Clark. SPDX-License-Identifier: GPL-3.0-only
 // Run against an installed pgmp in a disposable database. --pg-data supports restricted local environments.
-import { readFile, mkdtemp, writeFile } from 'node:fs/promises';
+import { readFile, mkdtemp, writeFile, chmod } from 'node:fs/promises';
 import { openSync, closeSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
@@ -23,6 +23,9 @@ import { indexedNodes } from '../server/tree.mjs';
 const value = (s) => (s === null ? 'NULL' : "'" + String(s).replaceAll("'", "''") + "'");
 const directory = await mkdtemp(join(tmpdir(), 'openchronology-sql-')),
   answers = join(directory, 'answers.json');
+// The server writes its answers here with COPY … TO, as its own user, which in CI's PostgreSQL
+// image (#605) isn't this one.
+await chmod(directory, 0o777);
 const events = [];
 for (let i = 0; i < 90; i++)
   events.push({
