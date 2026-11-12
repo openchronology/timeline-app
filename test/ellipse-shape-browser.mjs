@@ -113,6 +113,21 @@ export async function checkEllipseShape(page, restore) {
   assert.equal(oval.fill, 'rgb(122, 173, 196)');
   assert.deepEqual([oval.stroke, oval.borderFill], ['rgb(255, 255, 255)', 'none']);
   assert.equal(oval.width, 22);
+  // Over backgrounds, edged and shadowed along the oval, not by a round ring around it.
+  assert.deepEqual(
+    await marker('0/1').evaluate((button) => {
+      const stage = document.getElementById('timeline-stage'),
+        was = stage.classList.contains('over-backgrounds');
+      stage.classList.add('over-backgrounds');
+      const shadow = getComputedStyle(button).boxShadow,
+        filter = getComputedStyle(
+          button.querySelector('.marker-shape:not(.marker-outline)'),
+        ).filter;
+      stage.classList.toggle('over-backgrounds', was);
+      return [shadow, filter.includes('drop-shadow')];
+    }),
+    ['none', true],
+  );
 
   // An icon inside the large ellipse fills the marker inside its border, centred, and is
   // cropped to the oval, as in the other shapes.
