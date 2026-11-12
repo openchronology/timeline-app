@@ -848,6 +848,55 @@ html.timeline-fullscreen .timeline-stage {
   overflow: hidden;
   text-overflow: ellipsis;
 }
+/* The balance charts read under the mouse (#595): the time and each balance there, beside the
+   mouse, with a dot on each chart's line, above the moments. */
+.chart-tooltip {
+  position: absolute;
+  inset: 0;
+  z-index: 100002;
+  pointer-events: none;
+}
+.chart-tooltip::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: var(--tooltip-x);
+  border-left: 1px dashed
+    color-mix(in srgb, var(--timeline-text, var(--stage-text)) 45%, transparent);
+}
+.chart-tooltip-box {
+  position: absolute;
+  left: calc(var(--tooltip-x) + 12px);
+  top: var(--tooltip-y);
+  display: flex;
+  flex-direction: column;
+  padding: 3px 8px;
+  border-radius: 4px;
+  background: color-mix(in srgb, var(--timeline-background, var(--stage-ground)) 92%, transparent);
+  box-shadow: 0 1px 4px rgb(0 0 0 / 0.18);
+  font-size: 12px;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+  color: var(--timeline-text, var(--stage-text));
+  transform: translateY(-50%);
+}
+.chart-tooltip-value {
+  font-weight: 600;
+}
+.chart-tooltip.flipped .chart-tooltip-box {
+  left: auto;
+  right: calc(100% - var(--tooltip-x) + 12px);
+}
+.chart-tooltip-dot {
+  position: absolute;
+  width: 8px;
+  height: 8px;
+  margin: -4px 0 0 -4px;
+  border-radius: 50%;
+  background: currentColor;
+  box-shadow: 0 0 0 2px var(--timeline-background, var(--stage-ground));
+}
 /* A chart's series (#434): lighter fills beneath the total, each line in its own color. */
 .timeline-chart-series-area {
   fill: currentColor;

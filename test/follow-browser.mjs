@@ -205,7 +205,9 @@ export async function checkFollowLatest(browser) {
     );
     assert.equal(recentReads, 0);
     await page.clock.install();
-    await page.clock.pauseAt(new Date());
+    // A second ahead: the browser's clock (Firefox's especially) can be ahead of Node's, and
+    // pausing in its past is refused.
+    await page.clock.pauseAt(new Date(Date.now() + 1000));
     // An external addition is outside the cached viewport. Navigation postpones it.
     await page.locator('#zoom-in').click();
     revision = '3';
