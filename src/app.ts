@@ -136,6 +136,7 @@ import {
   stackedCurves,
   chartPaths,
   balanceSteps,
+  balanceAt,
   stepPaths,
   rationalNumber,
   axisTicks,
@@ -13622,6 +13623,7 @@ function renderBackgroundChart(host: HTMLElement) {
     axis: { measure: string; low: number; high: number; per?: { interval: Q; name: string } };
   }[] = [];
   let rate: { interval: Q; name: string } | null | undefined;
+  const hovered: NonNullable<typeof chartHover>['balances'] = [];
   for (const chart of charts.measures) {
     if (chart.kind === 'balance') {
       // A balance chart draws the measure's running balance across the view, as steps.
@@ -13637,6 +13639,14 @@ function renderBackgroundChart(host: HTMLElement) {
               width(),
             )
           : null;
+      if (steps)
+        hovered.push({
+          measure: chart.measure,
+          color: chart.color,
+          before: balance!.before,
+          low: steps.low,
+          high: steps.high,
+        });
       if (steps)
         layers.push({
           kind: 'balance',
@@ -13694,8 +13704,10 @@ function renderBackgroundChart(host: HTMLElement) {
       },
     });
   }
+  chartHover = measures && hovered.length ? { top, base: height, balances: hovered } : null;
+  if (!chartHover) hideChartTooltip();
   renderChartAxes(
-    host,
+    stage,
     measures
       ? layers
           .filter((layer) => measures[layer.axis.measure])
@@ -13792,11 +13804,15 @@ function renderBackgroundChart(host: HTMLElement) {
 }
 /**
  * The ruler's labelled step (#575): the time a measure chart's rate is per, such as a year or
- * 10 years, with its name; null when the ruler can't be planned.
+ * 10 years, with its name; null when the ruler can't be planned. Planned at the items' natural
+ * size, so resizing them (Ctrl and the wheel) doesn't change the rate the axes show.
  */
 function rulerStep(): { interval: Q; name: string } | null {
   try {
-    const rules = timelinePresenter().rules(viewContext('axis'));
+    const rules = timelinePresenter().rules({
+      ...viewContext('axis'),
+      textScale: textScales().measure,
+    });
     const labelled = rules.ticks.find((tick) => tick.labels.length)?.labels[0];
     return labelled && labelled.interval.compare(Q.zero) > 0
       ? { interval: labelled.interval, name: rules.graduation }
@@ -13806,6 +13822,97 @@ function rulerStep(): { interval: Q; name: string } | null {
   }
 }
 let chartAxes: HTMLElement | null = null;
+/** About how far apart, in pixels, a chart axis's values are. */
+const AXIS_SPACING = 36;
+/**
+ * What the balance charts drew (#595), for the tooltip that reads them under the mouse: the
+ * charts' extent on the stage, and each balance chart's measure, color, balance before the
+ * view and range.
+ */
+let chartHover: {
+  top: number;
+  base: number;
+  balances: {
+    measure: string;
+    color: string | null;
+    before: string;
+    low: number;
+    high: number;
+  }[];
+} | null = null;
+let chartTooltip: HTMLElement | null = null;
+function hideChartTooltip() {
+  chartTooltip?.remove();
+  chartTooltip = null;
+}
+/**
+ * The balance charts' values where the mouse is (#595): the time under it and each balance
+ * there, exactly, beside a dot on each chart's line. Only over the charts, and not over a
+ * moment or while dragging.
+ */
+function showChartTooltip(event: PointerEvent) {
+  const measures = timelineMeasures();
+  const box = stage.getBoundingClientRect();
+  const x = localX(event.clientX),
+    y = event.clientY - box.top;
+  if (
+    !chartHover ||
+    !measures ||
+    comparison ||
+    pointers.size ||
+    event.pointerType !== 'mouse' ||
+    (event.target as HTMLElement).closest(
+      'button, .duration-band, .chart-axes, .balance-readout',
+    ) ||
+    x < 0 ||
+    x > width() ||
+    y < chartHover.top ||
+    y > chartHover.base
+  )
+    return hideChartTooltip();
+  const { top, base, balances } = chartHover;
+  const position = (time: string) => viewport.x(parsedTime(time), width());
+  if (!chartTooltip) {
+    chartTooltip = document.createElement('div');
+    chartTooltip.className = 'chart-tooltip';
+    chartTooltip.setAttribute('role', 'status');
+  }
+  if (chartTooltip.parentNode !== stage) stage.append(chartTooltip);
+  const time = document.createElement('span');
+  time.className = 'chart-tooltip-time';
+  // As precise as a couple of pixels of the view, like the moments' labels.
+  time.textContent = presented(viewport.at(x, width()), 'event', 2);
+  const card = document.createElement('div');
+  card.className = 'chart-tooltip-box';
+  card.append(time);
+  const parts: HTMLElement[] = [card];
+  for (const chart of balances) {
+    const value = balanceAt(frame.groups, chart.measure, chart.before, position, width(), x);
+    const line = document.createElement('span');
+    line.className = 'chart-tooltip-value';
+    line.dataset.measure = chart.measure;
+    if (chart.color) line.style.color = chart.color;
+    line.textContent = `${measureLabel(measures, chart.measure)} ${balancePrinted(measures, chart.measure, value)}`;
+    const dot = document.createElement('span');
+    dot.className = 'chart-tooltip-dot';
+    if (chart.color) dot.style.color = chart.color;
+    const at = (rationalNumber(value) - chart.low) / (chart.high - chart.low);
+    dot.style.left = `${inset() + x}px`;
+    dot.style.top = `${base - at * (base - top)}px`;
+    card.append(line);
+    parts.push(dot);
+  }
+  chartTooltip.replaceChildren(...parts);
+  // Beside the mouse, on whichever side has room.
+  const left = inset() + x;
+  chartTooltip.style.setProperty('--tooltip-x', `${left}px`);
+  chartTooltip.style.setProperty('--tooltip-y', `${y}px`);
+  chartTooltip.classList.toggle('flipped', left > stageWidth() / 2);
+}
+stage.addEventListener('pointermove', showChartTooltip);
+stage.addEventListener('pointerleave', hideChartTooltip);
+stage.addEventListener('pointerdown', hideChartTooltip);
+stage.addEventListener('wheel', hideChartTooltip, { passive: true });
 /**
  * A value axis for each measure and balance chart (#595), side by side at the stage's right
  * edge, in the chart's color: its measure's label (a measure chart's per the ruler's step) and
@@ -13835,7 +13942,8 @@ function renderChartAxes(
     chartAxes.className = 'chart-axes';
   }
   if (chartAxes.parentNode !== host) host.append(chartAxes);
-  chartAxes.style.right = `${(stageWidth() - inset() - width()) / uiScale}px`;
+  // On the stage itself, above the moments, which aren't scaled with them (Ctrl and the wheel).
+  chartAxes.style.right = `${stageWidth() - inset() - width()}px`;
   const columns = axes.map((axis) => {
     const presenter = measurePresenter(measures, axis.measure);
     const label = measureLabel(measures, axis.measure);
@@ -13846,16 +13954,21 @@ function renderChartAxes(
     const title = document.createElement('span');
     title.className = 'chart-axis-title';
     title.textContent = axis.per ? `${label} per ${axis.per.name}` : label;
-    title.style.marginTop = `${(top - 20) / uiScale}px`;
+    title.style.marginTop = `${top - 20}px`;
     column.append(title);
-    for (const tick of axisTicks(axis.low, axis.high)) {
+    // A value about every AXIS_SPACING pixels of the chart's height.
+    for (const tick of axisTicks(
+      axis.low,
+      axis.high,
+      Math.max(4, Math.round((base - top) / AXIS_SPACING)),
+    )) {
       const y = base - tick.at * (base - top);
       // Clear of the balance readout in the lower corner.
-      if (y > base - 28 * uiScale) continue;
+      if (y > base - 28) continue;
       const value = document.createElement('span');
       value.className = 'chart-axis-value';
       value.textContent = presenter.print(tick.value, 'axis');
-      value.style.top = `${y / uiScale}px`;
+      value.style.top = `${y}px`;
       column.append(value);
     }
     return column;
@@ -13897,9 +14010,10 @@ function renderBalanceReadout(host: HTMLElement) {
     balanceReadout = { box, start, end };
   }
   const { box, start, end } = balanceReadout;
-  if (box.parentNode !== host || host.lastChild !== box) host.append(box);
-  box.style.left = `${inset() / uiScale}px`;
-  box.style.width = `${width() / uiScale}px`;
+  // Above the moments by its z-index, wherever it is among the stage's layers.
+  if (box.parentNode !== host) host.append(box);
+  box.style.left = `${inset()}px`;
+  box.style.width = `${width()}px`;
   const line = (edge: 'before' | 'after') =>
     shown
       .map(
@@ -14000,7 +14114,7 @@ function renderDurationBackgrounds() {
       if (box.style.zIndex !== String(index + 1)) box.style.zIndex = String(index + 1);
     });
   renderBackgroundChart(host);
-  renderBalanceReadout(host);
+  renderBalanceReadout(stage);
   for (const [key, entry] of durationBackgrounds)
     if (!shown.has(key)) {
       entry.box.remove();
@@ -14008,8 +14122,7 @@ function renderDurationBackgrounds() {
     }
   // The halo that keeps the timeline readable over the images (#220), and over a theme's
   // background color (#230).
-  const stage = el('timeline-stage'),
-    colored = renderTimelineTheme(stage);
+  const colored = renderTimelineTheme(stage);
   stage.classList.toggle('over-backgrounds', backdrop || colored || stacked.length > 0);
 }
 /** Band elements persist by duration so clicks and hover cards survive re-rendering. */

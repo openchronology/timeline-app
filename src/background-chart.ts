@@ -171,8 +171,29 @@ export function balanceSteps(
   return { steps: raw.map(([at, v]) => [at, scale(v)]), zero: scale(0), low, high };
 }
 /**
+ * A balance chart's value at `at` pixels across (#595), exactly as the chart draws it: the
+ * balance after the last summary placed at or before it (each at its middle, as balanceSteps
+ * places them), else the balance `before` the view.
+ */
+export function balanceAt(
+  groups: readonly Pick<FrameGroup, 'first' | 'last' | 'balanceAfter'>[],
+  measure: string,
+  before: string,
+  x: (time: string) => number,
+  width: number,
+  at: number,
+): string {
+  let value = before;
+  for (const group of groups) {
+    const text = group.balanceAfter?.[measure];
+    if (text === undefined) continue;
+    if (Math.max(0, Math.min(width, (x(group.first) + x(group.last)) / 2)) <= at) value = text;
+  }
+  return value;
+}
+/**
  * A chart's value axis (#595): round values from `low` to `high`, about `count` steps apart,
- * each 1, 2 or 5 times a power of ten, so the measure's format prints them cleanly. Exact
+ * each 1, 2, 2.5 or 5 times a power of ten, so the measure's format prints them cleanly. Exact
  * rationals, with `at` their place from 0 (`low`) to 1 (`high`). None for an empty range.
  */
 export function axisTicks(low: number, high: number, count = 4): { value: Q; at: number }[] {
@@ -180,12 +201,20 @@ export function axisTicks(low: number, high: number, count = 4): { value: Q; at:
   const raw = (high - low) / count,
     power = Math.floor(Math.log10(raw)),
     base = raw / 10 ** power;
-  const m = base <= 1 ? 1 : base <= 2 ? 2 : base <= 5 ? 5 : 10;
+  // The multiple, as a fraction n/d.
+  const [n, d] =
+    base <= 1
+      ? [1n, 1n]
+      : base <= 2
+        ? [2n, 1n]
+        : base <= 2.5
+          ? [5n, 2n]
+          : base <= 5
+            ? [5n, 1n]
+            : [10n, 1n];
   const step =
-    power >= 0
-      ? Q.from(BigInt(m) * 10n ** BigInt(power))
-      : Q.from(BigInt(m), 10n ** BigInt(-power));
-  const size = m * 10 ** power;
+    power >= 0 ? Q.from(n * 10n ** BigInt(power), d) : Q.from(n, d * 10n ** BigInt(-power));
+  const size = (Number(n) / Number(d)) * 10 ** power;
   const ticks: { value: Q; at: number }[] = [];
   for (let k = Math.ceil(low / size - 1e-9); k <= Math.floor(high / size + 1e-9); k++)
     ticks.push({ value: step.mul(Q.from(BigInt(k))), at: (k * size - low) / (high - low) });

@@ -225,6 +225,37 @@ test('a chart axis has round values, exact, at their heights', async () => {
   assert.deepEqual(text(axisTicks(0, 0.03)), ['0', '1/100', '1/50', '3/100']);
   assert.deepEqual(axisTicks(5, 5), []);
   assert.deepEqual(axisTicks(0, Infinity), []);
+  // More values on a taller axis, at 2.5 times a power of ten where that fits best.
+  assert.deepEqual(text(axisTicks(0, 38e12, 9)), [
+    '0',
+    '5000000000000',
+    '10000000000000',
+    '15000000000000',
+    '20000000000000',
+    '25000000000000',
+    '30000000000000',
+    '35000000000000',
+  ]);
+  assert.deepEqual(text(axisTicks(0, 10, 4)), ['0', '5/2', '5', '15/2', '10']);
+});
+
+test('a balance chart reads exactly under the mouse (#595)', async () => {
+  const { balanceAt } = await import('../dist/core.mjs');
+  const groups = [
+    { first: '10', last: '10', balanceAfter: { debt: '1/3' } },
+    { first: '20', last: '40', balanceAfter: { debt: '7' } },
+    { first: '50', last: '50' },
+    { first: '60', last: '60', balanceAfter: { debt: '-2' } },
+  ];
+  const x = (time) => Number(time);
+  const at = (px) => balanceAt(groups, 'debt', '5', x, 100, px);
+  assert.equal(at(0), '5');
+  assert.equal(at(10), '1/3');
+  // A summary's step is at its middle, as the chart draws it.
+  assert.equal(at(29), '1/3');
+  assert.equal(at(30), '7');
+  assert.equal(at(55), '7');
+  assert.equal(at(99), '-2');
 });
 
 test('scripts read a moment’s or summary’s balance after it (#595)', async () => {

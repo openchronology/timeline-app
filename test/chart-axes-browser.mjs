@@ -95,10 +95,22 @@ export async function checkChartAxes(page) {
   assert.equal(spend.measure, 'spend');
   assert.equal(spend.color, 'rgb(192, 97, 43)');
   assert.match(spend.title, /^Spending per \d* ?(year|years)$/);
-  // Round values in the measure's format, abbreviated, higher up the stage as they grow.
+  // Round values in the measure's format, abbreviated, higher up the stage as they grow, about
+  // every 36 pixels of the chart's height.
   assert.deepEqual(
     debt.values.map((v) => v.text),
-    ['$1T', '$2T', '$3T'],
+    ['$500B', '$1T', '$1.5T', '$2T', '$2.5T', '$3T', '$3.5T'],
+  );
+  // Above the moments: on the stage itself, after its layers of moments.
+  assert(
+    await page.evaluate(() => {
+      const axes = document.querySelector('.chart-axes');
+      return (
+        axes.parentElement.id === 'timeline-stage' &&
+        !!(document.getElementById('stack-markers').compareDocumentPosition(axes) & 4) &&
+        Number(getComputedStyle(axes).zIndex) > 1000
+      );
+    }),
   );
   for (const { values } of axes) {
     assert(values.length >= 2, 'at least two values');
@@ -118,5 +130,66 @@ export async function checkChartAxes(page) {
       ['spend', false, true],
     ],
   );
+  // Resizing the items (Ctrl and the wheel) changes neither axis: the rate stays per the same
+  // time, and the values stay where they were.
+  const box = await page.locator('#timeline-stage').boundingBox();
+  await page.mouse.move(box.x + box.width / 2, box.y + box.height / 2);
+  for (const [delta, larger] of [
+    [-400, true],
+    [800, false],
+  ]) {
+    await page.keyboard.down('Control');
+    await page.mouse.wheel(0, delta);
+    await page.keyboard.up('Control');
+    await page.waitForFunction((larger) => {
+      const scale = Number(document.getElementById('timeline-stage').dataset.uiScale);
+      return larger ? scale > 1.5 : scale < 0.8;
+    }, larger);
+    const resized = await page.evaluate(() =>
+      [...document.querySelectorAll('.chart-axis')].map((column) => ({
+        title: column.querySelector('.chart-axis-title').textContent,
+        values: [...column.querySelectorAll('.chart-axis-value')].map((v) => ({
+          text: v.textContent,
+          top: parseFloat(v.style.top),
+        })),
+      })),
+    );
+    assert.deepEqual(
+      resized.map((axis) => axis.title),
+      axes.map((axis) => axis.title),
+    );
+    // The same values at the same heights.
+    assert.deepEqual(
+      resized.map((axis) => axis.values),
+      axes.map((axis) => axis.values),
+    );
+  }
+  // Under the mouse, the time and the balance there exactly, with a dot on the line; at the
+  // view's left edge, the balance the readout gives for its start.
+  const readout = async (side) =>
+    (await page.locator(`.balance-readout .balance-${side}`).textContent()).trim();
+  // Across the time area, which the readout spans.
+  const hover = async (fraction) => {
+    const stage = await page.locator('#timeline-stage').boundingBox(),
+      area = await page.locator('.balance-readout').boundingBox();
+    await page.mouse.move(area.x + 1 + fraction * (area.width - 2), stage.y + stage.height * 0.28);
+    await page.waitForSelector('.chart-tooltip .chart-tooltip-value[data-measure=debt]');
+    return page.evaluate(() => ({
+      time: document.querySelector('.chart-tooltip-time').textContent,
+      debt: document.querySelector('.chart-tooltip-value[data-measure=debt]').textContent,
+      dots: document.querySelectorAll('.chart-tooltip-dot').length,
+    }));
+  };
+  const middle = await hover(0.5);
+  assert.match(middle.debt, /^Federal debt \$[\d,]+\.\d\d$/);
+  assert.match(middle.time, /\d{4}/);
+  assert.equal(middle.dots, 1);
+  const later = await hover(0.9);
+  const amount = (text) => BigInt(text.replace(/[^\d]/g, ''));
+  assert(amount(later.debt) > amount(middle.debt), 'the debt grows across the view');
+  assert.equal((await hover(0)).debt, await readout('start'));
+  // Gone once the mouse leaves the stage.
+  await page.mouse.move(0, 0);
+  await page.waitForFunction(() => !document.querySelector('.chart-tooltip'));
   console.log('PASS chart axes: a balance and a measure chart together, each with its own axis.');
 }
