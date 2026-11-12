@@ -13916,6 +13916,10 @@ function renderBackgroundChart(host: HTMLElement) {
     drawn.area.style.color = drawn.line.style.color = layer.color ?? '';
     drawn.line.classList.toggle('balance', layer.kind === 'balance');
     drawn.line.dataset.measure = layer.axis.measure;
+    // The chart whose axis is shown (#617) stands out from the others.
+    const muted = !!pickedAxis && layer.axis.measure !== pickedAxis;
+    drawn.area.classList.toggle('muted', muted);
+    drawn.line.classList.toggle('muted', muted);
     drawn.area.setAttribute('d', layer.paths.area);
     drawn.line.setAttribute('d', layer.paths.line);
   });
@@ -14060,6 +14064,7 @@ function renderChartAxes(
   if (!bands.some((band) => band.axes.length) || !measures) {
     chartAxes?.remove();
     chartAxes = null;
+    chartAxisPicker = pickedAxis = null;
     return;
   }
   if (!chartAxes) {
@@ -14069,50 +14074,113 @@ function renderChartAxes(
   if (chartAxes.parentNode !== host) host.append(chartAxes);
   // On the stage itself, above the moments, which aren't scaled with them (Ctrl and the wheel).
   chartAxes.style.right = `${stageWidth() - inset() - width()}px`;
-  // Each band's axes side by side at the right, the bands one above another (#612).
+  // One axis at a time (#617): the chosen measure's, or the first charted one's while it isn't
+  // charted. With several, a picker above the charts chooses it; every chart is still drawn.
+  const charted = [...new Set(bands.flatMap((band) => band.axes.map((axis) => axis.measure)))];
+  const shown = axisMeasure && charted.includes(axisMeasure) ? axisMeasure : charted[0];
+  const picker = renderChartAxisPicker(
+    measures,
+    charted,
+    shown,
+    bands.flatMap((band) => band.axes).find((axis) => axis.measure === shown)?.color ?? null,
+    bands.find((band) => band.axes.length)!.top,
+  );
+  // Each band's axis at the right, the bands one above another (#612).
   const sets = bands.map(({ top, base, clear, axes }) => {
     const set = document.createElement('div');
     set.className = 'chart-axes-band';
     set.append(
-      ...axes.map((axis) => {
-        const presenter = measurePresenter(measures, axis.measure);
-        const label = measureLabel(measures, axis.measure);
-        const column = document.createElement('div');
-        column.className = 'chart-axis';
-        column.dataset.measure = axis.measure;
-        if (axis.color) column.style.color = axis.color;
-        // Its title runs up beside its values, as long as the chart is tall, so many axes fit
-        // side by side however long their measures' names.
-        const title = document.createElement('span');
-        title.className = 'chart-axis-title';
-        title.textContent = axis.per ? `${label} per ${axis.per.name}` : label;
-        title.style.top = `${top}px`;
-        title.style.height = `${Math.max(0, base - top - clear)}px`;
-        column.append(title);
-        let widest = 0;
-        // A value about every AXIS_SPACING pixels of the chart's height.
-        for (const tick of axisTicks(
-          axis.low,
-          axis.high,
-          Math.max(2, Math.round((base - top) / AXIS_SPACING)),
-        )) {
-          const y = base - tick.at * (base - top);
-          if (y > base - clear) continue;
-          const value = document.createElement('span');
-          value.className = 'chart-axis-value';
-          value.textContent = presenter.print(tick.value, 'axis');
-          value.style.top = `${y}px`;
-          widest = Math.max(widest, value.textContent.length);
-          column.append(value);
-        }
-        // As wide as its longest value (in digits' width) and its title beside them.
-        column.style.setProperty('--axis-chars', String(widest));
-        return column;
-      }),
+      ...axes
+        .filter((axis) => axis.measure === shown)
+        .map((axis) => {
+          const presenter = measurePresenter(measures, axis.measure);
+          const label = measureLabel(measures, axis.measure);
+          const column = document.createElement('div');
+          column.className = 'chart-axis';
+          column.dataset.measure = axis.measure;
+          if (axis.color) column.style.color = axis.color;
+          // Its title runs up beside its values, as long as the chart is tall, so many axes fit
+          // side by side however long their measures' names.
+          const title = document.createElement('span');
+          title.className = 'chart-axis-title';
+          title.textContent = axis.per ? `${label} per ${axis.per.name}` : label;
+          title.style.top = `${top}px`;
+          title.style.height = `${Math.max(0, base - top - clear)}px`;
+          column.append(title);
+          let widest = 0;
+          // A value about every AXIS_SPACING pixels of the chart's height.
+          for (const tick of axisTicks(
+            axis.low,
+            axis.high,
+            Math.max(2, Math.round((base - top) / AXIS_SPACING)),
+          )) {
+            const y = base - tick.at * (base - top);
+            if (y > base - clear) continue;
+            const value = document.createElement('span');
+            value.className = 'chart-axis-value';
+            value.textContent = presenter.print(tick.value, 'axis');
+            value.style.top = `${y}px`;
+            widest = Math.max(widest, value.textContent.length);
+            column.append(value);
+          }
+          // As wide as its longest value (in digits' width) and its title beside them.
+          column.style.setProperty('--axis-chars', String(widest));
+          return column;
+        }),
     );
     return set;
   });
-  chartAxes.replaceChildren(...sets);
+  chartAxes.replaceChildren(...sets, ...(picker ? [picker] : []));
+}
+/** The measure whose axis is shown (#617), as chosen in the picker; null for the first. */
+let axisMeasure: string | null = null;
+let chartAxisPicker: HTMLSelectElement | null = null;
+/** The shown axis's measure while there are several, whose chart is drawn above the rest. */
+let pickedAxis: string | null = null;
+/**
+ * The picker of the shown axis (#617), right-aligned just above the charts: a select of the
+ * charted measures, beside a swatch of the chosen one's color. Kept across renders, so one
+ * left open isn't replaced under the pointer. None for a single chart.
+ */
+function renderChartAxisPicker(
+  measures: NonNullable<ReturnType<typeof timelineMeasures>>,
+  charted: string[],
+  shown: string,
+  color: string | null,
+  top: number,
+) {
+  if (charted.length < 2) {
+    chartAxisPicker = null;
+    pickedAxis = null;
+    return null;
+  }
+  pickedAxis = shown;
+  if (!chartAxisPicker) {
+    const select = document.createElement('select');
+    select.className = 'chart-axis-picker';
+    select.setAttribute('aria-label', 'Chart axis');
+    select.title = 'Which measure’s axis is shown';
+    // The stage's own gestures (panning, the long press's menu) leave it alone.
+    for (const type of ['pointerdown', 'wheel', 'click', 'dblclick'] as const)
+      select.addEventListener(type, (event) => event.stopPropagation());
+    select.addEventListener('change', () => {
+      axisMeasure = select.value;
+      render();
+    });
+    chartAxisPicker = select;
+  }
+  const select = chartAxisPicker;
+  const options = charted.map((name) => `${name}\u0000${measureLabel(measures, name)}`).join('\n');
+  if (select.dataset.options !== options) {
+    select.dataset.options = options;
+    select.replaceChildren(
+      ...charted.map((name) => new Option(measureLabel(measures, name), name)),
+    );
+  }
+  select.value = shown;
+  select.style.setProperty('--axis-color', color ?? '');
+  select.style.top = `${Math.max(2, top - 30)}px`;
+  return select;
 }
 /**
  * The balances at the view's edges (#595): the frame's are at the edges of the window it was
