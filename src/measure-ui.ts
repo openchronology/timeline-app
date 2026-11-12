@@ -4,9 +4,12 @@
 // read and written with the measure's own printer and parser.
 import { Rational as Q } from 'rational-ordered-map';
 import {
+  MEASURE_COLORS,
   MEASURE_LIMIT,
   MEASURE_NAME,
   MEASURES_KEY,
+  measureChart,
+  measureColor,
   measureLabel,
   measurePresenter,
   measureText,
@@ -196,6 +199,26 @@ export function addMeasureRow(
       'Typed as the measure shows values; the balance just after that time’s changes',
     ),
     balanceTimeField = field('At', balanceTime);
+  // Its chart (#612): a balance only with one, and its color, its place's when it has none.
+  const chart = select(
+    'measure-chart',
+    [
+      ['balance', 'Its balance, as steps'],
+      ['rate', 'Its totals, as a rate'],
+      ['off', 'Not charted'],
+    ],
+    d && name && measures ? measureChart(measures, name) : 'rate',
+  );
+  const color = document.createElement('input');
+  color.type = 'color';
+  color.className = 'measure-color';
+  color.value =
+    d && name && measures
+      ? measureColor(measures, name)
+      : MEASURE_COLORS[list.querySelectorAll('.measure-row').length % MEASURE_COLORS.length];
+  // Kept only when chosen here or already the measure's own.
+  if (!d?.color) color.dataset.placed = color.value;
+  const colorField = field('Chart color', color);
   const remove = document.createElement('button');
   remove.type = 'button';
   remove.className = 'button-danger measure-remove';
@@ -211,6 +234,10 @@ export function addMeasureRow(
     groupingField.hidden = !['fixed', 'decimal'].includes(mode.value);
     balanceValueField.hidden = !balance.value;
     balanceTimeField.hidden = balance.value !== 'time';
+    // Without a balance there is none to chart: a rate instead.
+    chart.options[0].disabled = !balance.value;
+    if (!balance.value && chart.value === 'balance') chart.value = 'rate';
+    colorField.hidden = chart.value === 'off';
     if (id.dataset.auto) {
       const taken = new Set(
         [...list.querySelectorAll<HTMLInputElement>('.measure-name')]
@@ -255,6 +282,8 @@ export function addMeasureRow(
     balance,
     balanceValue,
     balanceTime,
+    chart,
+    color,
   ])
     control.addEventListener('input', refresh);
   remove.onclick = () => {
@@ -286,6 +315,8 @@ export function addMeasureRow(
     field('Balance', balance, 'A known balance the values lead to or from'),
     balanceValueField,
     balanceTimeField,
+    field('Chart', chart, 'How the timeline’s background chart draws it, on its own axis'),
+    colorField,
     remove,
   );
   list.append(row);
@@ -381,6 +412,11 @@ export function readMeasureRows(list: HTMLElement): {
       ...(presentation ? { presentation } : {}),
       ...(value('measure-durations') === 'end' ? { durations: 'end' } : {}),
       ...(balance ? { balance } : {}),
+      chart: value('measure-chart'),
+      ...(() => {
+        const input = row.querySelector<HTMLInputElement>('.measure-color')!;
+        return input.dataset.placed === input.value ? {} : { color: input.value };
+      })(),
     };
     const original = row.dataset.original;
     if (original && original !== name) renames[original] = name;

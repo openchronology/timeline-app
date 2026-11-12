@@ -784,6 +784,9 @@ html.timeline-fullscreen .timeline-stage {
   stroke-width: 1.5;
 }
 /* A balance chart: steps, so the line is crisp where the balance changes. */
+.timeline-chart.crowded .timeline-chart-measure-area {
+  display: none;
+}
 .timeline-chart-measure-line.balance {
   stroke-linejoin: miter;
   shape-rendering: crispEdges;
@@ -804,19 +807,28 @@ html.timeline-fullscreen .timeline-stage {
 }
 .chart-axis {
   position: relative;
-  min-width: 56px;
+  width: calc(var(--axis-chars, 4) * 1ch + 30px);
 }
 .chart-axis-title,
 .chart-axis-value {
-  padding: 0 4px;
   border-radius: 3px;
   background: color-mix(in srgb, var(--timeline-background, var(--stage-ground)) 80%, transparent);
   white-space: nowrap;
   font-variant-numeric: tabular-nums;
 }
-/* In flow, so each column is as wide as its title. */
+.chart-axis-value {
+  padding: 0 4px;
+}
+/* Up the column's left edge, reading from the foot of the chart, cut short if too long. */
 .chart-axis-title {
-  display: block;
+  position: absolute;
+  left: 0;
+  padding: 4px 1px;
+  box-sizing: border-box;
+  writing-mode: vertical-rl;
+  transform: rotate(180deg);
+  overflow: hidden;
+  text-overflow: ellipsis;
   font-weight: 600;
 }
 .chart-axis-value {

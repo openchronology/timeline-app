@@ -33,6 +33,41 @@ export interface MeasureDeclaration {
    * everything) or an exact time (the balance just after that time's changes).
    */
   balance?: MeasureBalance;
+  /**
+   * How the background chart draws it (#612): its running balance as steps, its totals as a
+   * rate, or not at all. When absent, a measure with a balance is drawn as a balance and
+   * others as a rate.
+   */
+  chart?: MeasureChart;
+  /** Its chart's and axis's color, `#rrggbb`; a color by its place when absent (measureColor). */
+  color?: string;
+}
+export type MeasureChart = 'balance' | 'rate' | 'off';
+/**
+ * The colors measures' charts take by their place in the timeline's declarations when they
+ * have none of their own: eight distinct categorical hues, then again from the first.
+ */
+export const MEASURE_COLORS = [
+  '#2a78d6',
+  '#eb6834',
+  '#1baf7a',
+  '#eda100',
+  '#e87ba4',
+  '#008300',
+  '#6250d6',
+  '#e34948',
+] as const;
+/** A measure's chart as drawn (#612): its own, else a balance if it has one, else a rate. */
+export function measureChart(measures: Measures, name: string): MeasureChart {
+  const d = measures[name];
+  return d.chart ?? (d.balance ? 'balance' : 'rate');
+}
+/** A measure's color (#612): its own, else the one its place in the declarations gives it. */
+export function measureColor(measures: Measures, name: string): string {
+  const own = measures[name]?.color;
+  if (own) return own;
+  const place = Math.max(0, Object.keys(measures).indexOf(name));
+  return MEASURE_COLORS[place % MEASURE_COLORS.length];
 }
 /** A balance's anchor (#595): `value` at `at`, both exact canonical text. */
 export interface MeasureBalance {
@@ -74,11 +109,12 @@ export function validateMeasures(value: unknown): Measures {
     if (
       !plain(d) ||
       Object.keys(d).some(
-        (k) => !['type', 'label', 'presentation', 'durations', 'balance'].includes(k),
+        (k) =>
+          !['type', 'label', 'presentation', 'durations', 'balance', 'chart', 'color'].includes(k),
       )
     )
       throw new Error(
-        `Measure ${name} must be {"type": "mpz" | "mpq", "label"?, "presentation"?, "durations"?, "balance"?}.`,
+        `Measure ${name} must be {"type": "mpz" | "mpq", "label"?, "presentation"?, "durations"?, "balance"?, "chart"?, "color"?}.`,
       );
     if (d.type !== 'mpz' && d.type !== 'mpq')
       throw new Error(`Measure ${name}'s type must be "mpz" (whole numbers) or "mpq" (fractions).`);
@@ -126,12 +162,26 @@ export function validateMeasures(value: unknown): Measures {
         throw new Error(`Measure ${name}'s balance is a whole number.`);
       balance = { at, value: measureText(value) };
     }
+    if (d.chart !== undefined && !['balance', 'rate', 'off'].includes(d.chart as string))
+      throw new Error(`Measure ${name}'s chart is "balance", "rate" or "off".`);
+    if (d.chart === 'balance' && !balance)
+      throw new Error(`Measure ${name} is charted as a balance, so it needs one.`);
+    if (
+      d.color !== undefined &&
+      (typeof d.color !== 'string' || !/^#[0-9a-fA-F]{6}$/.test(d.color))
+    )
+      throw new Error(`Measure ${name}'s color is #rrggbb, such as "#2a78d6".`);
     measures[name] = {
       type: d.type,
       ...(d.label === undefined ? {} : { label: (d.label as string).trim() }),
       ...(presentation && !plainDefault ? { presentation } : {}),
       ...(d.durations === 'end' ? { durations: 'end' as const } : {}),
       ...(balance ? { balance } : {}),
+      // Only a chart other than the one it would have anyway.
+      ...(d.chart !== undefined && d.chart !== (balance ? 'balance' : 'rate')
+        ? { chart: d.chart as MeasureChart }
+        : {}),
+      ...(d.color !== undefined ? { color: (d.color as string).toLowerCase() } : {}),
     };
   }
   return measures;
