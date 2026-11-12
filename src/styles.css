@@ -2309,6 +2309,17 @@ dialog h3 {
 .event-marker.shaped.selected .marker-shape {
   filter: drop-shadow(0 0 2px var(--stage-cursor));
 }
+/* Over backgrounds, a shape is edged and shadowed along its own outline, as circles are along
+   theirs, rather than by the button's round box-shadow. */
+.timeline-stage.over-backgrounds .event-marker.shaped {
+  box-shadow: none;
+}
+.timeline-stage.over-backgrounds .event-marker.shaped .marker-shape:not(.marker-outline) {
+  filter: drop-shadow(0 0 0.5px rgb(0 0 0 / 70%)) drop-shadow(0 2px 3px rgb(0 0 0 / 45%));
+}
+.timeline-stage.over-backgrounds .event-marker.shaped.selected .marker-shape:not(.marker-outline) {
+  filter: drop-shadow(0 0 0.5px rgb(0 0 0 / 70%)) drop-shadow(0 0 2px var(--stage-cursor));
+}
 #plugin-definition,
 #plugin-source {
   min-height: 180px;
