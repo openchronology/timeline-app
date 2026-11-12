@@ -816,6 +816,30 @@ html.timeline-fullscreen .timeline-stage {
   flex-direction: row-reverse;
   gap: 8px;
 }
+/* The picker of the shown axis (#617), just above the charts at the right, its border and
+   text in the chosen chart's color. */
+.chart-axis-picker {
+  position: absolute;
+  right: 0;
+  max-width: min(260px, 60vw);
+  padding: 2px 6px;
+  border: 1px solid var(--axis-color, currentColor);
+  border-left-width: 6px;
+  border-radius: 4px;
+  background: color-mix(in srgb, var(--timeline-background, var(--stage-ground)) 90%, transparent);
+  color: var(--timeline-text, var(--stage-text));
+  font: inherit;
+  font-weight: 600;
+  pointer-events: auto;
+  cursor: pointer;
+}
+/* The other charts recede behind the one whose axis is shown. */
+.timeline-chart-measure-line.muted {
+  stroke-opacity: 0.35;
+}
+.timeline-chart-measure-area.muted {
+  fill-opacity: 0.05;
+}
 .chart-axis {
   position: relative;
   width: calc(var(--axis-chars, 4) * 1ch + 30px);

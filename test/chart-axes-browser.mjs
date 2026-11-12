@@ -1,5 +1,6 @@
 // Copyright (c) 2026 Athan Clark. SPDX-License-Identifier: GPL-3.0-only
-// Measure and balance charts together (#595), each with a value axis on the right: a balance
+// Measure and balance charts together (#595), each with a value axis on the right, shown one
+// at a time as picked (#617): a balance
 // chart's from the view's lowest balance to its highest, a measure chart's as a rate per the
 // ruler's labelled step, both in their measure's format and their plugin's color.
 import assert from 'node:assert/strict';
@@ -79,20 +80,55 @@ export async function checkChartAxes(page) {
     () =>
       document.querySelector('.balance-readout .balance-end')?.textContent ===
         'Federal debt $3,909,956,292,399.00' &&
-      document.querySelectorAll('.chart-axis').length === 3,
+      document.querySelectorAll('.chart-axis').length === 1,
   );
-  const axes = await page.evaluate(() =>
-    [...document.querySelectorAll('.chart-axis')].map((column) => ({
-      measure: column.dataset.measure,
-      color: getComputedStyle(column).color,
-      title: column.querySelector('.chart-axis-title').textContent,
-      values: [...column.querySelectorAll('.chart-axis-value')].map((v) => ({
-        text: v.textContent,
-        top: parseFloat(v.style.top),
+  // One axis at a time (#617), the first chart's, and a picker of the charted measures.
+  assert.deepEqual(
+    await page.evaluate(() =>
+      [...document.querySelectorAll('.chart-axis-picker option')].map((o) => [o.value, o.text]),
+    ),
+    [
+      ['debt', 'Federal debt'],
+      ['spend', 'Spending'],
+      ['interest', 'Interest paid'],
+    ],
+  );
+  const shownAxis = () =>
+    page.evaluate(() =>
+      [...document.querySelectorAll('.chart-axis')].map((column) => ({
+        measure: column.dataset.measure,
+        color: getComputedStyle(column).color,
+        title: column.querySelector('.chart-axis-title').textContent,
+        values: [...column.querySelectorAll('.chart-axis-value')].map((v) => ({
+          text: v.textContent,
+          top: parseFloat(v.style.top),
+        })),
       })),
-    })),
-  );
-  const [debt, spend, interest] = axes;
+    );
+  const pick = async (measure) => {
+    await page.locator('.chart-axis-picker').selectOption(measure);
+    await page.waitForFunction(
+      (measure) =>
+        document.querySelectorAll('.chart-axis').length === 1 &&
+        document.querySelector('.chart-axis').dataset.measure === measure,
+      measure,
+    );
+    // The others' charts recede behind the chosen one.
+    assert.deepEqual(
+      await page.evaluate(() =>
+        [...document.querySelectorAll('.timeline-chart-measure-line')]
+          .filter((line) => !line.classList.contains('muted'))
+          .map((line) => line.dataset.measure),
+      ),
+      [measure],
+    );
+    return (await shownAxis())[0];
+  };
+  const [debt] = await shownAxis();
+  const spend = await pick('spend');
+  const interest = await pick('interest');
+  await pick('debt');
+  const axes = [debt, spend, interest];
   // Charted by itself, as a rate, on its own axis and in the second of the measures' colors.
   assert.equal(interest.measure, 'interest');
   assert.equal(interest.color, 'rgb(235, 104, 52)');
@@ -161,24 +197,10 @@ export async function checkChartAxes(page) {
       const scale = Number(document.getElementById('timeline-stage').dataset.uiScale);
       return larger ? scale > 1.5 : scale < 0.8;
     }, larger);
-    const resized = await page.evaluate(() =>
-      [...document.querySelectorAll('.chart-axis')].map((column) => ({
-        title: column.querySelector('.chart-axis-title').textContent,
-        values: [...column.querySelectorAll('.chart-axis-value')].map((v) => ({
-          text: v.textContent,
-          top: parseFloat(v.style.top),
-        })),
-      })),
-    );
-    assert.deepEqual(
-      resized.map((axis) => axis.title),
-      axes.map((axis) => axis.title),
-    );
+    const [resized] = await shownAxis();
+    assert.equal(resized.title, debt.title);
     // The same values at the same heights.
-    assert.deepEqual(
-      resized.map((axis) => axis.values),
-      axes.map((axis) => axis.values),
-    );
+    assert.deepEqual(resized.values, debt.values);
   }
   // Under the mouse, the time and the balance there exactly, with a dot on the line; at the
   // view's left edge, the balance the readout gives for its start.
@@ -217,8 +239,8 @@ export async function checkChartAxes(page) {
   await page.locator('#measures-dialog').waitFor({ state: 'hidden' });
   await page.waitForFunction(
     () =>
-      document.querySelectorAll('.chart-axis').length === 2 &&
-      !document.querySelector('.chart-axis[data-measure=interest]'),
+      document.querySelectorAll('.chart-axis-picker option').length === 2 &&
+      !document.querySelector('.chart-axis-picker option[value=interest]'),
   );
   // Separated (#612), each track charts its own moments' measures in its own row, on its own
   // axes: the debt's balance on each side counts only that side's changes, the opening $1.00
@@ -239,7 +261,7 @@ export async function checkChartAxes(page) {
     () =>
       document.querySelectorAll('.chart-axes-band').length === 2 &&
       [...document.querySelectorAll('.chart-axes-band')].every(
-        (band) => band.querySelectorAll('.chart-axis').length === 2,
+        (band) => band.querySelectorAll('.chart-axis').length === 1,
       ),
   );
   const bands = await page.evaluate(() =>
@@ -252,7 +274,7 @@ export async function checkChartAxes(page) {
       };
     }),
   );
-  for (const band of bands) assert.deepEqual(band.measures, ['debt', 'spend']);
+  for (const band of bands) assert.deepEqual(band.measures, ['debt']);
   assert(bands[0].top + bands[0].height <= bands[1].top, JSON.stringify(bands));
   // The stage grows to show both tracks.
   const separated = await page.locator('#timeline-stage').boundingBox();
@@ -265,5 +287,7 @@ export async function checkChartAxes(page) {
   assert.equal(sides[0] + sides[1], whole);
   await page.locator('#separation-rejoin').click();
   await page.waitForFunction(() => document.querySelectorAll('.chart-axes-band').length === 1);
-  console.log('PASS chart axes: a balance and a measure chart together, each with its own axis.');
+  console.log(
+    'PASS chart axes: a balance and a measure chart together, each with its own axis, one shown at a time.',
+  );
 }
