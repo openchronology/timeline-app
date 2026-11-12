@@ -1424,17 +1424,18 @@ Every point has a place. Explore the spaces between them.</textarea>
         <p class="field-hint">
           Hide parts of the timeline while you read it. Only this tab is changed, not the timeline.
         </p>
-        <fieldset class="layers-group">
-          <legend>Timeline</legend>
+        <!-- Sections rather than fieldsets: WebKit lays a fieldset out taller until it's pressed. -->
+        <section class="layers-group" aria-labelledby="layers-timeline-heading">
+          <h3 id="layers-timeline-heading">Timeline</h3>
           <div id="layers-timeline" class="layers-list"></div>
-        </fieldset>
-        <fieldset class="layers-group">
-          <legend>Charts</legend>
+        </section>
+        <section class="layers-group" aria-labelledby="layers-charts-heading">
+          <h3 id="layers-charts-heading">Charts</h3>
           <div id="layers-charts" class="layers-list"></div>
           <p id="layers-no-charts" class="muted" hidden>
             This timeline draws no charts. Measures and chart plugins add them.
           </p>
-        </fieldset>
+        </section>
         <div class="dialog-commit">
           <button type="button" id="layers-show-all">Show all</button
           ><button type="button" data-close="layers-dialog" class="button-primary">Done</button>

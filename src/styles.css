@@ -4708,8 +4708,9 @@ body[data-warnings]:not([data-images-shown])
   border: 1px solid var(--line);
   border-radius: var(--radius);
 }
-.layers-group legend {
-  padding: 0 4px;
+.layers-group h3 {
+  margin: 0 0 6px;
+  font-size: 14px;
   font-weight: 600;
 }
 .layers-list {
