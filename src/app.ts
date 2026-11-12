@@ -86,6 +86,8 @@ import {
   validateMeasures,
   normalizeMeasureMetadata,
   measureLabel,
+  measureChart,
+  measureColor,
   measurePresenter,
   measureText,
   measuresCompatible,
@@ -13606,6 +13608,25 @@ function chartSeriesGroups(series: readonly (readonly string[])[]): ChartGroups[
  */
 function renderBackgroundChart(host: HTMLElement) {
   const charts = pluginCharts(installedPlugins());
+  const measures = timelineMeasures();
+  // Every measure is charted (#612) as its declaration says, in its color, unless a chart
+  // plugin charts it, whose chart is drawn instead (in the measure's color if it has none).
+  const charted = new Set(charts.measures.map((chart) => chart.measure));
+  const measureCharts = [
+    ...charts.measures.map((chart) => ({
+      ...chart,
+      color:
+        chart.color ?? (measures?.[chart.measure] ? measureColor(measures, chart.measure) : null),
+    })),
+    ...Object.keys(measures ?? {})
+      .filter((name) => !charted.has(name) && measureChart(measures!, name) !== 'off')
+      .map((name) => ({
+        kind:
+          measureChart(measures!, name) === 'balance' ? ('balance' as const) : ('measure' as const),
+        measure: name,
+        color: measureColor(measures!, name),
+      })),
+  ];
   const x = (time: string) => viewport.x(parsedTime(time), width()),
     spread = Math.max(24, 2 * pixels());
   const full = stageWidth(),
@@ -13613,7 +13634,6 @@ function renderBackgroundChart(host: HTMLElement) {
     top = height * 0.2;
   const density = charts.moments ? momentDensity(frame.groups, x, width(), spread) : null;
   const most = density ? Math.max(...density) : 0;
-  const measures = timelineMeasures();
   // Each measure chart's paths, and its axis: its range in stored units, from `low` at the
   // stage's foot to `high` at `top`, and what one unit of its height is.
   const layers: {
@@ -13624,7 +13644,7 @@ function renderBackgroundChart(host: HTMLElement) {
   }[] = [];
   let rate: { interval: Q; name: string } | null | undefined;
   const hovered: NonNullable<typeof chartHover>['balances'] = [];
-  for (const chart of charts.measures) {
+  for (const chart of measureCharts) {
     if (chart.kind === 'balance') {
       // A balance chart draws the measure's running balance across the view, as steps.
       const balance = shownBalances()?.[chart.measure];
@@ -13740,6 +13760,8 @@ function renderBackgroundChart(host: HTMLElement) {
   // Above the durations' backgrounds, whose z-indexes count up from 1.
   if (svg.parentNode !== host || host.lastChild !== svg) host.append(svg);
   svg.setAttribute('viewBox', `0 0 ${full} ${height}`);
+  // Many measure charts together are drawn as lines, as their fills would cloud each other.
+  svg.classList.toggle('crowded', layers.length > 2);
   const moments = charts.moments && most > 0 ? charts.moments : null;
   svg.style.color = moments?.color ?? '';
   const total = moments
@@ -13951,11 +13973,16 @@ function renderChartAxes(
     column.className = 'chart-axis';
     column.dataset.measure = axis.measure;
     if (axis.color) column.style.color = axis.color;
+    // Its title runs up beside its values, as long as the chart is tall, so many axes fit
+    // side by side however long their measures' names.
     const title = document.createElement('span');
     title.className = 'chart-axis-title';
     title.textContent = axis.per ? `${label} per ${axis.per.name}` : label;
-    title.style.marginTop = `${top - 20}px`;
+    title.style.top = `${top}px`;
+    // Clear of the balance readout in the lower corner, as the values are.
+    title.style.height = `${base - top - 28}px`;
     column.append(title);
+    let widest = 0;
     // A value about every AXIS_SPACING pixels of the chart's height.
     for (const tick of axisTicks(
       axis.low,
@@ -13969,8 +13996,11 @@ function renderChartAxes(
       value.className = 'chart-axis-value';
       value.textContent = presenter.print(tick.value, 'axis');
       value.style.top = `${y}px`;
+      widest = Math.max(widest, value.textContent.length);
       column.append(value);
     }
+    // As wide as its longest value (in digits' width) and its title beside them.
+    column.style.setProperty('--axis-chars', String(widest));
     return column;
   });
   chartAxes.replaceChildren(...columns);

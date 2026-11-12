@@ -154,7 +154,7 @@ Plugins can use measures too ([plugins](plugins.md)):
 - **Scripts:** `api.measure("cost")` reads a moment's value exactly, to compare with `api.compare`. A plugin that renders summaries (`renderSummaries`) reads their totals with `api.total("cost")`, and in a comparison each timeline's with `api.total("cost", n)` (#587). `api.balance("cost")` reads a moment's or summary's balance after its changes, exactly, or empty text when the measure has no balance (#595), so a script can color what leaves an account overdrawn.
 - **Derived metadata:** a derivation's `{ "measure": "cost" }` source reads a value, or a summary's total.
 - **Sizes:** `sizeBy` sizes markers and summaries by a measure's total.
-- **Charts:** the background chart can draw a measure's totals across the view as a rate, or its running balance as steps. Each measure's chart is drawn, with its own value axis on the right ([charting a measure](plugins.md#charting-a-measure)).
+- **Charts:** every measure is charted behind the timeline, each on its own scale, with its own value axis on the right ([charting a measure](plugins.md#charting-a-measure)). A measure with a balance is drawn as its running balance, in steps; any other as its totals across the view, as a rate. In the **Measures** dialog, each measure's **Chart** chooses its balance, its totals or no chart, and **Chart color** its color. A measure without a color of its own takes one of eight distinct colors by its place among the timeline's measures. In a document these are `"chart": "balance" | "rate" | "off"` and `"color": "#rrggbb"`. A chart plugin for a measure draws its chart instead.
 
 ## Where measures go
 

@@ -9,6 +9,9 @@ import {
   validateDuration,
   validateMeasures,
   validateMeasureValues,
+  measureChart,
+  measureColor,
+  MEASURE_COLORS,
   validateMeasureRenames,
   measuresCompatible,
   measureValue,
@@ -57,6 +60,40 @@ test('declarations: names, types and labels, bounded', () => {
     Object.fromEntries(Array.from({ length: 33 }, (_, i) => ['m' + i, { type: 'mpz' }])),
   ])
     assert.throws(() => validateMeasures(bad), undefined, JSON.stringify(bad).slice(0, 80));
+});
+
+test('each measure is charted, in its own color, unless it says otherwise (#612)', () => {
+  const measures = validateMeasures({
+    debt: { type: 'mpz', balance: { at: 'start', value: '0' } },
+    spend: { type: 'mpz', color: '#C0612B' },
+    ratio: { type: 'mpq', chart: 'off' },
+    held: { type: 'mpz', balance: { at: 'start', value: '0' }, chart: 'rate' },
+    // A chart it would have anyway isn't kept.
+    plain: { type: 'mpz', chart: 'rate' },
+  });
+  assert.equal(measures.plain.chart, undefined);
+  assert.equal(measures.spend.color, '#c0612b');
+  assert.deepEqual(
+    Object.keys(measures).map((name) => [name, measureChart(measures, name)]),
+    [
+      ['debt', 'balance'],
+      ['held', 'rate'],
+      ['plain', 'rate'],
+      ['ratio', 'off'],
+      ['spend', 'rate'],
+    ],
+  );
+  // Its own color, else its place's.
+  assert.equal(measureColor(measures, 'spend'), '#c0612b');
+  assert.equal(measureColor(measures, 'debt'), MEASURE_COLORS[0]);
+  assert.equal(measureColor(measures, 'held'), MEASURE_COLORS[1]);
+  for (const bad of [
+    { cost: { type: 'mpz', chart: 'balance' } },
+    { cost: { type: 'mpz', chart: 'pie' } },
+    { cost: { type: 'mpz', color: 'red' } },
+    { cost: { type: 'mpz', color: '#12345' } },
+  ])
+    assert.throws(() => validateMeasures(bad), undefined, JSON.stringify(bad));
 });
 
 test('values are exact text, canonical, never zero, and whole for mpz', () => {

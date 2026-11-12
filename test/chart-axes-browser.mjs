@@ -25,6 +25,7 @@ export async function checkChartAxes(page) {
         measures: {
           debt: String(BigInt(Math.round(1e6 * 1.06 ** (y - 1800))) * 100n),
           spend: String(BigInt(Math.round(2e5 * 1.05 ** (y - 1800))) * 100n),
+          interest: String(BigInt(Math.round(3e3 * 1.04 ** (y - 1800)))),
         },
       },
     });
@@ -48,6 +49,8 @@ export async function checkChartAxes(page) {
             balance: { at: 'start', value: '0' },
           },
           spend: { type: 'mpz', label: 'Spending', presentation: dollars },
+          // No chart plugin: charted by itself (#612), in its place's color.
+          interest: { type: 'mpz', label: 'Interest paid', presentation: dollars },
         },
         plugins: [
           {
@@ -74,7 +77,7 @@ export async function checkChartAxes(page) {
     () =>
       document.querySelector('.balance-readout .balance-end')?.textContent ===
         'Federal debt $3,909,956,292,398.00' &&
-      document.querySelectorAll('.chart-axis').length === 2,
+      document.querySelectorAll('.chart-axis').length === 3,
   );
   const axes = await page.evaluate(() =>
     [...document.querySelectorAll('.chart-axis')].map((column) => ({
@@ -87,7 +90,11 @@ export async function checkChartAxes(page) {
       })),
     })),
   );
-  const [debt, spend] = axes;
+  const [debt, spend, interest] = axes;
+  // Charted by itself, as a rate, on its own axis and in the second of the measures' colors.
+  assert.equal(interest.measure, 'interest');
+  assert.equal(interest.color, 'rgb(235, 104, 52)');
+  assert.match(interest.title, /^Interest paid per \d* ?(year|years)$/);
   // In plugin order, each in its plugin's color, named by its measure.
   assert.equal(debt.measure, 'debt');
   assert.equal(debt.color, 'rgb(59, 111, 182)');
@@ -128,7 +135,14 @@ export async function checkChartAxes(page) {
     [
       ['debt', true, true],
       ['spend', false, true],
+      ['interest', false, true],
     ],
+  );
+  // Three charts together are lines, without their fills.
+  assert(
+    await page.evaluate(() =>
+      document.querySelector('.timeline-chart').classList.contains('crowded'),
+    ),
   );
   // Resizing the items (Ctrl and the wheel) changes neither axis: the rate stays per the same
   // time, and the values stay where they were.
@@ -191,5 +205,17 @@ export async function checkChartAxes(page) {
   // Gone once the mouse leaves the stage.
   await page.mouse.move(0, 0);
   await page.waitForFunction(() => !document.querySelector('.chart-tooltip'));
+  // Switched off in the Measures dialog, its chart and axis go.
+  await page.locator('#measures-button').click();
+  const row = page.locator('.measure-row').filter({
+    has: page.locator('legend', { hasText: 'Interest paid' }),
+  });
+  await row.locator('.measure-chart').selectOption('off');
+  await page.locator('#measures-save').click();
+  await page.waitForFunction(
+    () =>
+      document.querySelectorAll('.chart-axis').length === 2 &&
+      !document.querySelector('.chart-axis[data-measure=interest]'),
+  );
   console.log('PASS chart axes: a balance and a measure chart together, each with its own axis.');
 }

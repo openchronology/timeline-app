@@ -325,7 +325,26 @@ fn measure_types(measures: Option<&Value>) -> Result<HashMap<String, String>, St
         if !measure_name(name)
             || !matches!(kind, Some("mpz" | "mpq"))
             || d.keys().any(|k| {
-                !["type", "label", "presentation", "durations", "balance"].contains(&k.as_str())
+                ![
+                    "type",
+                    "label",
+                    "presentation",
+                    "durations",
+                    "balance",
+                    "chart",
+                    "color",
+                ]
+                .contains(&k.as_str())
+            })
+            // Its chart (#612), and its color as #rrggbb.
+            || d.get("chart")
+                .is_some_and(|v| !matches!(v.as_str(), Some("balance" | "rate" | "off")))
+            || d.get("color").is_some_and(|v| {
+                v.as_str().is_none_or(|c| {
+                    c.len() != 7
+                        || !c.starts_with('#')
+                        || !c[1..].bytes().all(|b| b.is_ascii_hexdigit())
+                })
             })
             || d.get("durations")
                 .is_some_and(|v| !matches!(v.as_str(), Some("start" | "end")))
