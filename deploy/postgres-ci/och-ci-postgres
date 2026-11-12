@@ -1,0 +1,39 @@
+#!/bin/sh
+# Copyright (c) 2026 Athan Clark. SPDX-License-Identifier: GPL-3.0-only
+# Starts a disposable PostgreSQL 16 test database with pgmp (#605): a new cluster in PGDATA
+# whose superuser PGUSER logs in without a password, on PGPORT, with the database PGDATABASE
+# and pgmp installed in it. As root, PostgreSQL runs as the postgres user.
+#
+#   och-ci-postgres               start it in the background and return (ci.yml)
+#   och-ci-postgres --foreground  keep running until stopped, accepting connections from
+#                                 anywhere (`docker run -p 127.0.0.1:5433:5433 …`)
+set -eu
+port=${PGPORT:-5433}
+user=${PGUSER:-rational_test}
+database=${PGDATABASE:-rational_app}
+data=${PGDATA:-/tmp/openchronology-postgres}
+log=${OCH_POSTGRES_LOG:-$data.log}
+foreground=
+[ "${1:-}" = --foreground ] && foreground=1
+as_postgres() {
+  if [ "$(id -u)" = 0 ]; then runuser -u postgres -- "$@"; else "$@"; fi
+}
+mkdir -p "$data"
+touch "$log"
+[ "$(id -u)" = 0 ] && chown postgres "$data" "$log"
+as_postgres initdb -D "$data" -U "$user" --auth=trust >/dev/null
+listen=127.0.0.1
+if [ -n "$foreground" ]; then
+  # Only for a container whose port is published to the host's loopback.
+  echo 'host all all all trust' >> "$data/pg_hba.conf"
+  listen='*'
+fi
+as_postgres pg_ctl -D "$data" -l "$log" -o "-p $port -h '$listen' -k /tmp" -w start
+createdb -h 127.0.0.1 -p "$port" -U "$user" "$database"
+psql -X -q -v ON_ERROR_STOP=1 -h 127.0.0.1 -p "$port" -U "$user" -d "$database" -c 'CREATE EXTENSION pgmp;'
+echo "och-ci-postgres: postgresql://$user@127.0.0.1:$port/$database with pgmp"
+if [ -n "$foreground" ]; then
+  trap 'as_postgres pg_ctl -D "$data" -m fast -w stop; exit 0' INT TERM
+  tail -F "$log" &
+  wait
+fi

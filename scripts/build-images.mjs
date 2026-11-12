@@ -10,7 +10,8 @@
 //   node scripts/build-images.mjs --find desktop-build
 //
 // It also builds images from a whole Dockerfile (IMAGES): the Linux desktop build image, which
-// the desktop jobs run in when --find finds it published.
+// the desktop jobs run in when --find finds it published, and the PostgreSQL CI image, which
+// ci.yml's PostgreSQL job runs in.
 // Without --push the images are loaded into the local Docker. With --push (build-images.yml)
 // they are pushed, and with one target and stage the image's name and digest are written to
 // $GITHUB_OUTPUT for its attestation. OCH_TOOL_IMAGES names another repository.
@@ -76,21 +77,31 @@ export async function toolImage(name, stage, repo = TOOL_IMAGES) {
 
 /**
  * Images built from a whole Dockerfile, its folder the build context, tagged with a hash of the
- * Dockerfile: the Linux desktop build image (deploy/desktop-build). OCH_DESKTOP_IMAGES names
- * another repository for it.
+ * Dockerfile and the other files it copies: the Linux desktop build image (deploy/desktop-build)
+ * and the PostgreSQL CI image (deploy/postgres-ci). OCH_DESKTOP_IMAGES and OCH_POSTGRES_IMAGES
+ * name other repositories for them.
  */
 export const IMAGES = {
   'desktop-build': {
     dockerfile: 'deploy/desktop-build/Dockerfile',
+    files: [],
     repo: () => process.env.OCH_DESKTOP_IMAGES || 'ghcr.io/openchronology/desktop-build',
     description: "OpenChronology's Linux desktop build image (scripts/build-images.mjs)",
   },
+  'postgres-ci': {
+    dockerfile: 'deploy/postgres-ci/Dockerfile',
+    files: ['deploy/postgres-ci/och-ci-postgres'],
+    repo: () => process.env.OCH_POSTGRES_IMAGES || 'ghcr.io/openchronology/postgres-ci',
+    description:
+      "OpenChronology's PostgreSQL CI image: PostgreSQL 16 with pgmp (scripts/build-images.mjs)",
+  },
 };
-/** A whole-Dockerfile image's reference, tagged with the Dockerfile's hash. */
+/** A whole-Dockerfile image's reference, tagged with a hash of its Dockerfile, then its files. */
 export async function wholeImage(name) {
-  const { dockerfile, repo } = IMAGES[name];
-  const text = await readFile(dockerfile, 'utf8');
-  return `${repo()}:${createHash('sha256').update(text).digest('hex').slice(0, 16)}`;
+  const { dockerfile, files, repo } = IMAGES[name];
+  const hash = createHash('sha256');
+  for (const file of [dockerfile, ...files]) hash.update(await readFile(file, 'utf8'));
+  return `${repo()}:${hash.digest('hex').slice(0, 16)}`;
 }
 // OCH_UBUNTU_MIRROR: an Ubuntu archive mirror closer than archive.ubuntu.com.
 const imageArgs = () =>
@@ -151,39 +162,46 @@ export async function prebuiltToolArgs(name) {
   return args;
 }
 
-const run = (command, args) =>
+const run = (command, args, stdio = 'inherit') =>
   new Promise((done, fail) => {
-    const child = spawn(command, args, { stdio: 'inherit' });
+    const child = spawn(command, args, { stdio });
     child.on('error', fail);
     child.on('exit', (code) =>
       code === 0 ? done() : fail(new Error(`${command} ${args[0]} ${args[1]} failed`)),
     );
   });
 
-/** Builds one image, loaded into the local Docker or pushed; returns its digest when pushed. */
-async function buildImage(ref, args, description, push) {
-  console.log(`Building ${ref}`);
+/**
+ * Builds one image, loaded into the local Docker or pushed; returns its digest when pushed. With
+ * `log` console.error, nothing is written to standard output (--find).
+ */
+async function buildImage(ref, args, description, push, log = console.log) {
+  log(`Building ${ref}`);
   const dir = await mkdtemp(join(tmpdir(), 'och-image-'));
   const metadata = join(dir, 'metadata.json');
   try {
-    await run('docker', [
-      'buildx',
-      'build',
-      '--progress=plain',
-      ...args.slice(0, -1),
-      '--label',
-      'org.opencontainers.image.source=https://github.com/openchronology/timeline-app',
-      '--label',
-      `org.opencontainers.image.description=${description}`,
-      '--tag',
-      ref,
-      '--metadata-file',
-      metadata,
-      push ? '--push' : '--load',
-      args.at(-1),
-    ]);
+    await run(
+      'docker',
+      [
+        'buildx',
+        'build',
+        '--progress=plain',
+        ...args.slice(0, -1),
+        '--label',
+        'org.opencontainers.image.source=https://github.com/openchronology/timeline-app',
+        '--label',
+        `org.opencontainers.image.description=${description}`,
+        '--tag',
+        ref,
+        '--metadata-file',
+        metadata,
+        push ? '--push' : '--load',
+        args.at(-1),
+      ],
+      log === console.error ? ['ignore', 2, 2] : 'inherit',
+    );
     const digest = JSON.parse(await readFile(metadata, 'utf8'))['containerimage.digest'];
-    console.log(`Built ${ref}${digest ? `@${digest}` : ''}`);
+    log(`Built ${ref}${digest ? `@${digest}` : ''}`);
     return { ref, digest };
   } finally {
     await rm(dir, { recursive: true, force: true });
@@ -193,13 +211,20 @@ async function buildImage(ref, args, description, push) {
 async function main(argv) {
   const push = argv.includes('--push');
   // --find <image>: the published image's pinned reference as `image=<ref>@<digest>`, or an
-  // empty `image=` when there is none, for $GITHUB_OUTPUT (desktop.yml, ci.yml).
+  // empty `image=` when there is none, for $GITHUB_OUTPUT (desktop.yml, ci.yml). With --push
+  // as well, an image that isn't published is built and pushed first (ci.yml's postgres-image,
+  // so a pull request that changes the image tests it).
   const find = argv.indexOf('--find');
   if (find >= 0) {
     const name = argv[find + 1];
     if (!IMAGES[name]) throw new Error(`Unknown image ${name}`);
     const ref = await wholeImage(name);
-    const digest = await publishedDigest(ref);
+    let digest = await publishedDigest(ref);
+    if (!digest && push) {
+      const { dockerfile, description } = IMAGES[name];
+      const args = ['--file', dockerfile, ...imageArgs(), dirname(dockerfile)];
+      ({ digest } = await buildImage(ref, args, description, true, console.error));
+    }
     console.error(digest ? `Using the published ${ref}@${digest}` : `No published ${ref}`);
     console.log(`image=${digest ? `${ref}@${digest}` : ''}`);
     return;

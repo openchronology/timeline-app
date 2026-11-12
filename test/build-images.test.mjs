@@ -108,3 +108,56 @@ test('the Linux desktop jobs run in the image only when it is found', async () =
   assert.match(ci, /image: \$\{\{ needs\.desktop-image\.outputs\.image \}\}/);
   assert.match(ci, /if: \$\{\{ !needs\.desktop-image\.outputs\.image \}\}/);
 });
+
+test('the PostgreSQL CI image is tagged with a hash of its Dockerfile and start script', async () => {
+  const { IMAGES, wholeImage } = await import('../scripts/build-images.mjs');
+  const { createHash } = await import('node:crypto');
+  const { dockerfile, files } = IMAGES['postgres-ci'];
+  assert.deepEqual(files, ['deploy/postgres-ci/och-ci-postgres']);
+  const hash = createHash('sha256');
+  for (const file of [dockerfile, ...files]) hash.update(await readFile(file, 'utf8'));
+  assert.equal(
+    await wholeImage('postgres-ci'),
+    `ghcr.io/openchronology/postgres-ci:${hash.digest('hex').slice(0, 16)}`,
+  );
+  // build-images.yml rebuilds it when either changes.
+  const workflow = await readFile('.github/workflows/build-images.yml', 'utf8');
+  for (const file of [dockerfile, ...files]) assert(workflow.includes(`- ${file}\n`), file);
+});
+
+test('the PostgreSQL job runs in the CI image, on the project runner except for forks', async () => {
+  const ci = await readFile('.github/workflows/ci.yml', 'utf8');
+  // A job from its name to the next job.
+  const body = (name) => {
+    const start = ci.indexOf(`\n  ${name}:\n`);
+    const next = ci.slice(start + 1).search(/\n {2}[\w-]+:\n/);
+    return ci.slice(start, start + 1 + next);
+  };
+  const image = body('postgres-image'),
+    postgres = body('postgres'),
+    journald = body('journald');
+  assert.match(image, /--find postgres-ci \$PUSH >> "\$GITHUB_OUTPUT"/);
+  assert.match(
+    image,
+    /PUSH: \$\{\{ !github\.event\.pull_request\.head\.repo\.fork && '--push' \|\| '' \}\}/,
+  );
+  assert.match(
+    postgres,
+    /runs-on: \$\{\{ github\.event\.pull_request\.head\.repo\.fork && 'ubuntu-24\.04' \|\| 'och-heavy' \}\}/,
+  );
+  assert.match(postgres, /image: \$\{\{ needs\.postgres-image\.outputs\.image \}\}/);
+  assert.match(postgres, /run: och-ci-postgres\n/);
+  // Nothing on the project runner needs sudo or Ubuntu's mirrors.
+  assert.doesNotMatch(postgres.replace(/^\s*#.*$/gm, ''), /\bsudo\b|apt-get|--with-deps|rustup/);
+  assert.match(journald, /runs-on: ubuntu-24\.04\n/);
+  assert.match(journald, /och-ci-postgres --foreground/);
+  assert.match(journald, /node test\/journald-live-postgres\.mjs/);
+});
+
+test("the PostgreSQL CI image starts from the browser jobs' Playwright image", async () => {
+  const dockerfile = await readFile('deploy/postgres-ci/Dockerfile', 'utf8');
+  const ci = await readFile('.github/workflows/ci.yml', 'utf8');
+  const base = dockerfile.match(/^FROM (\S+)$/m)[1];
+  assert.match(base, /^mcr\.microsoft\.com\/playwright:v[\d.]+-noble@sha256:[0-9a-f]{64}$/);
+  assert(ci.includes(`image: ${base}\n`), base);
+});
