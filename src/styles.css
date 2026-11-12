@@ -772,10 +772,59 @@ html.timeline-fullscreen .timeline-stage {
   stroke-opacity: 0.55;
   stroke-width: 1.5;
 }
-/* A balance chart (#595): steps, so the line is crisp where the balance changes. */
-.timeline-chart.balance .timeline-chart-line {
+/* Measure (#575) and balance (#595) charts, each on its own scale over the moments chart. */
+.timeline-chart-measure-area {
+  fill: currentColor;
+  fill-opacity: 0.12;
+}
+.timeline-chart-measure-line {
+  fill: none;
+  stroke: currentColor;
+  stroke-opacity: 0.7;
+  stroke-width: 1.5;
+}
+/* A balance chart: steps, so the line is crisp where the balance changes. */
+.timeline-chart-measure-line.balance {
   stroke-linejoin: miter;
   shape-rendering: crispEdges;
+}
+/* Their value axes (#595), side by side at the stage's right edge, each in its chart's color:
+   a title above the chart and round values at their heights, right-aligned to a short tick. */
+.chart-axes {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  z-index: 100001;
+  display: flex;
+  flex-direction: row-reverse;
+  gap: 8px;
+  pointer-events: none;
+  font-size: 11px;
+  color: var(--timeline-marker, var(--stage-marker));
+}
+.chart-axis {
+  position: relative;
+  min-width: 56px;
+}
+.chart-axis-title,
+.chart-axis-value {
+  padding: 0 4px;
+  border-radius: 3px;
+  background: color-mix(in srgb, var(--timeline-background, var(--stage-ground)) 80%, transparent);
+  white-space: nowrap;
+  font-variant-numeric: tabular-nums;
+}
+/* In flow, so each column is as wide as its title. */
+.chart-axis-title {
+  display: block;
+  font-weight: 600;
+}
+.chart-axis-value {
+  position: absolute;
+  right: 0;
+  transform: translateY(-50%);
+  border-right: 2px solid currentColor;
+  border-radius: 3px 0 0 3px;
 }
 /* The view's balances at its edges (#595), in the stage's lower corners. */
 .balance-readout {

@@ -129,7 +129,7 @@ Install **Background chart** (`background-chart`) to chart how many moments lie 
 - **Look:** a translucent area under a thin line, above the timeline's and durations' backgrounds and beneath the axis, bands, links and markers. It takes the color of moments (the theme's marker color, if set), or the **Chart color** set under the plugin in the **Plugins** dialog; **Use default** clears it.
 - **Disabling:** disabling or removing the plugin removes the chart.
 
-A plugin's `chart` is `{ "kind": "moments" }`, with a `setting` naming one of its own `color` settings for the color, and optionally `series`. When several enabled plugins draw one, the last one wins.
+A plugin's `chart` is `{ "kind": "moments" }`, with a `setting` naming one of its own `color` settings for the color, and optionally `series`. When several enabled plugins draw a moments chart, the last one wins. Measure and balance charts (below) are each drawn as well.
 
 ### Series
 
@@ -144,9 +144,17 @@ Each of `series` (one to eight) is `{ "label": "Errors", "tags": ["severity:err"
 
 ### Charting a measure
 
-A chart can draw one of the timeline's [measures](measures.md) instead of the moments' count ([#575](https://github.com/openchronology/timeline-app/issues/575)): `{ "kind": "measure", "measure": "cost" }`, with an optional color `setting` as above. The curve is highest where the view's total of the measure is largest. Each summary weighs as much as its total, read from the view's summaries as counts are. A total below zero counts as zero, and a measure chart has no series.
+A chart can draw one of the timeline's [measures](measures.md) instead of the moments' count ([#575](https://github.com/openchronology/timeline-app/issues/575)): `{ "kind": "measure", "measure": "cost" }`, with an optional color `setting` as above. The curve is the measure's total across the view as a rate, highest where it is largest. Each summary weighs as much as its total, read from the view's summaries as counts are. A total below zero counts as zero, and a measure chart has no series.
 
 A balance chart draws a measure's running balance instead ([#595](https://github.com/openchronology/timeline-app/issues/595)): `{ "kind": "balance", "measure": "cost" }`, for a measure with a balance. It is a step line, level between changes and stepping at each summary. It runs from the balance before the view's changes to the balance after them, scaled to the view's highest and lowest balances, and filled to zero. Nothing is drawn when the measure has no balance, or in a comparison.
+
+Every enabled measure and balance chart is drawn, over the moments chart and in plugin order, each on its own scale and in its own color. Each has a value axis on the timeline's right edge, side by side, in the chart's color:
+
+- **Title:** the measure's label. A measure chart's says what its rate is per: the time axis's labelled step, such as `Spending per 10 years`.
+- **Values:** round values (1, 2 or 5 times a power of ten) at their heights, written in the measure's format and abbreviated, such as `$2T`.
+  - **Balance chart:** from the view's lowest balance to its highest.
+  - **Measure chart:** from zero to its highest rate.
+- **The lower corner:** values that would meet the balance readout there are left out.
 
 ## Timeline theme
 

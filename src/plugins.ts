@@ -1322,6 +1322,51 @@ export function pluginChart(plugins: readonly InstalledPlugin[] = []): {
     }
   return chart;
 }
+/**
+ * The charts drawn behind the timeline: the moments chart, the last enabled plugin's of kind
+ * `moments` (with its series), and every enabled measure (#575) and balance (#595) chart, in
+ * plugin order, each with its own color and value axis.
+ */
+export function pluginCharts(plugins: readonly InstalledPlugin[] = []): {
+  moments: {
+    color: string | null;
+    series: { label: string; tags: string[]; color: string }[];
+  } | null;
+  measures: {
+    kind: 'measure' | 'balance';
+    measure: string;
+    color: string | null;
+    plugin: string;
+  }[];
+} {
+  let moments: ReturnType<typeof pluginCharts>['moments'] = null;
+  const measures: ReturnType<typeof pluginCharts>['measures'] = [];
+  for (const { manifest, enabled, settings } of plugins) {
+    if (!enabled || !manifest.chart) continue;
+    const color = (key: string | undefined) => {
+      const setting = manifest.settings?.find((s) => s.key === key);
+      return (setting && settingValue(setting, settings?.[setting.key])) || null;
+    };
+    const chart = manifest.chart;
+    if (chart.kind === 'moments')
+      moments = {
+        color: color(chart.setting),
+        series: (chart.series ?? []).map((s) => ({
+          label: s.label,
+          tags: s.tags,
+          color: color(s.setting) ?? s.color,
+        })),
+      };
+    else
+      measures.push({
+        kind: chart.kind,
+        measure: chart.measure,
+        color: color(chart.setting),
+        plugin: manifest.id,
+      });
+  }
+  return { moments, measures };
+}
 /** The measure markers and summaries are sized by (#575): the last enabled plugin's, or null. */
 export function pluginSizeMeasure(plugins: readonly InstalledPlugin[] = []): string | null {
   let measure: string | null = null;

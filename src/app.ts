@@ -131,13 +131,15 @@ import {
   arrowsToward,
   pluginDrawsArrows,
   pluginBackdrop,
-  pluginChart,
+  pluginCharts,
   momentDensity,
   stackedCurves,
   chartPaths,
   balanceSteps,
   stepPaths,
   rationalNumber,
+  axisTicks,
+  CHART_STEP,
   newerRelease,
   pluginTheme,
   settingValue,
@@ -13565,7 +13567,8 @@ function renderTimelineBackdrop(host: HTMLElement) {
   return !!timelineBackdrop;
 }
 type ChartPaths = { area: SVGPathElement; line: SVGPathElement };
-let timelineChart: (ChartPaths & { svg: SVGSVGElement; series: ChartPaths[] }) | null = null;
+let timelineChart:
+  (ChartPaths & { svg: SVGSVGElement; series: ChartPaths[]; measures: ChartPaths[] }) | null = null;
 type ChartGroups = Pick<FrameGroup, 'first' | 'last' | 'count'>[];
 /**
  * A chart's series' moments in view (#434), each moment in the first series holding one of its
@@ -13593,50 +13596,115 @@ function chartSeriesGroups(series: readonly (readonly string[])[]): ChartGroups[
   return groups;
 }
 /**
- * The background chart (#289): the view's moments as a smooth curve over the stage's lower
- * part, above the backgrounds and beneath the axis and markers. Its highest point is where
- * they are most numerous in view. A chart's series (#434) are curves beneath it, each relative
- * to the total, so where one meets the total all the moments there are in it.
+ * The background charts. The moments chart (#289): the view's moments as a smooth curve over
+ * the stage's lower part, above the backgrounds and beneath the axis and markers, its highest
+ * point where they are most numerous in view, with its series (#434) as curves beneath it,
+ * each relative to the total. And every enabled measure chart (#575), a measure's totals as a
+ * rate across the view, and balance chart (#595), its running balance as steps, each on its
+ * own scale, with a value axis on the right (renderChartAxes).
  */
 function renderBackgroundChart(host: HTMLElement) {
-  const chart = pluginChart(installedPlugins());
+  const charts = pluginCharts(installedPlugins());
   const x = (time: string) => viewport.x(parsedTime(time), width()),
     spread = Math.max(24, 2 * pixels());
-  // A measure chart (#575) weighs each group by its total of the measure (none below zero),
-  // and each duration drawn as a band by its own value, at its start (#576).
-  const weight = (text: string | undefined) => {
-    const total = text ? Q.parse(text.includes('/') ? text : text + '/1') : Q.zero;
-    return String(total.compare(Q.zero) > 0 ? total.toApproximateNumber() : 0);
-  };
-  const charted = chart?.measure
-    ? [
+  const full = stageWidth(),
+    height = stageHeight(),
+    top = height * 0.2;
+  const density = charts.moments ? momentDensity(frame.groups, x, width(), spread) : null;
+  const most = density ? Math.max(...density) : 0;
+  const measures = timelineMeasures();
+  // Each measure chart's paths, and its axis: its range in stored units, from `low` at the
+  // stage's foot to `high` at `top`, and what one unit of its height is.
+  const layers: {
+    kind: 'measure' | 'balance';
+    color: string | null;
+    paths: { line: string; area: string };
+    axis: { measure: string; low: number; high: number; per?: { interval: Q; name: string } };
+  }[] = [];
+  let rate: { interval: Q; name: string } | null | undefined;
+  for (const chart of charts.measures) {
+    if (chart.kind === 'balance') {
+      // A balance chart draws the measure's running balance across the view, as steps.
+      const balance = shownBalances()?.[chart.measure];
+      const steps =
+        balance && !comparison
+          ? balanceSteps(
+              frame.groups,
+              chart.measure,
+              rationalNumber(balance.before),
+              rationalNumber(balance.after),
+              x,
+              width(),
+            )
+          : null;
+      if (steps)
+        layers.push({
+          kind: 'balance',
+          color: chart.color,
+          paths: stepPaths(steps.steps, steps.zero, inset(), width(), top, height),
+          axis: { measure: chart.measure, low: steps.low, high: steps.high },
+        });
+      continue;
+    }
+    // A measure chart weighs each group by its total of the measure (none below zero), and
+    // each duration drawn as a band by its own value, at its start (#576). Its height is the
+    // measure per CHART_STEP pixels, so per the ruler's labelled step on its axis.
+    const weight = (text: string | undefined) => {
+      const total = text ? Q.parse(text.includes('/') ? text : text + '/1') : Q.zero;
+      return String(total.compare(Q.zero) > 0 ? total.toApproximateNumber() : 0);
+    };
+    const values = momentDensity(
+      [
         ...frame.groups.map((g) => ({
           first: g.first,
           last: g.last,
-          count: weight(g.totals?.[chart.measure!]),
+          count: weight(g.totals?.[chart.measure]),
         })),
         ...(frame.durations ?? []).map((band) => {
           const values = band.metadata.measures as Record<string, string> | undefined;
-          return { first: band.first, last: band.first, count: weight(values?.[chart.measure!]) };
+          return { first: band.first, last: band.first, count: weight(values?.[chart.measure]) };
         }),
-      ]
-    : frame.groups;
-  // A balance chart (#595) draws the measure's running balance across the view, as steps.
-  const balance = chart?.balance ? shownBalances()?.[chart.balance] : undefined;
-  const steps =
-    chart?.balance && balance && !comparison
-      ? balanceSteps(
-          frame.groups,
-          chart.balance,
-          rationalNumber(balance.before),
-          rationalNumber(balance.after),
-          x,
-          width(),
-        )
-      : null;
-  const density = chart && !chart.balance ? momentDensity(charted, x, width(), spread) : null;
-  const most = density ? Math.max(...density) : 0;
-  if (!chart || (chart.balance ? !steps : !(most > 0))) {
+      ],
+      x,
+      width(),
+      spread,
+    );
+    const peak = values ? Math.max(...values) : 0;
+    if (!values || !(peak > 0)) continue;
+    rate ??= rulerStep();
+    // Stored units per CHART_STEP pixels, as stored units per the ruler's step.
+    const perStep = rate
+      ? rate.interval.div(viewport.span).toApproximateNumber() * (width() / CHART_STEP)
+      : 1;
+    layers.push({
+      kind: 'measure',
+      color: chart.color,
+      paths: chartPaths(
+        values.map((v) => v / peak),
+        inset(),
+        width(),
+        top,
+        height,
+      ),
+      axis: {
+        measure: chart.measure,
+        low: 0,
+        high: peak * perStep,
+        ...(rate ? { per: rate } : {}),
+      },
+    });
+  }
+  renderChartAxes(
+    host,
+    measures
+      ? layers
+          .filter((layer) => measures[layer.axis.measure])
+          .map((layer) => ({ ...layer.axis, color: layer.color }))
+      : [],
+    top,
+    height,
+  );
+  if (!(charts.moments && most > 0) && !layers.length) {
     timelineChart?.svg.remove();
     timelineChart = null;
     return;
@@ -13654,56 +13722,145 @@ function renderBackgroundChart(host: HTMLElement) {
     svg.classList.add('timeline-chart');
     const total = paths('');
     svg.append(total.area, total.line);
-    timelineChart = { svg, ...total, series: [] };
+    timelineChart = { svg, ...total, series: [], measures: [] };
   }
   const { svg, area, line } = timelineChart;
   // Above the durations' backgrounds, whose z-indexes count up from 1.
   if (svg.parentNode !== host || host.lastChild !== svg) host.append(svg);
-  const full = stageWidth(),
-    height = stageHeight(),
-    top = height * 0.2;
   svg.setAttribute('viewBox', `0 0 ${full} ${height}`);
-  svg.style.color = chart.color ?? '';
-  const total = steps
-    ? stepPaths(steps.steps, steps.zero, inset(), width(), top, height)
-    : chartPaths(
+  const moments = charts.moments && most > 0 ? charts.moments : null;
+  svg.style.color = moments?.color ?? '';
+  const total = moments
+    ? chartPaths(
         density!.map((v) => v / most),
         inset(),
         width(),
         top,
         height,
-      );
-  area.setAttribute('d', total.area);
-  line.setAttribute('d', total.line);
-  svg.classList.toggle('balance', !!steps);
+      )
+    : null;
+  area.setAttribute('d', total?.area ?? '');
+  line.setAttribute('d', total?.line ?? '');
   // The series between the total's area and its line, in the plugin's order.
-  while (timelineChart.series.length > chart.series.length) {
+  const series = moments?.series ?? [];
+  while (timelineChart.series.length > series.length) {
     const gone = timelineChart.series.pop()!;
     gone.area.remove();
     gone.line.remove();
   }
-  while (timelineChart.series.length < chart.series.length) {
+  while (timelineChart.series.length < series.length) {
     const added = paths('series-');
     line.before(added.area, added.line);
     timelineChart.series.push(added);
   }
   // Stacked in the plugin's order: each series' band lies on those before it.
   const stacked = stackedCurves(
-    chartSeriesGroups(chart.series.map((series) => series.tags)),
+    chartSeriesGroups(series.map((s) => s.tags)),
     x,
     width(),
     spread,
     most,
   );
-  chart.series.forEach((series, i) => {
+  series.forEach((s, i) => {
     const drawn = timelineChart!.series[i],
       values = stacked[i];
-    drawn.area.style.color = drawn.line.style.color = series.color;
-    drawn.line.dataset.series = series.label;
+    drawn.area.style.color = drawn.line.style.color = s.color;
+    drawn.line.dataset.series = s.label;
     const d = values ? chartPaths(values.top, inset(), width(), top, height, values.floor) : null;
     drawn.area.setAttribute('d', d?.area ?? '');
     drawn.line.setAttribute('d', d?.line ?? '');
   });
+  // The measure and balance charts over the moments chart, in plugin order.
+  while (timelineChart.measures.length > layers.length) {
+    const gone = timelineChart.measures.pop()!;
+    gone.area.remove();
+    gone.line.remove();
+  }
+  while (timelineChart.measures.length < layers.length) {
+    const added = paths('measure-');
+    svg.append(added.area, added.line);
+    timelineChart.measures.push(added);
+  }
+  layers.forEach((layer, i) => {
+    const drawn = timelineChart!.measures[i];
+    drawn.area.style.color = drawn.line.style.color = layer.color ?? '';
+    drawn.line.classList.toggle('balance', layer.kind === 'balance');
+    drawn.line.dataset.measure = layer.axis.measure;
+    drawn.area.setAttribute('d', layer.paths.area);
+    drawn.line.setAttribute('d', layer.paths.line);
+  });
+}
+/**
+ * The ruler's labelled step (#575): the time a measure chart's rate is per, such as a year or
+ * 10 years, with its name; null when the ruler can't be planned.
+ */
+function rulerStep(): { interval: Q; name: string } | null {
+  try {
+    const rules = timelinePresenter().rules(viewContext('axis'));
+    const labelled = rules.ticks.find((tick) => tick.labels.length)?.labels[0];
+    return labelled && labelled.interval.compare(Q.zero) > 0
+      ? { interval: labelled.interval, name: rules.graduation }
+      : null;
+  } catch {
+    return null;
+  }
+}
+let chartAxes: HTMLElement | null = null;
+/**
+ * A value axis for each measure and balance chart (#595), side by side at the stage's right
+ * edge, in the chart's color: its measure's label (a measure chart's per the ruler's step) and
+ * round values printed in the measure's format, abbreviated, at their heights. Values that
+ * would meet the balance readout in the lower corner are left out.
+ */
+function renderChartAxes(
+  host: HTMLElement,
+  axes: {
+    measure: string;
+    color: string | null;
+    low: number;
+    high: number;
+    per?: { interval: Q; name: string };
+  }[],
+  top: number,
+  base: number,
+) {
+  const measures = timelineMeasures();
+  if (!axes.length || !measures) {
+    chartAxes?.remove();
+    chartAxes = null;
+    return;
+  }
+  if (!chartAxes) {
+    chartAxes = document.createElement('div');
+    chartAxes.className = 'chart-axes';
+  }
+  if (chartAxes.parentNode !== host) host.append(chartAxes);
+  chartAxes.style.right = `${(stageWidth() - inset() - width()) / uiScale}px`;
+  const columns = axes.map((axis) => {
+    const presenter = measurePresenter(measures, axis.measure);
+    const label = measureLabel(measures, axis.measure);
+    const column = document.createElement('div');
+    column.className = 'chart-axis';
+    column.dataset.measure = axis.measure;
+    if (axis.color) column.style.color = axis.color;
+    const title = document.createElement('span');
+    title.className = 'chart-axis-title';
+    title.textContent = axis.per ? `${label} per ${axis.per.name}` : label;
+    title.style.marginTop = `${(top - 20) / uiScale}px`;
+    column.append(title);
+    for (const tick of axisTicks(axis.low, axis.high)) {
+      const y = base - tick.at * (base - top);
+      // Clear of the balance readout in the lower corner.
+      if (y > base - 28 * uiScale) continue;
+      const value = document.createElement('span');
+      value.className = 'chart-axis-value';
+      value.textContent = presenter.print(tick.value, 'axis');
+      value.style.top = `${y / uiScale}px`;
+      column.append(value);
+    }
+    return column;
+  });
+  chartAxes.replaceChildren(...columns);
 }
 /**
  * The balances at the view's edges (#595): the frame's are at the edges of the window it was

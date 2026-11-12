@@ -142,8 +142,8 @@ export function chartPaths(
 /**
  * A measure's balance across the view (#595) as steps: from `before` at the view's start, each
  * group's change applied at its middle (as momentDensity places its moments), to `after`. Points are [x, value], relative from 0 (the lowest balance in view, or zero
- * when that is higher) to 1 (the highest, or zero when that is lower). Null when it stays flat
- * at zero.
+ * when that is higher) to 1 (the highest, or zero when that is lower), which `low` and `high`
+ * give for its axis. Null when it stays flat at zero.
  */
 export function balanceSteps(
   groups: readonly Pick<FrameGroup, 'first' | 'last' | 'balanceAfter'>[],
@@ -152,7 +152,7 @@ export function balanceSteps(
   after: number,
   x: (time: string) => number,
   width: number,
-): { steps: [number, number][]; zero: number } | null {
+): { steps: [number, number][]; zero: number; low: number; high: number } | null {
   if (!(width > 0)) return null;
   const raw: [number, number][] = [[0, before]];
   for (const group of groups) {
@@ -168,7 +168,28 @@ export function balanceSteps(
     high = Math.max(0, ...values);
   if (!(high > low)) return null;
   const scale = (v: number) => (v - low) / (high - low);
-  return { steps: raw.map(([at, v]) => [at, scale(v)]), zero: scale(0) };
+  return { steps: raw.map(([at, v]) => [at, scale(v)]), zero: scale(0), low, high };
+}
+/**
+ * A chart's value axis (#595): round values from `low` to `high`, about `count` steps apart,
+ * each 1, 2 or 5 times a power of ten, so the measure's format prints them cleanly. Exact
+ * rationals, with `at` their place from 0 (`low`) to 1 (`high`). None for an empty range.
+ */
+export function axisTicks(low: number, high: number, count = 4): { value: Q; at: number }[] {
+  if (!(high > low) || !Number.isFinite(low) || !Number.isFinite(high)) return [];
+  const raw = (high - low) / count,
+    power = Math.floor(Math.log10(raw)),
+    base = raw / 10 ** power;
+  const m = base <= 1 ? 1 : base <= 2 ? 2 : base <= 5 ? 5 : 10;
+  const step =
+    power >= 0
+      ? Q.from(BigInt(m) * 10n ** BigInt(power))
+      : Q.from(BigInt(m), 10n ** BigInt(-power));
+  const size = m * 10 ** power;
+  const ticks: { value: Q; at: number }[] = [];
+  for (let k = Math.ceil(low / size - 1e-9); k <= Math.floor(high / size + 1e-9); k++)
+    ticks.push({ value: step.mul(Q.from(BigInt(k))), at: (k * size - low) / (high - low) });
+  return ticks;
 }
 /** Canonical rational text ("-7/2", "12") as an approximate number. */
 export function rationalNumber(text: string) {
