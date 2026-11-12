@@ -13792,11 +13792,15 @@ function renderBackgroundChart(host: HTMLElement) {
 }
 /**
  * The ruler's labelled step (#575): the time a measure chart's rate is per, such as a year or
- * 10 years, with its name; null when the ruler can't be planned.
+ * 10 years, with its name; null when the ruler can't be planned. Planned at the items' natural
+ * size, so resizing them (Ctrl and the wheel) doesn't change the rate the axes show.
  */
 function rulerStep(): { interval: Q; name: string } | null {
   try {
-    const rules = timelinePresenter().rules(viewContext('axis'));
+    const rules = timelinePresenter().rules({
+      ...viewContext('axis'),
+      textScale: textScales().measure,
+    });
     const labelled = rules.ticks.find((tick) => tick.labels.length)?.labels[0];
     return labelled && labelled.interval.compare(Q.zero) > 0
       ? { interval: labelled.interval, name: rules.graduation }

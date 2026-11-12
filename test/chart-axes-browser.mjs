@@ -118,5 +118,38 @@ export async function checkChartAxes(page) {
       ['spend', false, true],
     ],
   );
+  // Resizing the items (Ctrl and the wheel) changes neither axis: the rate stays per the same
+  // time, and the values stay where they were.
+  const box = await page.locator('#timeline-stage').boundingBox();
+  await page.mouse.move(box.x + box.width / 2, box.y + box.height / 2);
+  for (const [delta, larger] of [
+    [-400, true],
+    [800, false],
+  ]) {
+    await page.keyboard.down('Control');
+    await page.mouse.wheel(0, delta);
+    await page.keyboard.up('Control');
+    await page.waitForFunction((larger) => {
+      const scale = Number(document.getElementById('timeline-stage').dataset.uiScale);
+      return larger ? scale > 1.5 : scale < 0.8;
+    }, larger);
+    const resized = await page.evaluate(() =>
+      [...document.querySelectorAll('.chart-axis')].map((column) => ({
+        title: column.querySelector('.chart-axis-title').textContent,
+        values: [...column.querySelectorAll('.chart-axis-value')].map((v) => v.textContent),
+      })),
+    );
+    assert.deepEqual(
+      resized.map((axis) => axis.title),
+      axes.map((axis) => axis.title),
+    );
+    // Values the readout would meet may be left out, but the others are the same.
+    for (const [i, axis] of resized.entries())
+      for (const value of axis.values)
+        assert(
+          axes[i].values.some((v) => v.text === value),
+          `${value} was on the axis`,
+        );
+  }
   console.log('PASS chart axes: a balance and a measure chart together, each with its own axis.');
 }
