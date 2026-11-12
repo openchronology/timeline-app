@@ -148,13 +148,15 @@ A chart can draw one of the timeline's [measures](measures.md) instead of the mo
 
 A balance chart draws a measure's running balance instead ([#595](https://github.com/openchronology/timeline-app/issues/595)): `{ "kind": "balance", "measure": "cost" }`, for a measure with a balance. It is a step line, level between changes and stepping at each summary. It runs from the balance before the view's changes to the balance after them, scaled to the view's highest and lowest balances, and filled to zero. Nothing is drawn when the measure has no balance, or in a comparison.
 
-Every enabled measure and balance chart is drawn, over the moments chart and in plugin order, each on its own scale and in its own color. Each has a value axis on the timeline's right edge, side by side, in the chart's color:
+Every enabled measure and balance chart is drawn, over the moments chart and in plugin order, each on its own scale and in its own color. Each has a value axis on the timeline's right edge, side by side, in the chart's color, drawn above the moments so cards never hide it:
 
-- **Title:** the measure's label. A measure chart's says what its rate is per: the time axis's labelled step, such as `Spending per 10 years`.
-- **Values:** round values (1, 2 or 5 times a power of ten) at their heights, written in the measure's format and abbreviated, such as `$2T`.
+- **Title:** the measure's label. A measure chart's says what its rate is per: the time axis's labelled step, such as `Spending per 10 years`. The step is planned at the moments' natural size, so resizing them (Ctrl and the wheel) changes neither the rate nor the axis.
+- **Values:** round values (1, 2, 2.5 or 5 times a power of ten), about every 36 pixels of the chart's height, written in the measure's format and abbreviated, such as `$2T`.
   - **Balance chart:** from the view's lowest balance to its highest.
   - **Measure chart:** from zero to its highest rate.
 - **The lower corner:** values that would meet the balance readout there are left out.
+
+With the mouse over the charts (not over a moment), a balance chart reads out where the mouse is: a dashed line marks the time, a dot sits on each balance's line, and a box beside the mouse gives the time and each balance there exactly, as the chart draws it, in the measure's format.
 
 ## Timeline theme
 
