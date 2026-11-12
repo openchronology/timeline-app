@@ -203,14 +203,14 @@ export async function checkMobileToolbars(page) {
     await phone.keyboard.press('Enter');
     assert(await tools.open());
     const focused = () => phone.evaluate(() => document.activeElement?.id);
-    assert.equal(await focused(), 'separate-button');
+    assert.equal(await focused(), 'layers-button');
     await phone.keyboard.press('ArrowDown');
-    assert.equal(await focused(), 'presentation-button');
-    await phone.keyboard.press('ArrowUp');
-    await phone.keyboard.press('ArrowUp');
-    assert.notEqual(await focused(), 'separate-button', 'Arrows wrap around');
-    await phone.keyboard.press('Home');
     assert.equal(await focused(), 'separate-button');
+    await phone.keyboard.press('ArrowUp');
+    await phone.keyboard.press('ArrowUp');
+    assert.notEqual(await focused(), 'layers-button', 'Arrows wrap around');
+    await phone.keyboard.press('Home');
+    assert.equal(await focused(), 'layers-button');
     await phone.keyboard.press('Escape');
     assert.equal(await tools.open(), false);
 

@@ -1331,6 +1331,7 @@ export function pluginCharts(plugins: readonly InstalledPlugin[] = []): {
   moments: {
     color: string | null;
     series: { label: string; tags: string[]; color: string }[];
+    plugin: string;
   } | null;
   measures: {
     kind: 'measure' | 'balance';
@@ -1356,6 +1357,7 @@ export function pluginCharts(plugins: readonly InstalledPlugin[] = []): {
           tags: s.tags,
           color: color(s.setting) ?? s.color,
         })),
+        plugin: manifest.id,
       };
     else
       measures.push({

@@ -116,7 +116,7 @@ Type the bounds the way the timeline's display writes times. To see and type the
 
 ### On a phone
 
-On a narrow screen the toolbars keep one row each. Above the title are **View mode** (for those who can edit), the main action, such as **Save to server**, and **File**, which holds **Import**, **Export**, **Import .och** and **Export .och ↗**. Above the timeline are **−**, **＋**, **Fit all**, full screen (the corners icon), **＋ Event** and **Tools**. The search bar stays beneath them, the width of the screen. **Tools** holds the rest: **Separate**, **Time display**, **Plugins**, **Compare**, **Center axis**, **Help**, the text size (**A−** and **A＋**), **Follow latest moments**, **Group within**, and **Clear selection** once a time is selected. A menu closes when you choose an action, tap outside it or press Escape. In full screen the timeline takes all of the screen but that one row.
+On a narrow screen the toolbars keep one row each. Above the title are **View mode** (for those who can edit), the main action, such as **Save to server**, and **File**, which holds **Import**, **Export**, **Import .och** and **Export .och ↗**. Above the timeline are **−**, **＋**, **Fit all**, full screen (the corners icon), **＋ Event** and **Tools**. The search bar stays beneath them, the width of the screen. **Tools** holds the rest: **Show**, **Separate**, **Time display**, **Plugins**, **Compare**, **Center axis**, **Help**, the text size (**A−** and **A＋**), **Follow latest moments**, **Group within**, and **Clear selection** once a time is selected. A menu closes when you choose an action, tap outside it or press Escape. In full screen the timeline takes all of the screen but that one row.
 
 ### What markers show
 
@@ -125,6 +125,10 @@ On a narrow screen the toolbars keep one row each. Above the title are **View mo
 - **A band** is a duration. A duration too short to draw at the current zoom is summarized like a moment, and becomes a band again as you zoom in ([summaries](durations.md#summaries)).
 - **An arc** above the axis is a relationship between two things.
 - **A yellow line** is the time you selected by clicking empty space. New moments go there.
+
+### Showing and hiding parts
+
+**Show** in the toolbar opens a switch for each part of the timeline: its **Moments** (with their summaries and stacks), **Durations**, their **Backgrounds**, **Relationships**, and the **Balances at the edges**. Under **Charts** is a switch for each chart the timeline draws: the moments chart and each measure's chart, with a swatch of its color and the plugin that draws it, if one does. A plugin that draws a chart needs nothing more to appear there. Switches take effect at once, and **Show all** turns them all back on. While anything is hidden, the button counts it. Hiding changes only what this browser tab shows: the timeline, its exports and other readers see everything, and the tab keeps your choices, for every timeline you open in it, until it closes.
 
 Over a server timeline that keeps growing, **Follow latest moments** keeps the newest moments in view, once you have stopped moving around for 15 seconds.
 

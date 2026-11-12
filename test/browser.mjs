@@ -9,6 +9,7 @@ import { checkRangeDelete } from './range-delete-browser.mjs';
 import { checkTimeMap } from './time-map-browser.mjs';
 import { checkMeasures } from './measures-browser.mjs';
 import { checkChartAxes } from './chart-axes-browser.mjs';
+import { checkLayers } from './layers-browser.mjs';
 import { checkHelp } from './help-browser.mjs';
 import { checkDurationBackgrounds } from './duration-backgrounds-browser.mjs';
 import { checkBackgroundChart } from './background-chart-browser.mjs';
@@ -345,6 +346,7 @@ try {
   await checkTimeMap(page, document);
   await checkMeasures(page);
   await checkChartAxes(page);
+  await checkLayers(page);
   await checkHelp(page);
   await checkDurationBackgrounds(page, document);
   await checkBackgroundChart(page, document);
