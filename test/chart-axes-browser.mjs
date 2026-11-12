@@ -4,6 +4,7 @@
 // ruler's labelled step, both in their measure's format and their plugin's color.
 import assert from 'node:assert/strict';
 import { closeMomentDetails } from './moment-dialog-browser.mjs';
+import { separateBy } from './tags-browser.mjs';
 import { BACKGROUND_CHART, DEFAULT_PRESENTATION } from '../dist/core.mjs';
 
 export async function checkChartAxes(page) {
@@ -22,6 +23,7 @@ export async function checkChartAxes(page) {
       time: year(y),
       metadata: {
         title: `${y}`,
+        ...(y >= 1900 ? { tags: ['modern'] } : {}),
         measures: {
           debt: String(BigInt(Math.round(1e6 * 1.06 ** (y - 1800))) * 100n),
           spend: String(BigInt(Math.round(2e5 * 1.05 ** (y - 1800))) * 100n),
@@ -46,7 +48,7 @@ export async function checkChartAxes(page) {
             type: 'mpz',
             label: 'Federal debt',
             presentation: dollars,
-            balance: { at: 'start', value: '0' },
+            balance: { at: 'start', value: '100' },
           },
           spend: { type: 'mpz', label: 'Spending', presentation: dollars },
           // No chart plugin: charted by itself (#612), in its place's color.
@@ -76,7 +78,7 @@ export async function checkChartAxes(page) {
   await page.waitForFunction(
     () =>
       document.querySelector('.balance-readout .balance-end')?.textContent ===
-        'Federal debt $3,909,956,292,398.00' &&
+        'Federal debt $3,909,956,292,399.00' &&
       document.querySelectorAll('.chart-axis').length === 3,
   );
   const axes = await page.evaluate(() =>
@@ -212,10 +214,56 @@ export async function checkChartAxes(page) {
   });
   await row.locator('.measure-chart').selectOption('off');
   await page.locator('#measures-save').click();
+  await page.locator('#measures-dialog').waitFor({ state: 'hidden' });
   await page.waitForFunction(
     () =>
       document.querySelectorAll('.chart-axis').length === 2 &&
       !document.querySelector('.chart-axis[data-measure=interest]'),
   );
+  // Separated (#612), each track charts its own moments' measures in its own row, on its own
+  // axes: the debt's balance on each side counts only that side's changes, the opening $1.00
+  // staying with everything else, so at any time the two add up to the whole timeline's.
+  const stageBox = await page.locator('#timeline-stage').boundingBox();
+  const at = stageBox.x + stageBox.width * 0.6;
+  const debtAt = async (y) => {
+    await page.mouse.move(at, y);
+    await page.waitForSelector('.chart-tooltip .chart-tooltip-value[data-measure=debt]');
+    const text = await page.locator('.chart-tooltip-value[data-measure=debt]').textContent();
+    await page.mouse.move(0, 0);
+    await page.waitForFunction(() => !document.querySelector('.chart-tooltip'));
+    return BigInt(text.replace(/[^\d]/g, ''));
+  };
+  const whole = await debtAt(stageBox.y + stageBox.height * 0.28);
+  await separateBy(page, ['modern']);
+  await page.waitForFunction(
+    () =>
+      document.querySelectorAll('.chart-axes-band').length === 2 &&
+      [...document.querySelectorAll('.chart-axes-band')].every(
+        (band) => band.querySelectorAll('.chart-axis').length === 2,
+      ),
+  );
+  const bands = await page.evaluate(() =>
+    [...document.querySelectorAll('.chart-axes-band')].map((band) => {
+      const title = band.querySelector('.chart-axis-title');
+      return {
+        top: parseFloat(title.style.top),
+        height: parseFloat(title.style.height),
+        measures: [...band.querySelectorAll('.chart-axis')].map((a) => a.dataset.measure),
+      };
+    }),
+  );
+  for (const band of bands) assert.deepEqual(band.measures, ['debt', 'spend']);
+  assert(bands[0].top + bands[0].height <= bands[1].top, JSON.stringify(bands));
+  // The stage grows to show both tracks.
+  const separated = await page.locator('#timeline-stage').boundingBox();
+  const sides = [];
+  for (const band of bands) sides.push(await debtAt(separated.y + band.top + 6));
+  assert(
+    sides.every((side) => side > 0n && side < whole),
+    String(sides),
+  );
+  assert.equal(sides[0] + sides[1], whole);
+  await page.locator('#separation-rejoin').click();
+  await page.waitForFunction(() => document.querySelectorAll('.chart-axes-band').length === 1);
   console.log('PASS chart axes: a balance and a measure chart together, each with its own axis.');
 }

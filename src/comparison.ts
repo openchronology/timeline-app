@@ -473,6 +473,8 @@ export class ComparisonView {
     const time = (t: string) => Q.parse(t).mul(track.scale).add(track.offset).toString();
     return {
       ...frame,
+      // Its balances are its own (#612): kept by track when the frames are joined.
+      ...(frame.balances ? { trackBalances: { [track.source.key]: frame.balances } } : {}),
       edges: frame.edges?.map((e) => ({
         ...e,
         id: track.source.key + ':' + e.id,
@@ -528,6 +530,9 @@ export class ComparisonView {
       edgesTruncated: frames.some((f) => f.edgesTruncated),
       groups: frames.flatMap((f) => f.groups),
       visitedNodes: frames.reduce((n, f) => n + f.visitedNodes, 0),
+      ...(frames.some((f) => f.trackBalances)
+        ? { trackBalances: Object.assign({}, ...frames.map((f) => f.trackBalances ?? {})) }
+        : {}),
     };
     if (!this.combined) return frame;
     // Combined, groups of several timelines merge; their measures belong each to its own
