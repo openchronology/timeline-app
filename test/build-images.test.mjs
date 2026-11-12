@@ -161,3 +161,13 @@ test("the PostgreSQL CI image starts from the browser jobs' Playwright image", a
   assert.match(base, /^mcr\.microsoft\.com\/playwright:v[\d.]+-noble@sha256:[0-9a-f]{64}$/);
   assert(ci.includes(`image: ${base}\n`), base);
 });
+
+test("the benchmarks run in the published PostgreSQL CI image, on GitHub's runner", async () => {
+  const bench = await readFile('.github/workflows/bench.yml', 'utf8');
+  assert.match(bench, /--find postgres-ci >> "\$GITHUB_OUTPUT"/);
+  assert.match(bench, /image: \$\{\{ needs\.image\.outputs\.image \}\}/);
+  assert.match(bench, /run: och-ci-postgres\n/);
+  assert.doesNotMatch(bench, /--push/);
+  assert.doesNotMatch(bench.replace(/^\s*#.*$/gm, ''), /\bsudo\b|apt-get|--with-deps|rustup/);
+  assert.doesNotMatch(bench, /och-heavy/);
+});

@@ -31,7 +31,7 @@ npm run bench:report   # rebuild the report from existing results
 
 Use a dedicated database. Seeding creates a `bench` user (with quota bypass) and replaces that user's timelines; nothing else is touched. Opening 200,000-moment timelines in a throttled browser takes minutes per sample, so a run at the default sizes takes about an hour. `BENCH_SIZES=1000,10000` finishes in a few minutes. The capacity measurements need Chromium (`npx playwright install chromium`); without it they are skipped.
 
-The [Benchmarks workflow](../.github/workflows/bench.yml) runs the suite on demand (**Actions → Benchmarks → Run workflow**) at 1,000, 10,000, 50,000, 100,000 and 200,000 moments by default, against a fresh PostgreSQL 16 with native `pgmp`, and uploads `bench/results/` as the `benchmark-report` artifact. Hosted runners share hardware, so compare backends and sizes within one run rather than absolute numbers across runs.
+The [Benchmarks workflow](../.github/workflows/bench.yml) runs the suite on demand (**Actions → Benchmarks → Run workflow**) at 1,000, 10,000, 50,000, 100,000 and 200,000 moments by default, against a fresh PostgreSQL 16 with native `pgmp` in the published [PostgreSQL CI image](../deploy/postgres-ci/README.md) (#605), on GitHub's runner, and uploads `bench/results/` as the `benchmark-report` artifact. Hosted runners share hardware, so compare backends and sizes within one run rather than absolute numbers across runs.
 
 ## Seeds
 
