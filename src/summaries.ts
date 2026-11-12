@@ -80,6 +80,12 @@ export function coalesceGroups(groups: readonly FrameGroup[], threshold: Q): Fra
         ...(durations ? { durationCount: durations.toString() } : {}),
         ...(totals ? { totals } : {}),
         ...(sourceTotals && Object.keys(sourceTotals).length ? { sourceTotals } : {}),
+        // Balances run in time order (#595), so the merged summary's balance after its changes
+        // is the later one's; one without (such as a resolved ongoing duration's, with no
+        // changes of its own) leaves the earlier one's.
+        ...((group.balanceAfter ?? prev.balanceAfter)
+          ? { balanceAfter: group.balanceAfter ?? prev.balanceAfter }
+          : {}),
       };
     } else out.push(group);
   }

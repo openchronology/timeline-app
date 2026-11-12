@@ -155,6 +155,45 @@ export function groupBalances<G extends { totals?: Record<string, string> }>(
   });
 }
 
+/**
+ * The balances at a view's edges (#595), from a window fetched around it. A server's or desktop
+ * file's window is wider than the view, and the editor shows cached windows while it zooms and
+ * pans, so the window's own balances are at its edges, not the view's. Each summary carries the
+ * running balance after its changes, which span from its first time to the next summary's
+ * (partitionTotals). The view's balance before is the last one whose span ends by `left`, else
+ * the window's; after, the last one whose span starts by `right`. Both are exact at span
+ * boundaries; an edge within a span takes that whole span on the side of the view. Summaries
+ * that carry no balance (such as ones unsaved edits changed) are passed over, and a view of
+ * only such keeps the window's balance after.
+ */
+export function viewBalances(
+  groups: readonly { first: string; balanceAfter?: Record<string, string> }[],
+  balances: Record<string, WindowBalance> | undefined,
+  left: Q,
+  right: Q,
+): Record<string, WindowBalance> | undefined {
+  if (!balances) return balances;
+  const firsts = groups.map((g) => Q.parse(g.first));
+  return Object.fromEntries(
+    Object.entries(balances).map(([name, window]) => {
+      let before = window.before,
+        after: string | undefined,
+        unknown = false;
+      groups.forEach((group, i) => {
+        const value = group.balanceAfter?.[name];
+        const next = firsts[i + 1];
+        if (next && next.compare(left) <= 0) {
+          if (value !== undefined) before = value;
+        } else if (firsts[i].compare(right) <= 0) {
+          if (value !== undefined) after = value;
+          else unknown = true;
+        }
+      });
+      return [name, { before, after: after ?? (unknown ? window.after : before) }];
+    }),
+  );
+}
+
 /** A duration's changes (#595): [time, values] at its start and end, as `measures` say. */
 export function durationContributions(
   band: { first: string; last: string; end?: unknown; metadata: Record<string, unknown> },
