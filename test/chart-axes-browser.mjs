@@ -79,7 +79,7 @@ export async function checkChartAxes(page) {
   await page.waitForFunction(
     () =>
       document.querySelector('.balance-readout .balance-end')?.textContent ===
-        'Federal debt $3,909,956,292,399.00' &&
+        'Federal debt $1,954,978,146,200.00' &&
       document.querySelectorAll('.chart-axis').length === 1,
   );
   // One axis at a time (#617), the first chart's, and a picker of the charted measures.
@@ -144,7 +144,7 @@ export async function checkChartAxes(page) {
   // every 36 pixels of the chart's height.
   assert.deepEqual(
     debt.values.map((v) => v.text),
-    ['$500B', '$1T', '$1.5T', '$2T', '$2.5T', '$3T', '$3.5T'],
+    ['$250B', '$500B', '$750B', '$1T', '$1.25T', '$1.5T', '$1.75T'],
   );
   // Above the moments: on the stage itself, after its layers of moments.
   assert(

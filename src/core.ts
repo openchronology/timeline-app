@@ -714,7 +714,10 @@ export class TimelineIndex {
     this.tally(event, -1);
     return true;
   }
-  /** Counts a moment in (or, -1, out of) the first chart series that holds one of its tags. */
+  /**
+   * Counts a moment in (or, -1, out of) the measures' totals and the first chart series that
+   * holds one of its tags.
+   */
   private tally(event: PointEvent, change: 1 | -1) {
     const totals = this.#momentTotals;
     if (totals) {
@@ -722,6 +725,10 @@ export class TimelineIndex {
       if (change > 0) totals.add(Q.parse(event.time), values);
       else totals.remove(Q.parse(event.time), values);
     }
+    this.chartTally(event, change);
+  }
+  /** Counts a moment in (or, -1, out of) the first chart series that holds one of its tags. */
+  private chartTally(event: PointEvent, change: 1 | -1) {
     if (!this.charted) return;
     const tags = entityTags(event.metadata),
       i = this.charted.wanted.findIndex((wanted) => tags.some((tag) => wanted.has(tag)));
@@ -752,7 +759,8 @@ export class TimelineIndex {
         wanted,
         counts: wanted.map(() => new RationalMap<number>((count) => BigInt(count))),
       };
-      for (const event of this.byId.values()) this.tally(event, 1);
+      // Only the series are new: the measures' totals already hold every moment.
+      for (const event of this.byId.values()) this.chartTally(event, 1);
     }
     return this.charted.counts.map((counts) =>
       counts

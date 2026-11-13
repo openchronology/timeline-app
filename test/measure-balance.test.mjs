@@ -263,3 +263,52 @@ test('an ongoing duration counted at its end applies nothing yet', () => {
   // balance shows it.
   assert.equal(frame.balances.cost.after, '4');
 });
+
+// Drawing a chart of tagged moments counts its series from every moment; it must not count
+// their measures again, which doubled every balance in the editor until the view next changed.
+test('charting tagged moments leaves the measures’ totals and balances as they were', () => {
+  const index = new TimelineIndex(
+    validateDocument({
+      format: 'openchronology',
+      version: 1,
+      title: 'Debt',
+      description: 'Charted debt.',
+      measures: validateMeasures({
+        debt: { type: 'mpz', label: 'Debt', balance: { at: 'start', value: '0' } },
+      }),
+      events: [
+        {
+          id: 'a',
+          time: '1/1',
+          metadata: { title: 'A', tags: ['war'], measures: { debt: '100' } },
+        },
+        { id: 'b', time: '2/1', metadata: { title: 'B', measures: { debt: '50' } } },
+        {
+          id: 'c',
+          time: '3/1',
+          metadata: { title: 'C', tags: ['war'], measures: { debt: '-30' } },
+        },
+      ],
+    }),
+  );
+  const view = new Viewport(q('0'), q('4'));
+  const before = index.frame(view, 400).balances;
+  assert.deepEqual(index.changeSum(undefined, undefined), { debt: '120' });
+  index.chartSeriesGroups([['war']], q('0'), q('4'), q('1/1000'));
+  assert.deepEqual(index.changeSum(undefined, undefined), { debt: '120' });
+  assert.deepEqual(index.frame(view, 400).balances, before);
+  assert.deepEqual(before.debt, { before: '0', after: '120' });
+  // And edits after the chart is drawn still count once in both.
+  index.put({
+    id: 'd',
+    time: '7/2',
+    metadata: { title: 'D', tags: ['war'], measures: { debt: '5' } },
+  });
+  assert.deepEqual(index.changeSum(undefined, undefined), { debt: '125' });
+  assert.equal(
+    index
+      .chartSeriesGroups([['war']], q('0'), q('4'), q('1/1000'))[0]
+      .reduce((n, g) => n + Number(g.count), 0),
+    3,
+  );
+});
