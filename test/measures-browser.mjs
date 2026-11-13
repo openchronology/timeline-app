@@ -121,6 +121,21 @@ export async function checkMeasures(page) {
   await reader.waitFor();
   assert.equal(await reader.locator('dt').first().textContent(), 'Cost');
   assert.equal(await reader.locator('dd').first().textContent(), '$1,234.56');
+  // On a phone, a long label wraps and leaves its value room on one line.
+  const phone = await page.evaluate(() => {
+    const box = document.createElement('div');
+    box.style.width = '326px';
+    box.innerHTML =
+      '<dl class="measure-list"><dt>Treasury intragovernmental holdings balance</dt>' +
+      '<dd><span>$1,287,301,055,524.27</span> USD</dd></dl>';
+    document.body.append(box);
+    const dt = box.querySelector('dt').getBoundingClientRect(),
+      value = box.querySelector('dd span').getClientRects();
+    box.remove();
+    return { label: dt.width, lines: value.length };
+  });
+  assert(phone.label <= 0.4 * 326 + 1, `label ${phone.label}px`);
+  assert.equal(phone.lines, 1, 'the value wraps');
   await input('reader-close').click();
   await input('inspector').waitFor({ state: 'hidden' });
   await input('view-mode').uncheck();
