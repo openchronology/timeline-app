@@ -4660,9 +4660,11 @@ body[data-warnings]:not([data-images-shown])
   gap: 4px;
   margin-bottom: 8px;
 }
+/* Labels take at most 40% of the width, so on a phone a long one ("Treasury intragovernmental
+   holdings balance") wraps rather than squeezing the values to a character a line. */
 .measure-list {
   display: grid;
-  grid-template-columns: max-content 1fr;
+  grid-template-columns: fit-content(40%) minmax(0, 1fr);
   gap: 4px 16px;
   margin: 0 0 12px;
   font-size: 14px;
@@ -4672,6 +4674,8 @@ body[data-warnings]:not([data-images-shown])
 }
 .measure-list dd {
   margin: 0;
+  min-width: 0;
+  overflow-wrap: break-word;
   font-variant-numeric: tabular-nums;
 }
 /* Summaries sized by a measure's total (#575). */
